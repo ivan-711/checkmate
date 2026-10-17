@@ -19,16 +19,17 @@ import csv
 import hashlib
 import json
 import random
-import unicodedata
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import date
 from pathlib import Path
 from uuid import UUID, uuid5
 
+from backend.ingest.blocking import swapped_day_month
 from backend.ingest.csvio import CsvPatient
 from backend.ingest.fhir import FhirPatientBundle
-from backend.ingest.normalize import Identity, parse_date, strip_synthea_digits
+from backend.ingest.normalize import Identity, parse_date, strip_accents
 from backend.ingest.records import SOURCE_CLINIC_CSV, SOURCE_ER_FHIR, SourceRecordDraft, csv_draft, fhir_draft
 
 # Taxonomy rows (evaluation plan §2). Core = P0, implemented here; P1 rows land by 19:00 and are
@@ -67,6 +68,9 @@ PARENT_CHILD_MIN_YEARS = 18
 PARENT_CHILD_MAX_YEARS = 40
 P_CHILD_HAS_SUFFIX = 0.5
 P_HOUSEHOLD_PHONE = 0.5
+P_CHILD_IS_RECIPIENT = 0.5
+P_S5_HYPHENATE = 0.5  # else the two surnames are glued together
+FALLBACK_DONOR_DOB = date(1980, 1, 1)  # only if a donor somehow has no parseable DOB
 
 PAIR_NAMESPACE = UUID("0b8c1d2e-3f4a-4b5c-8d6e-7f8a9b0c1d2e")
 ENTITY_NAMESPACE = UUID("9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d")
@@ -150,9 +154,11 @@ def _weighted(rng: random.Random, options: tuple[tuple[object, float], ...]) -> 
     return rng.choices([o for o, _ in options], weights=[w for _, w in options], k=1)[0]
 
 
-def _drop_accents(text: str) -> str:
-    decomposed = unicodedata.normalize("NFKD", text)
-    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+def _shift_years(dob: date, years: int) -> date:
+    try:
+        return dob.replace(year=dob.year + years)
+    except ValueError:  # 29 Feb into a common year
+        return dob.replace(year=dob.year + years, day=28)
 
 
 def entity_id_for(synthea_id: str) -> str:
@@ -170,7 +176,7 @@ def is_spanish(identity: Identity) -> bool:
 
 def maternal_surname(mother_maiden: str | None) -> str | None:
     """Last surname of the mother's maiden name, keeping particles ('de Anda', not 'Anda')."""
-    tokens = (strip_synthea_digits(mother_maiden) or "").split()
+    tokens = (mother_maiden or "").split()  # digits already stripped by the loader
     return " ".join(tokens[1:]) if len(tokens) > 1 else None
 
 
@@ -216,9 +222,10 @@ def edit_t3(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | N
 
 def edit_d1(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | None:
     dob = parse_date(identity.birth_date)
-    if dob is None or dob.day > 12 or dob.day == dob.month:
+    swapped = swapped_day_month(dob) if dob else None
+    if swapped is None:
         return None
-    after = dob.replace(month=dob.day, day=dob.month).isoformat()
+    after = swapped.isoformat()
     return replace(identity, birth_date=after), Edit("D1", "birth_date", identity.birth_date, after)
 
 
@@ -226,11 +233,7 @@ def edit_d3(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | N
     dob = parse_date(identity.birth_date)
     if dob is None:
         return None
-    delta = rng.choice((-1, 1))
-    try:
-        after = dob.replace(year=dob.year + delta).isoformat()
-    except ValueError:  # 29 Feb into a common year
-        after = dob.replace(year=dob.year + delta, day=28).isoformat()
+    after = _shift_years(dob, rng.choice((-1, 1))).isoformat()
     return replace(identity, birth_date=after), Edit("D3", "birth_date", identity.birth_date, after)
 
 
@@ -260,8 +263,8 @@ def edit_l7(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | N
 
 def edit_s1(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | None:
     before = f"{identity.given or ''}|{identity.family or ''}"
-    given = _drop_accents(identity.given) if identity.given else None
-    family = _drop_accents(identity.family) if identity.family else None
+    given = strip_accents(identity.given) if identity.given else None
+    family = strip_accents(identity.family) if identity.family else None
     after = f"{given or ''}|{family or ''}"
     if after == before:
         return None
@@ -281,14 +284,14 @@ def edit_s5(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | N
     if "-" in name:
         after = name.replace("-", " ")
     elif " " in name:
-        after = name.replace(" ", "-") if rng.random() < 0.5 else name.replace(" ", "")
+        after = name.replace(" ", "-") if rng.random() < P_S5_HYPHENATE else name.replace(" ", "")
     else:
         return None
     return replace(identity, family=after), Edit("S5", "family", name, after)
 
 
 def edit_s6(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | None:
-    if not identity.given or _drop_accents(identity.given).lower() != "maria":
+    if not identity.given or strip_accents(identity.given).lower() != "maria":
         return None
     return replace(identity, given=MARIA_ABBREVIATION), Edit("S6", "given", identity.given, MARIA_ABBREVIATION)
 
@@ -338,17 +341,10 @@ def corrupt(identity: Identity, rng: random.Random, spanish: bool) -> tuple[Iden
 
 # ---- hard negatives: grafts ----
 
-def _shift_years(dob: date, years: int) -> date:
-    try:
-        return dob.replace(year=dob.year + years)
-    except ValueError:
-        return dob.replace(year=dob.year + years, day=28)
-
-
 def graft(donor: Identity, recipient: Identity, family: str, rng: random.Random) -> Identity:
     """N1 siblings share surname, address and phone with a birth year within 3 and another given
     name; N3 parent/child share the full name and address with DOBs at least 18 years apart."""
-    donor_dob = parse_date(donor.birth_date) or date(1980, 1, 1)
+    donor_dob = parse_date(donor.birth_date) or FALLBACK_DONOR_DOB
     shared = replace(recipient, family=donor.family, address_line=donor.address_line, city=donor.city,
                      state=donor.state, postal_code=donor.postal_code)
     if family == "N1":
@@ -359,7 +355,7 @@ def graft(donor: Identity, recipient: Identity, family: str, rng: random.Random)
         return replace(shared, given=given, phone=donor.phone, birth_date=_shift_years(donor_dob, gap).isoformat())
     if family == "N3":
         years = rng.randint(PARENT_CHILD_MIN_YEARS, PARENT_CHILD_MAX_YEARS)
-        child_is_recipient = rng.random() < 0.5
+        child_is_recipient = rng.random() < P_CHILD_IS_RECIPIENT
         dob = _shift_years(donor_dob, years if child_is_recipient else -years)
         suffix = "Jr." if child_is_recipient and rng.random() < P_CHILD_HAS_SUFFIX else recipient.suffix
         phone = donor.phone if rng.random() < P_HOUSEHOLD_PHONE else recipient.phone
@@ -430,12 +426,18 @@ def draw_heldout_families(seed: int) -> list[str]:
 
 # ---- generation ----
 
-def _local_id(seed: int, synthea_id: str, index: int, source: str) -> str:
+def corpus_fingerprint(seed: int, entity_ids: list[str]) -> str:
+    """Seed plus the entity set: grafts depend on which entities exist, so a corpus built from a
+    subset (``--limit``) must never share local ids, and thus payloads, with the full one."""
+    return hashlib.sha256(f"{seed}:{','.join(sorted(entity_ids))}".encode()).hexdigest()[:12]
+
+
+def _local_id(fingerprint: str, synthea_id: str, index: int, source: str) -> str:
     prefix = "ER" if source == SOURCE_ER_FHIR else "CL"
-    return f"{prefix}-{hashlib.sha256(f'{seed}:{synthea_id}:{index}'.encode()).hexdigest()[:10].upper()}"
+    return f"{prefix}-{hashlib.sha256(f'{fingerprint}:{synthea_id}:{index}'.encode()).hexdigest()[:10].upper()}"
 
 
-def generate_entity(seed: int, entity: Entity) -> list[GeneratedRecord]:
+def generate_entity(seed: int, fingerprint: str, entity: Entity) -> list[GeneratedRecord]:
     rng = rng_for(seed, entity.synthea_id)
     spanish = is_spanish(entity.bundle.identity)
     n_rec = int(_weighted(rng, FRAGMENT_COUNTS))
@@ -450,7 +452,7 @@ def generate_entity(seed: int, entity: Entity) -> list[GeneratedRecord]:
         p_corrupt = P_FHIR_BASE_CORRUPTED if index == 0 else P_OTHER_RECORD_CORRUPTED
         identity, family, edits = (corrupt(entity.identity, rng, spanish) if rng.random() < p_corrupt
                                    else (entity.identity, NO_EDIT, []))
-        local_id = _local_id(seed, entity.synthea_id, index, source)
+        local_id = _local_id(fingerprint, entity.synthea_id, index, source)
         if source == SOURCE_ER_FHIR:
             draft = fhir_draft(identity, entity.bundle, local_id)
         else:
@@ -482,9 +484,10 @@ def build_corpus(seed: int, bundles: dict[str, FhirPatientBundle], csv_patients:
     splits = assign_splits(component_of, language_of)
     apply_grafts(seed, entities, grafts)
 
+    fingerprint = corpus_fingerprint(seed, ids)
     records: list[GeneratedRecord] = []
     for pid in ids:
-        records.extend(generate_entity(seed, entities[pid]))
+        records.extend(generate_entity(seed, fingerprint, entities[pid]))
 
     by_entity: dict[str, list[GeneratedRecord]] = {}
     for rec in records:
@@ -517,23 +520,16 @@ def build_corpus(seed: int, bundles: dict[str, FhirPatientBundle], csv_patients:
 
     heldout = draw_heldout_families(seed)
     run = {
-        "seed": seed, "entities": len(ids), "records": len(records), "pairs_same": sum(p["label"] == LABEL_SAME for p in pairs),
+        "seed": seed, "corpus_fingerprint": fingerprint, "entities": len(ids), "records": len(records), "pairs_same": sum(p["label"] == LABEL_SAME for p in pairs),
         "pairs_not_same": sum(p["label"] == LABEL_NOT_SAME for p in pairs), "grafts": len(grafts),
         "spanish_entities": sum(1 for e in entities.values() if is_spanish(e.bundle.identity)),
         "components": len(splits), "largest_component": max(len(s["members"]) for s in splits.values()),
         "partitions": {name: sum(1 for s in splits.values() if s["partition"] == name) for name in ("showcase", "development", "test")},
         "families_core": list(CORE_TRUE_MATCH + CORE_HARD_NEGATIVE), "heldout_families": heldout,
         "heldout_note": "drawn from the P1 rows by seed; their generators land by 19:00, so they are held out from training by name",
-        "family_counts": _count(rec.family for rec in records),
+        "family_counts": dict(sorted(Counter(rec.family for rec in records).items())),
     }
     return CorpusOutput(records, pairs, truth_rows, splits, grafts, heldout, run)
-
-
-def _count(values) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for v in values:
-        counts[v] = counts.get(v, 0) + 1
-    return dict(sorted(counts.items()))
 
 
 def write_outputs(corpus: CorpusOutput, out_dir: Path) -> CorpusOutput:

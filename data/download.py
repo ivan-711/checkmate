@@ -48,7 +48,10 @@ def download(name: str, dest: Path) -> Path:
 
 
 def extract(archive: Path, dest: Path) -> int:
-    """Flat, safe extraction: members with absolute paths or '..' are refused."""
+    """Safe extraction (absolute or '..' members refused), skipped when its marker says it is done."""
+    marker = dest / f".extracted-{archive.name}"
+    if marker.exists():
+        return int(marker.read_text() or 0)
     count = 0
     with zipfile.ZipFile(archive) as zf:
         for member in zf.infolist():
@@ -57,6 +60,7 @@ def extract(archive: Path, dest: Path) -> int:
                 raise SystemExit(f"refusing unsafe archive member {name!r}")
             zf.extract(member, dest)
             count += not member.is_dir()
+    marker.write_text(str(count))
     return count
 
 

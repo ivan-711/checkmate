@@ -41,11 +41,23 @@ def load_sample(raw_dir: Path, limit: int | None = None):
     return bundles, csv_patients
 
 
+def foreign_records(conn: psycopg.Connection, corpus) -> int:
+    """Rows already in source_record that are not part of this corpus. Loading on top of another
+    corpus or seed would mix truth tables and pair counts, so the CLI refuses before writing."""
+    expected = {(rec.draft.source_system, rec.draft.source_local_id) for rec in corpus.records}
+    rows = conn.execute("SELECT source_system, source_local_id FROM source_record").fetchall()
+    return sum(1 for row in rows if tuple(row) not in expected)
+
+
 def cmd_load(args: argparse.Namespace) -> int:
     started = time.monotonic()
     bundles, csv_patients = load_sample(args.raw, args.limit)
-    corpus = write_outputs(build_corpus(args.seed, bundles, csv_patients), args.out / f"corruptor-{args.seed}")
+    corpus = build_corpus(args.seed, bundles, csv_patients)
     with psycopg.connect(args.database_url) as conn:
+        foreign = foreign_records(conn, corpus)
+        if foreign:
+            raise SystemExit(f"database already holds {foreign} record(s) from another corpus or seed; use a fresh database")
+        write_outputs(corpus, args.out / f"corruptor-{args.seed}")
         result = ingest(conn, (rec.draft for rec in corpus.records))
         counts = pair_candidates_by_key_type(conn)
         total_records = conn.execute("SELECT count(*) FROM source_record").fetchone()[0]

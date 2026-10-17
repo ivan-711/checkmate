@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import csv
 from collections import defaultdict
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -64,12 +63,16 @@ def read_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(fh))
 
 
-def _group_by_patient(rows: Iterable[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
+def _group_by_patient(rows: list[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
     grouped: dict[str, list[dict[str, str]]] = defaultdict(list)
+    if not rows:
+        return grouped
+    column = next((k for k in rows[0] if k and k.lower() == PATIENT_COLUMN), None)
+    if column is None:
+        return grouped
     for row in rows:
-        pid = _lower(row).get(PATIENT_COLUMN)
-        if pid:
-            grouped[pid].append(row)
+        if row.get(column):
+            grouped[row[column]].append(row)
     return grouped
 
 

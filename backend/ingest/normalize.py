@@ -93,13 +93,17 @@ def clean_text(text: str | None) -> str | None:
     return cleaned or None
 
 
+def strip_accents(text: str) -> str:
+    """NFKD decomposition with the combining marks removed: 'Núñez' -> 'Nunez'."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
 def fold(text: str | None) -> str | None:
-    """Accent-fold (NFKD, marks removed), casefold, hyphen to space, apostrophes and periods dropped."""
+    """Accent-fold, casefold, hyphen to space, apostrophes and periods dropped."""
     if text is None:
         return None
-    decomposed = unicodedata.normalize("NFKD", text)
-    stripped = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-    stripped = _DROPPED_PUNCT.sub("", stripped)
+    stripped = _DROPPED_PUNCT.sub("", strip_accents(text))
     stripped = _HYPHENS.sub(" ", stripped)
     return clean_text(stripped.casefold())
 
