@@ -11,6 +11,7 @@ from fastapi import APIRouter, Query
 from sqlalchemy import text
 
 from backend.app.deps import EngineDep
+from backend.app.openapi_meta import common_error_responses
 from contracts.models.tiles import Tile, TileBucket, TileId, TilesResponse
 from contracts.version import API_PREFIX
 
@@ -35,7 +36,7 @@ TILE_SOURCES: dict[TileId, tuple[str, str]] = {
 }
 
 
-@router.get("/metrics/tiles", response_model=TilesResponse,
+@router.get("/metrics/tiles", response_model=TilesResponse, responses=common_error_responses(),
             description="Lane W3a (AGENT_GATE tile: Q1.3). Continuous-aggregate tiles for a window.")
 def get_tiles(engine: EngineDep,
               window_minutes: int = Query(WINDOW_DEFAULT_MINUTES, ge=1, le=WINDOW_MAX_MINUTES)) -> TilesResponse:

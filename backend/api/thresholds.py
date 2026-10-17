@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from backend.api.common import current_threshold_row
 from backend.app.deps import EngineDep
 from backend.app.errors import ApiError
+from backend.app.openapi_meta import common_error_responses
 from contracts.models.common import ErrorCode
 from contracts.models.thresholds import ThresholdSet
 from contracts.version import API_PREFIX
@@ -15,7 +16,7 @@ from contracts.version import API_PREFIX
 router = APIRouter(prefix=API_PREFIX, tags=["core"])
 
 
-@router.get("/threshold-sets/current", response_model=ThresholdSet,
+@router.get("/threshold-sets/current", response_model=ThresholdSet, responses=common_error_responses(),
             description="Lane W3a. The current threshold set: cLow/cHigh decide; display values are display-only.")
 def get_current_threshold_set(engine: EngineDep) -> ThresholdSet:
     with engine.connect() as conn:

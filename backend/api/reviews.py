@@ -29,6 +29,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.api.common import current_decision_row, decision_from_row
 from backend.app.deps import EngineDep
 from backend.app.errors import ApiError
+from backend.app.openapi_meta import common_error_responses, error_responses
 from backend.events.writer import write_event
 from backend.link import service as link
 from contracts.api_spec import IdempotencyKey
@@ -170,6 +171,8 @@ def _review(conn: Connection, scope: str, key: str, sha: str, pair_id: UUID, bod
 
 
 @router.post("/candidate-pairs/{pair_id}/reviews", response_model=ReviewResponse, status_code=201,
+             responses=error_responses(ErrorCode.NOT_FOUND, ErrorCode.CANNOT_LINK_CONFLICT, ErrorCode.DECISION_NOT_PENDING,
+                                       ErrorCode.IDEMPOTENCY_MISMATCH) | common_error_responses(),
              description="Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. "
                          "Idempotency-Key required; only PROPOSED moves; same-state request returns 200 with no new version.")
 def create_review(pair_id: UUID, body: ReviewRequest, idempotency_key: IdempotencyKey,

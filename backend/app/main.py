@@ -19,6 +19,7 @@ from backend.app import request_context
 from backend.app.config import load_settings
 from backend.app.db import db_is_up, make_engine
 from backend.app.errors import ApiError
+from backend.app.openapi_meta import common_error_responses
 from contracts.api_spec import build_app, error_envelope
 from contracts.models.common import ErrorCode
 from contracts.models.health import AgentStatus, DependencyStatus, Health, HealthVersions
@@ -86,9 +87,9 @@ async def request_id_and_log(request: Request, call_next) -> Response:
     return response
 
 
-@app.get(API_PREFIX + "/health", response_model=Health, tags=["core"],
+@app.get(API_PREFIX + "/health", response_model=Health, tags=["core"], responses=common_error_responses(),
          description="Lane: plumbing (lead session). Dependency status and versions.")
-async def health() -> Health:
+def health() -> Health:  # sync: db_is_up blocks, so it runs in the threadpool, never on the event loop
     db = DependencyStatus.UP if db_is_up(engine) else DependencyStatus.DOWN
     agent = AgentStatus.REPLAY if settings.frontdesk_agent_mode != "LIVE" else AgentStatus.DOWN
     return Health(

@@ -20,6 +20,7 @@ from sqlalchemy.engine import Connection, Row
 
 from backend.api.common import current_decision_row, current_thresholds
 from backend.app.deps import EngineDep
+from backend.app.openapi_meta import common_error_responses
 from backend.events.writer import write_event
 from backend.match.seam import MatchCore, MatchResult, Thresholds, resolve_core
 from contracts.models.common import ActorType, Band, DecisionStatus, EventType, PairOrigin, ReasonCode
@@ -110,7 +111,7 @@ def propose(conn: Connection, pair_id: UUID, version: int, result: MatchResult, 
     return decision_id
 
 
-@router.post("/match-runs", response_model=MatchRunResponse, status_code=201,
+@router.post("/match-runs", response_model=MatchRunResponse, status_code=201, responses=common_error_responses(),
              description='Lane W2/W3a. UX "Resolve identity": block, score, band. Returns counts and the first 50 queued pair ids.')
 def create_match_run(engine: EngineDep) -> MatchRunResponse:
     started = time.perf_counter()

@@ -18,6 +18,7 @@ from backend.api.common import (
 )
 from backend.app.deps import EngineDep
 from backend.app.errors import ApiError
+from backend.app.openapi_meta import common_error_responses, error_responses
 from backend.link import service as link
 from contracts.models.common import Band, DecisionStatus, ErrorCode, Page, PairOrigin
 from contracts.models.pairs import CandidatePair, CandidatePairDetail, MatchDecision
@@ -61,7 +62,7 @@ def list_query(filters: dict[str, str], after: tuple[float, UUID] | None, limit:
     return sql, params
 
 
-@router.get("/candidate-pairs", response_model=Page[CandidatePair],
+@router.get("/candidate-pairs", response_model=Page[CandidatePair], responses=common_error_responses(),
             description="Lane W3a. Review queue ordered by |p-0.5|. Bounded list.")
 def list_candidate_pairs(
     engine: EngineDep,
@@ -100,6 +101,7 @@ def load_detail(conn: Connection, pair_id: UUID) -> CandidatePairDetail:
 
 
 @router.get("/candidate-pairs/{pair_id}", response_model=CandidatePairDetail,
+            responses=error_responses(ErrorCode.NOT_FOUND) | common_error_responses(),
             description="Lane W3a. Evidence view: records, contributions, decision history, merge preview.")
 def get_candidate_pair(pair_id: UUID, engine: EngineDep) -> CandidatePairDetail:
     with engine.connect() as conn:

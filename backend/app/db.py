@@ -16,7 +16,8 @@ def make_engine(database_url: str) -> Engine:
         max_overflow=POOL_MAX_OVERFLOW,
         pool_timeout=POOL_TIMEOUT_S,
         pool_pre_ping=True,
-        connect_args={"options": f"-c statement_timeout={STATEMENT_TIMEOUT_S * 1000}"},
+        connect_args={"options": f"-c statement_timeout={STATEMENT_TIMEOUT_S * 1000}",
+                      "connect_timeout": POOL_TIMEOUT_S},
     )
 
 

@@ -14,6 +14,7 @@ from sqlalchemy.engine import Connection
 from backend.api.common import current_thresholds
 from backend.app.deps import EngineDep
 from backend.app.errors import ApiError
+from backend.app.openapi_meta import common_error_responses, error_responses
 from backend.events.writer import write_event
 from backend.match.seam import MatchCore, resolve_core
 from backend.scenarios.loader import ScenarioNotFound, load_scenario
@@ -77,6 +78,7 @@ def insert_source_card(conn: Connection, card: SourceCard, core: MatchCore) -> N
 
 
 @router.post("/sessions", response_model=SessionResponse, status_code=201,
+             responses=error_responses(ErrorCode.NOT_FOUND) | common_error_responses(),
              description="Lane W1/W3a. Reset: truncate state, load the scenario, append DEMO_RESET.")
 def create_session(body: CreateSessionRequest, engine: EngineDep) -> SessionResponse:
     try:
