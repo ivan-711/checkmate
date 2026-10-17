@@ -1,13 +1,20 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useDataSource } from "@/data/DataSourceProvider";
+
+/** Reset and Undo share this key so the case screen can hold Resolve until the new session has
+ * loaded: a match run that overlaps a reset gets a 503 and leaves no candidate pair. */
+export const SESSION_CHANGE_KEY = ["session-change"] as const;
+/** Resolve's key, so Reset waits for a match run in flight for the same reason. */
+export const RESOLVE_KEY = ["resolve"] as const;
 
 /** One click, no confirmation; a 5 s "Undo reset" toast covers a stray click. */
 export function ResetButton() {
   const source = useDataSource();
   const queryClient = useQueryClient();
+  const resolving = useIsMutating({ mutationKey: RESOLVE_KEY }) > 0;
 
   // Reset, not invalidate, the case: its panels remount, so no half-typed note or stale
   // error survives. Tiles keep showing their values while they refetch.
@@ -22,12 +29,14 @@ export function ResetButton() {
   }
 
   const restore = useMutation({
+    mutationKey: SESSION_CHANGE_KEY,
     mutationFn: (previousSessionId: string) => source.restore(previousSessionId),
     onSuccess: refreshAfterSessionChange,
     onError: (error) => toast(`Undo failed: ${error.message}`),
   });
 
   const reset = useMutation({
+    mutationKey: SESSION_CHANGE_KEY,
     mutationFn: () => source.reset(),
     onSuccess: async (session) => {
       await refreshAfterSessionChange();
@@ -47,7 +56,7 @@ export function ResetButton() {
       type="button"
       data-testid="reset-button"
       onClick={() => reset.mutate()}
-      disabled={reset.isPending}
+      disabled={reset.isPending || resolving}
       className="h-11 rounded-md border border-border-strong bg-surface px-4 text-[16px] font-semibold text-ink-1 hover:bg-sunken disabled:text-ink-3"
     >
       {reset.isPending ? "Resetting..." : "Reset demo"}

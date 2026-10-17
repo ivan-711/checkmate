@@ -1,9 +1,10 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { ReviewResponse } from "@/api/types";
 import { useAnnounce } from "@/components/ui/LiveRegion";
+import { RESOLVE_KEY, SESSION_CHANGE_KEY } from "@/components/ui/ResetButton";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { DataError } from "@/data/source";
 import { differingFields, type CardField } from "@/lib/display";
@@ -43,7 +44,10 @@ export function CaseScreen() {
     queryFn: () => source.getTimeline(entity!.id),
     enabled: linked,
   });
+  // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
+  const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
   const resolve = useMutation({
+    mutationKey: RESOLVE_KEY,
     mutationFn: () => source.resolve(),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["case"] });
@@ -57,7 +61,7 @@ export function CaseScreen() {
       type="button"
       data-testid="resolve-button"
       onClick={() => resolve.mutate()}
-      disabled={resolve.isPending}
+      disabled={resolve.isPending || sessionChanging}
       className="h-11 rounded-md bg-accent px-4 font-semibold text-on-accent hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-3"
     >
       {resolve.isPending ? "Resolving..." : "Resolve identity"}
@@ -103,6 +107,8 @@ export function CaseScreen() {
                 focusOnMount={justApproved}
                 onFocused={() => setJustApproved(false)}
               />
+              {/* The flag sits right under the combined record so it is on screen after Approve. */}
+              <FlagCard state={flagState(caseQuery.data)} />
               <Timeline events={timeline.data} cards={cards} />
             </>
           ) : (
@@ -124,9 +130,11 @@ export function CaseScreen() {
                   <SourceCardView key={card.record.id} card={card} differs={differs} />
                 ))}
               </div>
+              <div className="mt-4">
+                <FlagCard state={flagState(caseQuery.data)} />
+              </div>
             </section>
           )}
-          <FlagCard state={flagState(caseQuery.data)} />
           <EventFeed />
         </div>
         <aside className="space-y-4">

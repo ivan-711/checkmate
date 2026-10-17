@@ -69,3 +69,18 @@ export function actorName(actor: string): string {
 export function sourceLabel(sourceSystem: string, cards: SourceCard[]): string {
   return cards.find((c) => c.record.sourceSystem === sourceSystem)?.displayLabel ?? sourceSystem;
 }
+
+/** A golden value as text. Clinical values (allergies, active orders) arrive as coded objects;
+ * they read by their display name and status, so no value ever renders as "[object Object]". */
+export function goldenValueText(value: unknown): string | null {
+  if (value == null) return null;
+  if (Array.isArray(value)) return value.map(goldenValueText).filter(Boolean).join(", ");
+  if (typeof value !== "object") return String(value);
+  const record = value as Record<string, unknown>;
+  const name = record.display ?? record.code;
+  if (name != null) return record.status ? `${String(name)} (${String(record.status)})` : String(name);
+  return Object.entries(record)
+    .filter(([, v]) => v != null)
+    .map(([k, v]) => `${k}: ${goldenValueText(v)}`)
+    .join(", ");
+}
