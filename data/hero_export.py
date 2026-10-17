@@ -125,7 +125,7 @@ def utterances(er: Record) -> dict[str, str]:
 
 
 def export(selection: HeroSelection, result: RunResult, out: Path, provisional: bool,
-           hero: Candidate | None = None, engine: Engine | None = None) -> None:
+           hero: Candidate | None = None, engine: Engine | None = None, pinned: bool = False) -> None:
     """``hero`` overrides the selection's hero (the best partial when nothing qualified); ``engine`` is the
     scorer that selected it (block keys, display p and the shipped weights come from it)."""
     engine = engine or standin_engine()
@@ -153,7 +153,7 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
                              f"{hero.entity_id}{'' if qualified else ' (best partial; see hero.unmetCriteria)'}; "
                              f"scorer {scorer}; thresholds {thresholds_id}; seed {selection.seed}")
     scenario["hero"] = {"provisional": provisional, "constructedFloor": False, "selectedBy": "data/hero_select.py",
-                        "qualified": qualified, "unmetCriteria": hero.unmet(), "criteriaLevel": hero.level,
+                        "qualified": qualified, "pinned": pinned, "unmetCriteria": hero.unmet(), "criteriaLevel": hero.level,
                         "criteriaRequired": list(hero.required),
                         "criteria": {k: hero.criteria[k] for k in hero.criteria}, "criteriaText": selection.criteria,
                         "relaxationLevel": selection.relaxation_level, "drawnFromTest": selection.drawn_from_test,
@@ -228,7 +228,9 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
             "baseline": baseline_state, "whatIf": score_state(s),
             "deltas": [{"feature": f, "logit": round(s.contributions.get(f, 0.0) - base.contributions.get(f, 0.0), 6), "value": None}
                        for f in base.contributions if abs(s.contributions.get(f, 0.0) - base.contributions.get(f, 0.0)) > 1e-9],
-            "caption": whatifs.caption_for(button.value, base.band, s.band, s.p - base.p),
+            # computed from what the button does on this ER record: an edit that cannot happen claims no effect
+            "caption": whatifs.caption_of(button.value, {**er, "birth_date": iso_date(er.get("birth_date"))},
+                                          base.band, s.band, s.p - base.p),
             "counterfactualFields": {field_name: _counterfactual(button, er, hero)},
             "alertWouldBeHidden": s.band == BAND_KEEP_SEPARATE, "heldOutRecall": recall, "seed": selection.seed,
         }
@@ -239,7 +241,8 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
     }
     (out / "scenario.json").write_text(json.dumps(scenario, indent=2, ensure_ascii=False) + "\n")
     (out / "hero.json").write_text(json.dumps({
-        "entityId": hero.entity_id, "provisional": provisional, "qualified": qualified, "unmetCriteria": hero.unmet(),
+        "entityId": hero.entity_id, "provisional": provisional, "qualified": qualified, "pinned": pinned,
+        "unmetCriteria": hero.unmet(),
         "scorerVersion": scorer, "thresholdsId": thresholds_id,
         "cLow": c_low, "cHigh": c_high, "records": {"ER_FHIR": er, "CLINIC_CSV": clinic},
         "baseline": asdict(base), "whatIfs": {k: asdict(v) for k, v in hero.what_ifs.items()}, "intake": asdict(hero.intake),

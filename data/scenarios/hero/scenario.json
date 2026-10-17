@@ -6,8 +6,10 @@
     "constructedFloor": false,
     "selectedBy": "data/hero_select.py",
     "qualified": false,
+    "pinned": true,
     "unmetCriteria": [
-      "change_birth_year_keep_separate"
+      "change_birth_year_keep_separate",
+      "swap_dob_day_month_robust"
     ],
     "criteriaLevel": 3,
     "criteriaRequired": [
@@ -23,7 +25,7 @@
       "baseline_review": true,
       "remove_address_keep_separate": true,
       "change_birth_year_keep_separate": false,
-      "swap_dob_day_month_robust": true,
+      "swap_dob_day_month_robust": false,
       "accent_hyphen_surname_robust": true,
       "intake_rendering_review": true,
       "fixture_check_bounds": true,
@@ -32,9 +34,9 @@
     "criteriaText": {
       "baseline_review": "baseline band is REVIEW (never relaxed)",
       "remove_address_keep_separate": "REMOVE_ADDRESS drops to KEEP_SEPARATE (abstention: not enough to link)",
-      "change_birth_year_keep_separate": "CHANGE_BIRTH_YEAR +1 and -1 each drop to KEEP_SEPARATE (level 3: either)",
-      "swap_dob_day_month_robust": "SWAP_DOB_DAY_MONTH moves p by at most the tolerance (0.05; level 2: 0.10)",
-      "accent_hyphen_surname_robust": "ACCENT_HYPHEN_SURNAME moves p by at most the tolerance (0.05; level 2: 0.10)",
+      "change_birth_year_keep_separate": "CHANGE_BIRTH_YEAR +1 and -1 each drop to KEEP_SEPARATE (level 3: the shipped -1)",
+      "swap_dob_day_month_robust": "SWAP_DOB_DAY_MONTH applies (day <= 12, day != month) and moves p by at most the tolerance (0.05; level 2: 0.10)",
+      "accent_hyphen_surname_robust": "ACCENT_HYPHEN_SURNAME changes the name and moves p by at most the tolerance (0.05; level 2: 0.10)",
       "intake_rendering_review": "the intake rendering of the ER fragment lands in REVIEW against the Clinic record",
       "fixture_check_bounds": "p in [0,1]; no AUTO_LINK; no what-if raises p above baseline + 0.005; no negative rule",
       "spanish_name": "Spanish-language name (reported as a fact; required at level 0 only)"
@@ -2097,7 +2099,7 @@
         "negativeRulesFired": []
       },
       "deltas": [],
-      "caption": "Day and month swapped: the engine has a named feature for this; the score barely moves.",
+      "caption": "This birth date has no day/month swap: the day is above 12.",
       "counterfactualFields": {
         "birthDate": "1964-05-16"
       },

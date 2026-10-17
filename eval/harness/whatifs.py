@@ -4,6 +4,7 @@ Used by the hero selector and fixture check. Each returns a new record; nothing 
 """
 from __future__ import annotations
 
+import re
 import unicodedata
 from collections.abc import Callable
 
@@ -29,9 +30,20 @@ def remove_address(rec: Record) -> Record:
     return out
 
 
+_ISO_DOB = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _iso_dob(rec: Record) -> tuple[str, str, str] | None:
+    value = rec.get("birth_date")
+    if not value or not _ISO_DOB.match(value):
+        return None
+    y, m, d = value.split("-")
+    return y, m, d
+
+
 def change_birth_year(rec: Record, delta: int) -> Record:
     out = dict(rec)
-    if not rec.get("birth_date"):
+    if _iso_dob(rec) is None:
         return out
     y, m, d = rec["birth_date"].split("-")
     out["birth_date"] = f"{int(y) + delta:04d}-{m}-{d}"
@@ -41,9 +53,10 @@ def change_birth_year(rec: Record, delta: int) -> Record:
 def swap_dob_day_month(rec: Record) -> Record:
     """Applicable only when day <= 12 and day != month; otherwise the record is unchanged."""
     out = dict(rec)
-    if not rec.get("birth_date"):
+    parts = _iso_dob(rec)
+    if parts is None:
         return out
-    y, m, d = rec["birth_date"].split("-")
+    y, m, d = parts
     if int(d) <= 12 and d != m:
         out["birth_date"] = f"{y}-{d}-{m}"
     return out
@@ -76,7 +89,31 @@ def is_applicable(button: str, rec: Record) -> bool:
         return accent_plus_hyphen(rec) != rec
     if button == REMOVE_ADDRESS:
         return bool(rec.get("address_line"))
-    return bool(rec.get("birth_date"))
+    return _iso_dob(rec) is not None
+
+
+def inapplicable_caption(button: str, rec: Record) -> str:
+    """Plain words for an edit that cannot happen on this record: no effect is claimed."""
+    if button == SWAP_DOB_DAY_MONTH:
+        parts = _iso_dob(rec)
+        if parts is None:
+            return "This record has no full birth date to swap."
+        _, m, d = parts
+        if d == m:
+            return "This birth date has no day/month swap: the day and the month are the same."
+        return "This birth date has no day/month swap: the day is above 12."
+    if button == ACCENT_HYPHEN_SURNAME:
+        return "This name has no accents or hyphens to change."
+    if button == REMOVE_ADDRESS:
+        return "This record has no address to remove."
+    return "This record has no full birth date to change."
+
+
+def caption_of(button: str, rec: Record, baseline_band: str, what_if_band: str, delta_p: float) -> str:
+    """The caption a what-if ships with, from what the button actually does on ``rec`` (the ER record)."""
+    if not is_applicable(button, rec):
+        return inapplicable_caption(button, rec)
+    return caption_for(button, baseline_band, what_if_band, delta_p)
 
 
 TRANSFORMS: dict[str, Callable[[Record], Record]] = {
