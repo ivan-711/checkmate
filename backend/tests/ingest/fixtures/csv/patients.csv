@@ -1,0 +1,4 @@
+Id,BIRTHDATE,DEATHDATE,SSN,DRIVERS,PASSPORT,PREFIX,FIRST,LAST,SUFFIX,MAIDEN,MARITAL,RACE,ETHNICITY,GENDER,BIRTHPLACE,ADDRESS,CITY,STATE,COUNTY,ZIP,LAT,LON,HEALTHCARE_EXPENSES,HEALTHCARE_COVERAGE
+aaaaaaaa-0000-4000-8000-000000000001,1990-03-07,,999-11-1111,,,Mr.,José45,Núñez-García77,,,S,white,hispanic,M,Worcester  Massachusetts  US,857 Kling Arcade,Worcester,Massachusetts,Worcester County,01604,42.25,-71.70,1000.00,500.00
+bbbbbbbb-0000-4000-8000-000000000001,1985-11-02,,999-22-2222,,,Mrs.,Robert22,Smith9,,Jones4,M,white,nonhispanic,F,Boston  Massachusetts  US,1 Main St,Boston,Massachusetts,Suffolk County,,42.36,-71.06,2000.00,900.00
+cccccccc-0000-4000-8000-000000000001,1950-01-01,2010-01-01,999-33-3333,,,,Dora3,Doe8,,,,white,nonhispanic,F,Lowell  Massachusetts  US,9 Elm St,Lowell,Massachusetts,Middlesex County,01852,42.63,-71.31,3000.00,100.00

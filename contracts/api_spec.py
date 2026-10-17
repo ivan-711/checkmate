@@ -6,6 +6,7 @@ against one spec from the freeze on. Each route's description names the lane it 
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -15,7 +16,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from contracts.models.alerts import SafetyAlert
+from contracts.models.alerts import AlertStatus, SafetyAlert
 from contracts.models.common import (
     ERROR_STATUS,
     Band,
@@ -27,6 +28,7 @@ from contracts.models.common import (
     PairOrigin,
 )
 from contracts.models.entities import Entity, HistoryEvent, TimelineEvent
+from contracts.models.events import EventLogRow
 from contracts.models.health import Health
 from contracts.models.intake import CreateIntakeSessionRequest, IntakeSession, IntakeTurn, TurnRequest
 from contracts.models.pairs import CandidatePair, CandidatePairDetail
@@ -87,7 +89,8 @@ def build_app(implemented: frozenset[Route] = frozenset()) -> FastAPI:
         return error_envelope(ErrorCode.INTERNAL, str(exc.detail))
 
     p = API_PREFIX
-    common_errors = _err(ErrorCode.VALIDATION_ERROR, ErrorCode.INTERNAL, ErrorCode.NOT_IMPLEMENTED)
+    common_errors = _err(ErrorCode.VALIDATION_ERROR, ErrorCode.INTERNAL, ErrorCode.NOT_IMPLEMENTED,
+                         ErrorCode.UPSTREAM_UNAVAILABLE)  # any route answers 503 when the database is down
 
     @app.get(p + "/health", response_model=Health, tags=["core"], responses=common_errors,
              description="Lane: plumbing (lead session). Dependency status and versions.")
@@ -124,8 +127,9 @@ def build_app(implemented: frozenset[Route] = frozenset()) -> FastAPI:
         return not_implemented("W3a")
 
     @app.post(p + "/candidate-pairs/{pair_id}/reviews", response_model=ReviewResponse, status_code=201, tags=["core"],
-              responses=_err(ErrorCode.NOT_FOUND, ErrorCode.CANNOT_LINK_CONFLICT, ErrorCode.DECISION_NOT_PENDING,
-                             ErrorCode.IDEMPOTENCY_MISMATCH) | common_errors,
+              responses={200: {"model": ReviewResponse, "description": "Same-state request: the current decision, no new version"}}
+              | _err(ErrorCode.NOT_FOUND, ErrorCode.CANNOT_LINK_CONFLICT, ErrorCode.DECISION_NOT_PENDING,
+                     ErrorCode.IDEMPOTENCY_MISMATCH) | common_errors,
               description="Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. "
                           "Idempotency-Key required. PROPOSED or REJECTED may move to LINKED or REJECTED (a second review supersedes the first, "
                           "so the demo can reject and then approve; history keeps both). LINKED only accepts the same-state APPROVE, which "
@@ -161,11 +165,22 @@ def build_app(implemented: frozenset[Route] = frozenset()) -> FastAPI:
                                  cursor: str | None = None):
         return not_implemented("Q8")
 
-    @app.get(p + "/alerts", response_model=Page[SafetyAlert], tags=["core"], responses=common_errors,
-             description="Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity; bounded list.")
+    @app.get(p + "/alerts", response_model=Page[SafetyAlert], tags=["core"],
+             responses=_err(ErrorCode.NOT_FOUND) | common_errors,
+             description="Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity (unknown "
+                         "entityId is a 404) and one status; bounded list.")
     async def list_alerts(entity_id: Annotated[UUID | None, Query(alias="entityId")] = None,
+                          status: AlertStatus | None = None,
                           limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX), cursor: str | None = None):
         return not_implemented("W3b")
+
+    @app.get(p + "/events", response_model=Page[EventLogRow], tags=["core"], responses=common_errors,
+             description="Lane W3a (additive, G16 step 7). The append-only event feed, newest first; bounded list "
+                         "with an opaque keyset cursor over (ts, eventId). `since` keeps only rows with ts at or "
+                         "after it, so a caller can count one run's events on a reused database.")
+    async def list_events(since: datetime | None = None,
+                          limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX), cursor: str | None = None):
+        return not_implemented("W3a")
 
     @app.get(p + "/threshold-sets/current", response_model=ThresholdSet, tags=["core"], responses=common_errors,
              description="Lane W3a (additive). The current raw-score cutoffs; Platt values display-only.")

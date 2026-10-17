@@ -1,4 +1,5 @@
 """Settings from the environment (.env is gitignored; .env.example documents the keys)."""
+
 from __future__ import annotations
 
 import os
@@ -25,7 +26,9 @@ class Settings:
 def load_settings() -> Settings:
     return Settings(
         database_url=os.environ.get("DATABASE_URL", "postgresql://checkmate:checkmate@127.0.0.1:5432/checkmate"),
-        cors_origins=tuple(o.strip() for o in os.environ.get("CORS_ORIGINS", DEFAULT_CORS_ORIGINS).split(",") if o.strip()),
+        cors_origins=tuple(
+            o.strip() for o in os.environ.get("CORS_ORIGINS", DEFAULT_CORS_ORIGINS).split(",") if o.strip()
+        ),
         frontdesk_agent_mode=os.environ.get("FRONTDESK_AGENT_MODE", "REPLAY"),
         gemini_model_id=os.environ.get("GEMINI_MODEL_ID") or None,
         gemini_api_key_present=bool(os.environ.get("GEMINI_API_KEY")),
