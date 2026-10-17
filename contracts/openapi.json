@@ -3881,9 +3881,26 @@
     },
     "/api/v1/events": {
       "get": {
-        "description": "Lane W3a (additive, G16 step 7). The append-only event feed, newest first; bounded list with an opaque keyset cursor over (ts, eventId).",
+        "description": "Lane W3a (additive, G16 step 7). The append-only event feed, newest first; bounded list with an opaque keyset cursor over (ts, eventId). `since` keeps only rows with ts at or after it, so a caller can count one run's events on a reused database.",
         "operationId": "list_events_api_v1_events_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
           {
             "in": "query",
             "name": "limit",

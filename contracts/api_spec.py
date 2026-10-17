@@ -6,6 +6,7 @@ against one spec from the freeze on. Each route's description names the lane it 
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -174,8 +175,10 @@ def build_app(implemented: frozenset[Route] = frozenset()) -> FastAPI:
 
     @app.get(p + "/events", response_model=Page[EventLogRow], tags=["core"], responses=common_errors,
              description="Lane W3a (additive, G16 step 7). The append-only event feed, newest first; bounded list "
-                         "with an opaque keyset cursor over (ts, eventId).")
-    async def list_events(limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX), cursor: str | None = None):
+                         "with an opaque keyset cursor over (ts, eventId). `since` keeps only rows with ts at or "
+                         "after it, so a caller can count one run's events on a reused database.")
+    async def list_events(since: datetime | None = None,
+                          limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX), cursor: str | None = None):
         return not_implemented("W3a")
 
     @app.get(p + "/threshold-sets/current", response_model=ThresholdSet, tags=["core"], responses=common_errors,
