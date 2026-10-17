@@ -26,6 +26,11 @@ from contracts.models.common import ActorType, DecisionStatus, EventType, Mode, 
 from contracts.models.entities import Entity
 from contracts.version import RULE_ID, RULE_VERSION
 
+# One fixed key for the whole link graph: every rebuild of the union-find serializes on it
+# for the rest of the transaction, so no approve can read edges another approve is writing.
+LINK_GRAPH_LOCK_KEY = 0x434B4D4C  # "CKML"
+_LOCK_GRAPH = text("SELECT pg_advisory_xact_lock(:key)")
+
 
 class LinkError(ValueError):
     """The decision row does not say what the caller claims (wrong pair or status)."""
@@ -94,6 +99,11 @@ _INSERT_REVOKED_DECISION = text(
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def lock_link_graph(conn: Connection) -> None:
+    """Taken first by every writer; released when the caller's transaction ends."""
+    conn.execute(_LOCK_GRAPH, {"key": LINK_GRAPH_LOCK_KEY})
 
 
 def _decision(conn: Connection, pair_id: UUID, decision_id: UUID, expected: DecisionStatus):
@@ -228,6 +238,7 @@ def apply_approve(conn: Connection, pair_id: UUID, decision_id: UUID, *, mode: M
                   request_id: str | None = None) -> tuple[Entity, list[SafetyAlert]]:
     """After the LINKED decision row exists: rebuild the component, write the entity and
     its members, append ENTITY_MERGED, run the rule, raise or retract alerts."""
+    lock_link_graph(conn)
     row = _decision(conn, pair_id, decision_id, DecisionStatus.LINKED)
     ctx = _context(row, mode, request_id)
     edges = _linked_edges(conn)
@@ -250,6 +261,7 @@ def apply_reject(conn: Connection, pair_id: UUID, decision_id: UUID, *, mode: Mo
                  request_id: str | None = None) -> None:
     """A REJECTED decision changes no entity and the rule stays silent. DIFFERENT_PERSON
     remembers the pair in not_a_match (idempotent); INSUFFICIENT_EVIDENCE writes nothing."""
+    lock_link_graph(conn)
     row = _decision(conn, pair_id, decision_id, DecisionStatus.REJECTED)
     if row["reason_code"] == ReasonCode.DIFFERENT_PERSON.value:
         conn.execute(_INSERT_NOT_A_MATCH, {"a": row["record_a_id"], "b": row["record_b_id"],
@@ -284,6 +296,7 @@ def apply_revoke(conn: Connection, pair_id: UUID, decision_id: UUID, *, mode: Mo
                  request_id: str | None = None) -> SplitResult | None:
     """After a REVOKED decision row exists: recompute the entity's components and retract
     flags that lost their approved path. None when neither record is in an entity."""
+    lock_link_graph(conn)
     row = _decision(conn, pair_id, decision_id, DecisionStatus.REVOKED)
     ctx = _context(row, mode, request_id)
     if row["reason_code"] == ReasonCode.DIFFERENT_PERSON.value:
@@ -302,6 +315,7 @@ def apply_split(conn: Connection, entity_id: UUID, source_record_ids: list[UUID]
                 mode: Mode = Mode.LOCAL, request_id: str | None = None) -> SplitResult:
     """Scaffold for Q4.2 (POST /entities/{id}/splits): move ``source_record_ids`` out of
     the entity by revoking every LINKED edge that crosses the partition (ADR-002)."""
+    lock_link_graph(conn)
     members = {r[0] for r in conn.execute(_ENTITY_MEMBERS, {"entity_id": entity_id})}
     side = set(source_record_ids)
     if not members:

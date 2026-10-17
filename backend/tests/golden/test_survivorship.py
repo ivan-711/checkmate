@@ -59,3 +59,22 @@ def test_missing_values_are_skipped_and_every_value_has_a_crosswalk():
         assert f.crosswalk.source_system and f.crosswalk.source_record_id
         for a in f.alternates:
             assert a.crosswalk.source_record_id
+
+
+def test_clinical_union_prefers_the_active_allergy_and_keeps_distinct_orders():
+    from backend.golden.service import clinical_union
+    from backend.tests.rule.test_bl_amox_01 import (
+        clinic_member,
+        csv_allergy_row,
+        er_member,
+        fhir_order,
+    )
+    member = clinic_member(allergies=[csv_allergy_row(stop="2020-01-01"), csv_allergy_row()])
+    (allergy,) = [f for f in clinical_union([member]) if f.field == "allergy"]
+    assert allergy.value["status"] == "active" and allergy.value["resourceId"] == "allergies.csv:1"
+    reversed_member = clinic_member(allergies=[csv_allergy_row(), csv_allergy_row(stop="2020-01-01")])
+    (allergy,) = [f for f in clinical_union([reversed_member]) if f.field == "allergy"]
+    assert allergy.value["status"] == "active" and allergy.value["resourceId"] == "allergies.csv:0"
+    second = fhir_order(); second["id"] = "mr-2"
+    orders = [f for f in clinical_union([er_member(fhir_order(), second)]) if f.field == "activeMedicationOrder"]
+    assert sorted(f.value["resourceId"] for f in orders) == ["MedicationRequest/mr-1", "MedicationRequest/mr-2"]

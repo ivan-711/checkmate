@@ -35,7 +35,7 @@ _ALERTS = text(
     "sa.constructed_scenario, sa.identified_at, a.source_system AS allergy_system, o.source_system AS order_system "
     "FROM safety_alert sa JOIN source_record a ON a.id = sa.allergy_record_id "
     "JOIN source_record o ON o.id = sa.order_record_id "
-    "WHERE sa.entity_id = :entity_id ORDER BY sa.identified_at, sa.id"
+    "WHERE (CAST(:entity_id AS uuid) IS NULL OR sa.entity_id = :entity_id) ORDER BY sa.identified_at, sa.id"
 )
 
 
@@ -77,7 +77,8 @@ def clinical_union(members: Sequence[MemberResources]) -> list[GoldenField]:
             if o.code and o.status == "active":
                 orders.append(({"code": o.code.code, "display": o.code.display, "status": o.status,
                                 "resourceId": o.ref.resource_id}, xw))
-    return golden_union("allergy", allergies) + golden_union("activeMedicationOrder", orders)
+    return (golden_union("allergy", allergies, per_resource=False)
+            + golden_union("activeMedicationOrder", orders, per_resource=True))
 
 
 def read_entity(conn: Connection, entity_id: UUID) -> Entity | None:
@@ -116,7 +117,8 @@ def _alert(r) -> SafetyAlert:
     )
 
 
-def read_alerts(conn: Connection, entity_id: UUID, *, status: AlertStatus | None = None) -> list[SafetyAlert]:
+def read_alerts(conn: Connection, entity_id: UUID | None, *, status: AlertStatus | None = None) -> list[SafetyAlert]:
+    """Alerts of one entity, or of every entity when ``entity_id`` is None (demo scale; paged in memory)."""
     rows = conn.execute(_ALERTS, {"entity_id": entity_id}).mappings().all()
     alerts = [_alert(r) for r in rows]
     return [a for a in alerts if status is None or a.status == status]

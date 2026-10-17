@@ -117,14 +117,19 @@ def golden_demographics(members: Sequence[MemberDemographics]) -> list[GoldenFie
     return fields
 
 
-def golden_union(name: str, items: Sequence[tuple[dict, Crosswalk]]) -> list[GoldenField]:
-    """Clinical lists: every distinct item survives with its own crosswalk."""
-    seen: set[str] = set()
-    out = []
-    for value, crosswalk in items:
+def golden_union(name: str, items: Sequence[tuple[dict, Crosswalk]], *, per_resource: bool) -> list[GoldenField]:
+    """Clinical lists: every distinct item survives with its own crosswalk.
+
+    ``per_resource`` keeps every resource (orders: two same-code orders are two orders).
+    Otherwise one value per (code, source record) survives and an ``active`` one wins over
+    an inactive one whatever their order in the payload."""
+    best: dict[str, tuple[int, int, dict, Crosswalk]] = {}
+    for position, (value, crosswalk) in enumerate(items):
         key = f"{value.get('code')}|{crosswalk.source_system}|{crosswalk.source_record_id}"
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(GoldenField(field=name, value=value, crosswalk=crosswalk, rule=RULE_UNION))
-    return out
+        if per_resource:
+            key += f"|{value.get('resourceId')}"
+        rank = 0 if value.get("status") == "active" else 1
+        if key not in best or rank < best[key][0]:
+            best[key] = (rank, position, value, crosswalk)
+    return [GoldenField(field=name, value=value, crosswalk=crosswalk, rule=RULE_UNION)
+            for _, _, value, crosswalk in sorted(best.values(), key=lambda b: b[1])]

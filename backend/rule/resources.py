@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from backend.rule.terminology import ANAPHYLAXIS_SNOMED, RXNORM_SYSTEM, load_terminology
+from backend.rule.terminology import ANAPHYLAXIS_SNOMED, RXNORM_SYSTEM, SNOMED_SYSTEM, load_terminology
 from contracts.models.common import SourceKind
 from contracts.models.entities import TimelineVerification
 
@@ -44,18 +44,27 @@ class Coding:
     display: str | None
 
 
+def is_rxnorm(system: str | None) -> bool:
+    return system is not None and "rxnorm" in system.lower()
+
+
 @dataclass(frozen=True)
 class Reaction:
     severity: str | None                      # mild / moderate / severe, lower-case; None when not recorded
-    manifestation_codes: tuple[str, ...]      # SNOMED codes
+    manifestations: tuple[Coding, ...]        # every coding of every manifestation, system kept
     manifestation_display: str | None
+
+
+def is_anaphylaxis(reaction: Reaction) -> bool:
+    """Only SNOMED CT 39579001 counts; a local system reusing the digits does not."""
+    return any(c.system == SNOMED_SYSTEM and c.code == ANAPHYLAXIS_SNOMED for c in reaction.manifestations)
 
 
 def worst_reaction(reactions: tuple[Reaction, ...]) -> Reaction | None:
     """Anaphylaxis first, then the explicit severity rank; shared by the card and the timeline."""
     if not reactions:
         return None
-    return max(reactions, key=lambda r: (ANAPHYLAXIS_SNOMED in r.manifestation_codes, _SEVERITY_RANK.get(r.severity, 0)))
+    return max(reactions, key=lambda r: (is_anaphylaxis(r), _SEVERITY_RANK.get(r.severity, 0)))
 
 
 @dataclass(frozen=True)
@@ -71,7 +80,8 @@ class SourceRef:
 @dataclass(frozen=True)
 class AllergyRecord:
     ref: SourceRef
-    code: Coding | None
+    code: Coding | None                       # preferred coding: the first RxNorm one, else the first
+    codings: tuple[Coding, ...]               # every coding; eligibility scans all of them
     type: str | None                          # allergy / intolerance; None when absent (never eligible)
     clinical_status: str | None               # active / inactive / resolved
     verification_status: str | None           # confirmed / unconfirmed / refuted / entered-in-error; None = not stated
@@ -84,6 +94,7 @@ class AllergyRecord:
 class OrderRecord:
     ref: SourceRef
     code: Coding | None
+    codings: tuple[Coding, ...]
     status: str | None                        # FHIR MedicationRequest.status
     intent: str | None
     authored_at: datetime | None
@@ -145,13 +156,20 @@ def _walk_resources(node: Any) -> Iterator[dict]:
             yield from _walk_resources(item)
 
 
-def _first_coding(concept: Mapping | None) -> Coding | None:
+def _codings(concept: Mapping | None) -> tuple[Coding, ...]:
     if not concept:
-        return None
-    for coding in concept.get("coding") or []:
-        if coding.get("code"):
-            return Coding(system=coding.get("system"), code=str(coding["code"]), display=coding.get("display") or concept.get("text"))
-    return None
+        return ()
+    return tuple(Coding(system=c.get("system"), code=str(c["code"]), display=c.get("display") or concept.get("text"))
+                 for c in concept.get("coding") or [] if c.get("code"))
+
+
+def preferred_coding(codings: tuple[Coding, ...]) -> Coding | None:
+    """The RxNorm coding when there is one, else the first: display never depends on coding order."""
+    return next((c for c in codings if is_rxnorm(c.system)), codings[0] if codings else None)
+
+
+def _first_coding(concept: Mapping | None) -> Coding | None:
+    return preferred_coding(_codings(concept))
 
 
 def _first_code(concept: Mapping | None) -> str | None:
@@ -176,11 +194,12 @@ def _fhir_allergy(base: MemberResources, r: Mapping, index: int) -> AllergyRecor
     reactions = []
     for reaction in r.get("reaction") or []:
         manifestations = reaction.get("manifestation") or []
-        codes = tuple(c.code for m in manifestations if (c := _first_coding(m)))
-        display = next((c.display for m in manifestations if (c := _first_coding(m)) and c.display), None)
-        reactions.append(Reaction((reaction.get("severity") or None), codes, display))
+        codings = tuple(c for m in manifestations for c in _codings(m))
+        display = next((c.display for c in codings if c.display), None)
+        reactions.append(Reaction((reaction.get("severity") or None), codings, display))
+    codings = _codings(r.get("code"))
     return AllergyRecord(
-        ref=_fhir_ref(base, r, index), code=_first_coding(r.get("code")), type=r.get("type"),
+        ref=_fhir_ref(base, r, index), code=preferred_coding(codings), codings=codings, type=r.get("type"),
         clinical_status=_first_code(r.get("clinicalStatus")), verification_status=_first_code(r.get("verificationStatus")),
         criticality=r.get("criticality"), reactions=tuple(reactions), recorded_at=parse_timestamp(r.get("recordedDate")),
     )
@@ -189,10 +208,12 @@ def _fhir_allergy(base: MemberResources, r: Mapping, index: int) -> AllergyRecor
 def _fhir_order(base: MemberResources, r: Mapping, index: int, medications: Mapping[str, Mapping]) -> OrderRecord:
     concept = r.get("medicationCodeableConcept")
     if concept is None and (ref := (r.get("medicationReference") or {}).get("reference")):
-        med = medications.get(ref.split("/")[-1].replace("urn:uuid:", ""))
-        concept = (med or {}).get("code")
+        # "#id" (contained), "urn:uuid:id" (transaction bundle) or "Medication/id" all key the same map
+        med_id = ref.lstrip("#").split("/")[-1].replace("urn:uuid:", "")
+        concept = (medications.get(med_id) or {}).get("code")
+    codings = _codings(concept)
     return OrderRecord(
-        ref=_fhir_ref(base, r, index), code=_first_coding(concept), status=r.get("status"), intent=r.get("intent"),
+        ref=_fhir_ref(base, r, index), code=preferred_coding(codings), codings=codings, status=r.get("status"), intent=r.get("intent"),
         authored_at=parse_timestamp(r.get("authoredOn")), requester_display=(r.get("requester") or {}).get("display"),
     )
 
@@ -278,11 +299,14 @@ def _csv_allergy(base: MemberResources, row: Mapping, index: int) -> AllergyReco
     for n in ("1", "2"):
         code, severity = row.get(f"REACTION{n}"), row.get(f"SEVERITY{n}")
         if code or severity:
-            reactions.append(Reaction((str(severity).lower() or None) if severity else None,
-                                      (str(code),) if code else (), row.get(f"DESCRIPTION{n}") or None))
+            description = row.get(f"DESCRIPTION{n}") or None
+            # Synthea reaction codes are SNOMED CT (CSV data dictionary); the adapter says so explicitly
+            manifestations = (Coding(SNOMED_SYSTEM, str(code), description),) if code else ()
+            reactions.append(Reaction((str(severity).lower() or None) if severity else None, manifestations, description))
+    code = _csv_code(row)
     return AllergyRecord(
         ref=_csv_ref(base, ALLERGY_FILE, row, index),
-        code=_csv_code(row),
+        code=code, codings=(code,) if code else (),
         type=(str(row.get("TYPE")).lower() or None) if row.get("TYPE") else None,
         clinical_status="active" if not row.get("STOP") else "inactive",
         verification_status=None,  # allergies.csv carries no verificationStatus: "not stated in source"
@@ -292,9 +316,10 @@ def _csv_allergy(base: MemberResources, row: Mapping, index: int) -> AllergyReco
 
 
 def _csv_order(base: MemberResources, row: Mapping, index: int) -> OrderRecord:
+    code = _csv_code(row)
     return OrderRecord(
         ref=_csv_ref(base, MEDICATION_FILE, row, index),
-        code=_csv_code(row),
+        code=code, codings=(code,) if code else (),
         status=str(row["STATUS"]).lower() if row.get("STATUS") else ("active" if not row.get("STOP") else "completed"),
         intent=str(row["INTENT"]).lower() if row.get("INTENT") else "order",
         authored_at=parse_timestamp(row.get("START")), requester_display=row.get("PROVIDER") or None,

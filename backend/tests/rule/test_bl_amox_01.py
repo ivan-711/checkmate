@@ -258,3 +258,40 @@ def test_idless_fhir_resources_get_distinct_references():
     refs = {a.ref.resource_id for a in member.allergies}
     assert len(refs) == 2 and all(r.startswith("AllergyIntolerance/_") for r in refs)
     assert len({f.key for f in evaluate([member])}) == 2
+
+
+# Codex review (PR #3) regressions -------------------------------------------------------
+
+def test_eligibility_scans_every_coding_not_only_the_first():
+    allergy = fhir_allergy()
+    allergy["code"]["coding"].insert(0, {"system": "urn:local:allergens", "code": "PEN-V", "display": "Penicillin (local)"})
+    order = fhir_order()
+    order["medicationCodeableConcept"]["coding"].insert(0, {"system": "urn:local:formulary", "code": "AMX500", "display": "Amox 500"})
+    (flag,) = evaluate([er_member(allergy, order)])
+    assert flag.tier == AlertTier.A
+    assert "coded penicillin V (RxNorm 7984;" in flag.card_text and "RxNorm 308192." in flag.card_text
+
+
+def test_anaphylaxis_requires_the_snomed_system():
+    local = fhir_allergy(reactions=())
+    local["reaction"] = [{"manifestation": [{"coding": [{"system": "urn:local:reactions", "code": "39579001", "display": "Anaphylaxis"}]}],
+                         "severity": "mild"}]
+    (flag,) = evaluate([er_member(local, fhir_order())])
+    assert flag.tier == AlertTier.B, "a local system reusing the digits is not SNOMED anaphylaxis"
+    snomed = fhir_allergy(reactions=(("39579001", "Anaphylaxis (disorder)", "mild"),))
+    (flag,) = evaluate([er_member(snomed, fhir_order())])
+    assert flag.tier == AlertTier.A and "reaction: anaphylaxis, mild" in flag.card_text
+
+
+def test_contained_medication_reference_resolves():
+    order = fhir_order()
+    concept = order.pop("medicationCodeableConcept")
+    order["medicationReference"] = {"reference": "#amox"}
+    order["contained"] = [{"resourceType": "Medication", "id": "amox", "code": concept}]
+    (flag,) = evaluate([er_member(fhir_allergy(), order)])
+    assert flag.tier == AlertTier.A and "Amoxicillin 500 MG Oral Tablet, RxNorm 308192" in flag.card_text
+    bundle_ref = fhir_order()
+    bundle_ref.pop("medicationCodeableConcept")
+    bundle_ref["medicationReference"] = {"reference": "urn:uuid:med-9"}
+    (flag,) = evaluate([er_member(fhir_allergy(), bundle_ref, {"resourceType": "Medication", "id": "med-9", "code": concept})])
+    assert flag.tier == AlertTier.A

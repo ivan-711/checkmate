@@ -190,3 +190,50 @@ def test_revoke_that_does_not_disconnect_writes_no_split_event(conn):
     result = apply_revoke(conn, pair_ab, revoked)
     assert len(result.entities) == 1 and result.entities[0].id == entity.id
     assert "ENTITY_SPLIT" not in events(conn, entity_id=entity.id)
+
+
+def test_concurrent_approvals_serialize_on_the_link_graph_lock(engine):
+    """Codex finding 1: AB and CD exist; T1 approves B-C and pauses before commit; T2 approves D-E.
+    Without the advisory lock T2 reads edges without B-C and leaves E in a stale CD entity."""
+    import threading
+
+    with engine.begin() as c:
+        mk = lambda i: insert_record(c, system="ER_FHIR", local_id=f"CC{i}", kind=SourceKind.FHIR_PATIENT,
+                                     raw_payload={"resourceType": "Patient", "id": f"cc{i}"}, ingested_at=T0 + timedelta(minutes=i))
+        a, b, c_, d, e = records = [mk(i) for i in range(5)]
+        apply_approve(c, *linked_pair(c, a, b))
+        apply_approve(c, *linked_pair(c, c_, d))
+        pair_bc, pair_de = insert_pair(c, b, c_), insert_pair(c, d, e)
+        for p in (pair_bc, pair_de):
+            insert_decision(c, p, 1, DecisionStatus.PROPOSED, actor="system:scorer", actor_type="SYSTEM")
+    outcome: dict = {}
+    try:
+        conn1 = engine.connect()
+        tx1 = conn1.begin()
+        apply_approve(conn1, pair_bc, insert_decision(conn1, pair_bc, 2, DecisionStatus.LINKED))  # holds the lock
+
+        def second_approval():
+            with engine.begin() as c2:
+                outcome["entity"] = apply_approve(c2, pair_de, insert_decision(c2, pair_de, 2, DecisionStatus.LINKED))[0]
+
+        t2 = threading.Thread(target=second_approval)
+        t2.start()
+        t2.join(0.5)
+        assert t2.is_alive(), "the second approval must wait for the first to commit"
+        tx1.commit()
+        conn1.close()
+        t2.join(5)
+        assert not t2.is_alive() and "entity" in outcome
+        with engine.connect() as c:
+            rows = c.execute(text("SELECT DISTINCT entity_id FROM entity_member WHERE source_record_id = ANY(:ids)"), {"ids": records}).all()
+            assert len(rows) == 1, "all five records end in one entity"
+            assert {m.source_record_id for m in outcome["entity"].members} == set(records)
+    finally:
+        with engine.begin() as c:
+            ents = [r[0] for r in c.execute(text("SELECT DISTINCT entity_id FROM entity_member WHERE source_record_id = ANY(:ids)"), {"ids": records})]
+            pairs = [r[0] for r in c.execute(text("SELECT id FROM candidate_pair WHERE record_a_id = ANY(:ids) OR record_b_id = ANY(:ids)"), {"ids": records})]
+            c.execute(text("DELETE FROM event_log WHERE entity_id = ANY(:e) OR pair_id = ANY(:p)"), {"e": ents, "p": pairs})
+            c.execute(text("DELETE FROM entity WHERE id = ANY(:e)"), {"e": ents})
+            c.execute(text("DELETE FROM match_decision WHERE pair_id = ANY(:p)"), {"p": pairs})
+            c.execute(text("DELETE FROM candidate_pair WHERE id = ANY(:p)"), {"p": pairs})
+            c.execute(text("DELETE FROM source_record WHERE id = ANY(:ids)"), {"ids": records})

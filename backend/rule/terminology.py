@@ -12,6 +12,7 @@ from pathlib import Path
 
 CACHE_DIR = Path(__file__).parent / "cache"
 ANAPHYLAXIS_SNOMED = "39579001"
+SNOMED_SYSTEM = "http://snomed.info/sct"
 RXNORM_SYSTEM = "http://www.nlm.nih.gov/research/umls/rxnorm"
 
 

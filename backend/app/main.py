@@ -39,7 +39,9 @@ engine = make_engine(settings.database_url)
 # Routes the backend implements for real; their stubs are dropped. Lanes add to this set.
 IMPLEMENTED = frozenset({
     ("GET", API_PREFIX + "/health"),
-    ("GET", API_PREFIX + "/entities/{entity_id}"),  # W3b
+    ("GET", API_PREFIX + "/entities/{entity_id}"),           # W3b
+    ("GET", API_PREFIX + "/entities/{entity_id}/timeline"),  # W3b
+    ("GET", API_PREFIX + "/alerts"),                         # W3b
 })
 app = build_app(implemented=IMPLEMENTED)
 
@@ -92,7 +94,7 @@ async def health() -> Health:
 
 
 # W3b: read-time golden record, timeline and alerts (architecture section 5, section 8; ADR-014).
-# The timeline and alerts routes are additive to contracts-v1 (flagged in the lane's PR).
+# Real handlers for the three stubs named in IMPLEMENTED above.
 Limit = Annotated[int, Query(ge=1, description=f"clamped to {LIST_LIMIT_MAX}, never rejected")]
 _NOT_FOUND = _err(ErrorCode.NOT_FOUND)
 _COMMON = _err(ErrorCode.VALIDATION_ERROR, ErrorCode.INTERNAL)
@@ -112,7 +114,7 @@ def get_entity(entity_id: uuid.UUID):
 
 @app.get(API_PREFIX + "/entities/{entity_id}/timeline", response_model=Page[TimelineEvent], tags=["core"],
          responses=_NOT_FOUND | _COMMON,
-         description="Lane W3b (additive). Timeline from the members' encounters, allergies and orders; bounded keyset list.")
+         description="Lane W3b. Timeline across the entity's sources; bounded keyset list.")
 def get_entity_timeline(entity_id: uuid.UUID, limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None):
     try:
         with engine.connect() as conn:
@@ -122,12 +124,12 @@ def get_entity_timeline(entity_id: uuid.UUID, limit: Limit = LIST_LIMIT_DEFAULT,
     return page if page is not None else error_envelope(ErrorCode.NOT_FOUND, "entity not found")
 
 
-@app.get(API_PREFIX + "/alerts", response_model=Page[SafetyAlert], tags=["core"], responses=_COMMON,
-         description="Lane W3b (additive). DetectedIssue-shaped alerts for one entity; bounded keyset list.")
-def list_alerts(entity_id: Annotated[uuid.UUID, Query(alias="entityId")], status: AlertStatus | None = None,
-                limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None):
+@app.get(API_PREFIX + "/alerts", response_model=Page[SafetyAlert], tags=["core"], responses=_NOT_FOUND | _COMMON,
+         description="Lane W3b. DetectedIssue-shaped alerts, optionally for one entity; bounded keyset list.")
+def list_alerts(entity_id: Annotated[uuid.UUID | None, Query(alias="entityId")] = None,
+                status: AlertStatus | None = None, limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None):
     with engine.connect() as conn:
-        if not entity_exists(conn, entity_id):
+        if entity_id is not None and not entity_exists(conn, entity_id):
             return error_envelope(ErrorCode.NOT_FOUND, "entity not found")
         alerts = read_alerts(conn, entity_id, status=status)
     try:

@@ -15,13 +15,16 @@ from backend.rule.resources import (
     ALLERGY_FILE,
     MEDICATION_FILE,
     AllergyRecord,
+    Coding,
     MemberResources,
     OrderRecord,
     SourceRef,
+    is_anaphylaxis,
+    is_rxnorm,
     strip_snomed_tag,
     worst_reaction,
 )
-from backend.rule.terminology import ANAPHYLAXIS_SNOMED, RXNORM_SYSTEM, Terminology, load_terminology
+from backend.rule.terminology import RXNORM_SYSTEM, Terminology, load_terminology
 from contracts.models.alerts import CARD_FOOTER, AlertStatus, AlertTier, Citation, ResourceRef, SafetyAlert
 from contracts.version import RULE_ID, RULE_VERSION
 
@@ -73,15 +76,14 @@ class RuleFlag:
 
 # Eligibility ----------------------------------------------------------------------------
 
-def _is_rxnorm(system: str | None) -> bool:
-    return system is not None and "rxnorm" in system.lower()
+def class_coding(codings: tuple[Coding, ...], term: Terminology) -> Coding | None:
+    """The first RxNorm coding that resolves into the penicillin class, scanning every coding."""
+    return next((c for c in codings if is_rxnorm(c.system) and term.class_ingredients_of(c.code)), None)
 
 
 def is_eligible_allergy(allergy: AllergyRecord, term: Terminology) -> bool:
     return (
-        allergy.code is not None
-        and _is_rxnorm(allergy.code.system)
-        and bool(term.class_ingredients_of(allergy.code.code))
+        class_coding(allergy.codings, term) is not None
         and allergy.type == "allergy"
         and allergy.clinical_status == "active"
         and allergy.verification_status not in INELIGIBLE_VERIFICATIONS
@@ -90,9 +92,7 @@ def is_eligible_allergy(allergy: AllergyRecord, term: Terminology) -> bool:
 
 def is_eligible_order(order: OrderRecord, term: Terminology) -> bool:
     return (
-        order.code is not None
-        and _is_rxnorm(order.code.system)
-        and bool(term.class_ingredients_of(order.code.code))
+        class_coding(order.codings, term) is not None
         and order.status in ELIGIBLE_ORDER_STATUSES
         and order.intent in ELIGIBLE_ORDER_INTENTS
     )
@@ -102,7 +102,7 @@ def is_serious(allergy: AllergyRecord) -> bool:
     return (
         allergy.criticality == SERIOUS_CRITICALITY
         or any(r.severity == SERIOUS_SEVERITY for r in allergy.reactions)
-        or any(ANAPHYLAXIS_SNOMED in r.manifestation_codes for r in allergy.reactions)
+        or any(is_anaphylaxis(r) for r in allergy.reactions)
     )
 
 
@@ -123,7 +123,7 @@ def _reaction_text(allergy: AllergyRecord) -> str:
     worst = worst_reaction(allergy.reactions)
     if worst is None:
         return "not recorded"
-    name = strip_snomed_tag(worst.manifestation_display) or ("anaphylaxis" if ANAPHYLAXIS_SNOMED in worst.manifestation_codes else None)
+    name = strip_snomed_tag(worst.manifestation_display) or ("anaphylaxis" if is_anaphylaxis(worst) else None)
     severity = worst.severity or "severity not recorded"
     return f"{name}, {severity}" if name else severity
 
@@ -133,16 +133,14 @@ def _reaction_word(allergy: AllergyRecord) -> str:
     return worst.severity if worst and worst.severity else "not recorded"
 
 
-def _allergy_sentence(allergy: AllergyRecord) -> str:
-    code = allergy.code
+def _allergy_sentence(allergy: AllergyRecord, code: Coding) -> str:
     display = strip_snomed_tag(code.display) or f"RxNorm {code.code}"
     verification = allergy.verification_status or VERIFICATION_NOT_STATED
     return (f"{_ref_text(allergy.ref, ALLERGY_FILE)} documents an allergy coded {display} (RxNorm {code.code}; "
             f"status active; verification {verification}; reaction: {_reaction_text(allergy)}).")
 
 
-def _order_sentence(order: OrderRecord) -> str:
-    code = order.code
+def _order_sentence(order: OrderRecord, code: Coding) -> str:
     display = code.display or f"RxNorm {code.code}"
     return f"{_ref_text(order.ref, MEDICATION_FILE)} has an active order for {display}, RxNorm {code.code}."
 
@@ -154,9 +152,10 @@ def _citation_sentence(citation: Citation | None, drug_name: str | None) -> str:
 
 
 def render_card(tier: AlertTier, revealed: bool, allergy: AllergyRecord, order: OrderRecord,
-                citation: Citation | None, drug_name: str | None) -> str:
+                citation: Citation | None, drug_name: str | None, term: Terminology) -> str:
     first = REVEAL_SENTENCE if revealed else NON_REVEAL_SENTENCE
-    body = [first, _allergy_sentence(allergy), CLASS_SENTENCE, _order_sentence(order)]
+    body = [first, _allergy_sentence(allergy, class_coding(allergy.codings, term)), CLASS_SENTENCE,
+            _order_sentence(order, class_coding(order.codings, term))]
     if tier == AlertTier.A:
         return " ".join([HEADLINE_A, *body, _citation_sentence(citation, drug_name), CLOSING])
     reaction = f"The documented reaction is {_reaction_word(allergy)}; this rule cannot tell whether it is serious."
@@ -166,7 +165,7 @@ def render_card(tier: AlertTier, revealed: bool, allergy: AllergyRecord, order: 
 # Evaluation -----------------------------------------------------------------------------
 
 def _citation_for(order: OrderRecord, term: Terminology) -> tuple[Citation | None, str | None]:
-    label = term.label_for(term.ingredients_of(order.code.code))
+    label = term.label_for(term.ingredients_of(class_coding(order.codings, term).code))
     if label is None:
         return None, None
     return Citation(label_name=label.label_name, set_id=label.set_id, revised=label.revised, url=label.url,
@@ -188,7 +187,7 @@ def evaluate(members: Sequence[MemberResources], term: Terminology | None = None
             citation, drug_name = _citation_for(order, term) if tier == AlertTier.A else (None, None)
             flags.append(RuleFlag(
                 tier=tier, revealed_by_merge=revealed, allergy=allergy, order=order,
-                card_text=render_card(tier, revealed, allergy, order, citation, drug_name), citation=citation,
+                card_text=render_card(tier, revealed, allergy, order, citation, drug_name, term), citation=citation,
                 constructed_scenario=allergy.ref.is_constructed or order.ref.is_constructed,
             ))
     flags.sort(key=lambda f: (str(f.allergy.ref.source_record_id), f.allergy.ref.resource_id,
