@@ -295,3 +295,10 @@ def test_contained_medication_reference_resolves():
     bundle_ref["medicationReference"] = {"reference": "urn:uuid:med-9"}
     (flag,) = evaluate([er_member(fhir_allergy(), bundle_ref, {"resourceType": "Medication", "id": "med-9", "code": concept})])
     assert flag.tier == AlertTier.A
+
+
+def test_detected_issue_states_the_csv_order_rule():
+    from backend.rule.bl_amox_01 import CSV_ORDER_NOTE
+    (flag,) = flags_for([HERO_ALLERGY, HERO_ORDER], LINK)
+    issue = detected_issue(to_safety_alert(flag, alert_id=ER, entity_id=CLINIC, identified_at=T0))
+    assert CSV_ORDER_NOTE in issue["note"] and "derived from STOP" in CSV_ORDER_NOTE

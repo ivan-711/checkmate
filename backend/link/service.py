@@ -52,10 +52,13 @@ _DECISION = text(
     "cp.record_a_id, cp.record_b_id FROM match_decision md JOIN candidate_pair cp ON cp.id = md.pair_id "
     "WHERE md.id = :decision_id"
 )
+# An approved edge is a current LINKED decision written by a registrar. ADR-015 says only humans
+# create LINKED; this clause makes the identity gate hold even if a future writer forgets that.
+APPROVING_ACTOR_TYPE = ActorType.REGISTRAR
 _LINKED_EDGES = text(
     "SELECT cp.id AS pair_id, cp.record_a_id, cp.record_b_id FROM candidate_pair cp "
-    "JOIN LATERAL (SELECT status FROM match_decision WHERE pair_id = cp.id ORDER BY version DESC LIMIT 1) d ON true "
-    "WHERE d.status = 'LINKED'"
+    "JOIN LATERAL (SELECT status, actor_type FROM match_decision WHERE pair_id = cp.id ORDER BY version DESC LIMIT 1) d "
+    "ON true WHERE d.status = 'LINKED' AND d.actor_type = :actor_type"
 )
 _INGEST_ORDER = text("SELECT id FROM source_record WHERE id = ANY(:ids) ORDER BY ingested_at, id")
 _MEMBERSHIP = text("SELECT entity_id, source_record_id FROM entity_member WHERE source_record_id = ANY(:ids)")
@@ -120,7 +123,8 @@ def _context(row, mode: Mode, request_id: str | None) -> EventContext:
 
 
 def _linked_edges(conn: Connection) -> list[tuple[UUID, UUID, UUID]]:
-    return [(r["record_a_id"], r["record_b_id"], r["pair_id"]) for r in conn.execute(_LINKED_EDGES).mappings()]
+    rows = conn.execute(_LINKED_EDGES, {"actor_type": APPROVING_ACTOR_TYPE.value}).mappings()
+    return [(r["record_a_id"], r["record_b_id"], r["pair_id"]) for r in rows]
 
 
 def _ingest_order(conn: Connection, ids: set[UUID]) -> list[UUID]:
@@ -240,6 +244,8 @@ def apply_approve(conn: Connection, pair_id: UUID, decision_id: UUID, *, mode: M
     its members, append ENTITY_MERGED, run the rule, raise or retract alerts."""
     lock_link_graph(conn)
     row = _decision(conn, pair_id, decision_id, DecisionStatus.LINKED)
+    if row["actor_type"] != APPROVING_ACTOR_TYPE.value:  # spec section 5 row 13: no human approval, no link
+        raise LinkError(f"decision {decision_id} is LINKED by {row['actor']}; only a registrar's approval links records")
     ctx = _context(row, mode, request_id)
     edges = _linked_edges(conn)
     component = set(components([(a, b) for a, b, _ in edges], [row["record_a_id"], row["record_b_id"]])[row["record_a_id"]])

@@ -18,9 +18,9 @@ from backend.app.config import load_settings
 from backend.app.db import db_is_up, make_engine
 from backend.golden.service import alert_page, entity_exists, read_alerts, read_entity, read_timeline
 from backend.golden.timeline import BadCursor
-from contracts.api_spec import _err, build_app, error_envelope
+from contracts.api_spec import build_app, error_envelope
 from contracts.models.alerts import AlertStatus, SafetyAlert
-from contracts.models.common import ErrorCode, Page
+from contracts.models.common import ERROR_STATUS, ErrorCode, ErrorEnvelope, Page
 from contracts.models.entities import Entity, TimelineEvent
 from contracts.models.health import AgentStatus, DependencyStatus, Health, HealthVersions
 from contracts.version import (
@@ -96,8 +96,15 @@ async def health() -> Health:
 # W3b: read-time golden record, timeline and alerts (architecture section 5, section 8; ADR-014).
 # Real handlers for the three stubs named in IMPLEMENTED above.
 Limit = Annotated[int, Query(ge=1, description=f"clamped to {LIST_LIMIT_MAX}, never rejected")]
-_NOT_FOUND = _err(ErrorCode.NOT_FOUND)
-_COMMON = _err(ErrorCode.VALIDATION_ERROR, ErrorCode.INTERNAL)
+
+
+def _responses(*codes: ErrorCode) -> dict:
+    """OpenAPI ``responses`` entries for the error envelope (the same shape api_spec uses for its stubs)."""
+    return {ERROR_STATUS[c]: {"model": ErrorEnvelope, "description": c.value} for c in codes}
+
+
+_NOT_FOUND = _responses(ErrorCode.NOT_FOUND)
+_COMMON = _responses(ErrorCode.VALIDATION_ERROR, ErrorCode.INTERNAL)
 
 
 def _clamp(limit: int) -> int:

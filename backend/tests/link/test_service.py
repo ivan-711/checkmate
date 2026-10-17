@@ -237,3 +237,20 @@ def test_concurrent_approvals_serialize_on_the_link_graph_lock(engine):
             c.execute(text("DELETE FROM match_decision WHERE pair_id = ANY(:p)"), {"p": pairs})
             c.execute(text("DELETE FROM candidate_pair WHERE id = ANY(:p)"), {"p": pairs})
             c.execute(text("DELETE FROM source_record WHERE id = ANY(:ids)"), {"ids": records})
+
+
+def test_system_written_linked_row_never_links_or_fires(conn):
+    """R3b finding 1: an approved edge is a LINKED decision with actor_type REGISTRAR."""
+    clinic, er = hero_records(conn)
+    pair = insert_pair(conn, clinic, er)
+    auto = insert_decision(conn, pair, 1, DecisionStatus.LINKED, actor="system:scorer", actor_type="SYSTEM", band="AUTO_LINK")
+    with pytest.raises(LinkError):
+        apply_approve(conn, pair, auto)
+    assert conn.execute(text("SELECT count(*) FROM entity_member")).scalar() == 0
+    assert conn.execute(text("SELECT count(*) FROM safety_alert")).scalar() == 0
+    # a system LINKED row on another pair is not an edge either: the human approval below links two records, not three
+    third = insert_record(conn, system="ER_FHIR", local_id="ER-MRN-3", kind=SourceKind.FHIR_PATIENT,
+                          raw_payload={"resourceType": "Patient", "id": "p3"}, ingested_at=T0 + timedelta(minutes=9))
+    insert_decision(conn, insert_pair(conn, er, third), 1, DecisionStatus.LINKED, actor="system:scorer", actor_type="SYSTEM")
+    entity, _ = apply_approve(conn, *linked_pair(conn, clinic, er))
+    assert {m.source_record_id for m in entity.members} == {clinic, er}

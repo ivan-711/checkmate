@@ -45,6 +45,10 @@ REVEAL_SENTENCE = ("Two records that were previously separate are now linked to 
                    "identity link.")
 NON_REVEAL_SENTENCE = "Both records come from the same source."
 CLASS_SENTENCE = "This rule treats that code as penicillin-class."
+# Evidence panel statement (reviewer R3b, finding 9): the spec defines eligible orders on MedicationRequest;
+# a medications.csv row is admitted on the adapter rule from section 4, and the panel says so.
+CSV_ORDER_NOTE = ("A medications.csv row with an empty STOP is treated as an active order with intent order "
+                  "(CSV order status derived from STOP); a row with a STOP date is completed and never fires.")
 CLOSING = ("This is a rule-based flag on synthetic data. It does not say what the patient took or tolerated, "
            "or what should be prescribed. A clinician decides.")
 
@@ -232,7 +236,7 @@ def detected_issue(alert: SafetyAlert) -> dict:
         "reference": alert.citation.url if alert.citation else None,
         "evidence": [{"detail": [{"display": f"tier {alert.tier.value}; revealed_by_merge={str(alert.revealed_by_merge).lower()}"}]}],
         "note": ["DetectedIssueCategory has no allergy code; code.text plus the local code BL-AMOX-01 is used instead.",
-                 alert.card_footer],
+                 CSV_ORDER_NOTE, alert.card_footer],
         "meta": {"tag": [{"system": "urn:chartguard:provenance", "code": "constructed-scenario"}]} if alert.constructed_scenario else {},
         "extension": [{"url": "urn:chartguard:terminology-snapshot", "valueString": RXNORM_SYSTEM}],
     }
