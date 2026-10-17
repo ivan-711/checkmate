@@ -1,0 +1,25 @@
+{
+  "class_id": "N0000175497",
+  "class_name": "Penicillin-class Antibacterial",
+  "class_type": "EPC",
+  "rela_sources": ["DAILYMED", "FDASPL", "MEDRT"],
+  "rxnav_version": "05-Oct-2026",
+  "fetched": "2026-10-17",
+  "source_url": "https://rxnav.nlm.nih.gov/REST/rxclass/classMembers.json?classId=N0000175497&relaSource=DAILYMED",
+  "note": "Offline snapshot; the runtime makes no network call. Entries with verified=false were folded from the corpus by the team, not read from RxClass.",
+  "ingredients": [
+    {"rxcui": "7984", "name": "penicillin V", "tty": "IN", "verified": true},
+    {"rxcui": "733", "name": "ampicillin", "tty": "IN", "verified": true},
+    {"rxcui": "7980", "name": "penicillin G", "tty": "IN", "verified": true},
+    {"rxcui": "7233", "name": "nafcillin", "tty": "IN", "verified": true},
+    {"rxcui": "7773", "name": "oxacillin", "tty": "IN", "verified": true},
+    {"rxcui": "3356", "name": "dicloxacillin", "tty": "IN", "verified": true},
+    {"rxcui": "10591", "name": "ticarcillin", "tty": "IN", "verified": true},
+    {"rxcui": "723", "name": "amoxicillin", "tty": "IN", "verified": true, "via": "MED-RT D010406 Penicillins (has_chemical_structure)"},
+    {"rxcui": "8339", "name": "piperacillin", "tty": "IN", "verified": false, "via": "IN of PIN 1546000 piperacillin anhydrous, which RxClass lists as a member"}
+  ],
+  "pin_to_in": {
+    "1297882": "723",
+    "1546000": "8339"
+  }
+}
