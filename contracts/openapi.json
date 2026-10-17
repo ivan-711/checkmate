@@ -473,6 +473,17 @@
         "title": "EntityMember",
         "type": "object"
       },
+      "EntryPoint": {
+        "enum": [
+          "API",
+          "CLI",
+          "EVAL_WORKER",
+          "REPLAY",
+          "AGENT"
+        ],
+        "title": "EntryPoint",
+        "type": "string"
+      },
       "ErrorBody": {
         "additionalProperties": false,
         "properties": {
@@ -537,6 +548,275 @@
         ],
         "title": "ErrorEnvelope",
         "type": "object"
+      },
+      "EventLogRow": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "actorType": {
+            "$ref": "#/components/schemas/ActorType"
+          },
+          "band": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Band"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clientRequestId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clientrequestid"
+          },
+          "decisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisionid"
+          },
+          "effectStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectstatus"
+          },
+          "entityId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entityid"
+          },
+          "entryPoint": {
+            "$ref": "#/components/schemas/EntryPoint"
+          },
+          "eventId": {
+            "format": "uuid",
+            "title": "Eventid",
+            "type": "string"
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/EventType"
+          },
+          "evidenceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Evidenceids",
+            "type": "array"
+          },
+          "evidenceSnapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidencesnapshot"
+          },
+          "gateOutcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gateoutcome"
+          },
+          "intakeSessionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intakesessionid"
+          },
+          "latencyMs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latencyms"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/Mode"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "pairId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pairid"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "description": "validated args or summary; never free text",
+            "title": "Payload",
+            "type": "object"
+          },
+          "reasonCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoncode"
+          },
+          "requestId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requestid"
+          },
+          "runId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runid"
+          },
+          "toolCallId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toolcallid"
+          },
+          "toolName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toolname"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "versions": {
+            "$ref": "#/components/schemas/Versions"
+          }
+        },
+        "required": [
+          "ts",
+          "eventId",
+          "eventType",
+          "entryPoint",
+          "actor",
+          "actorType",
+          "mode"
+        ],
+        "title": "EventLogRow",
+        "type": "object"
+      },
+      "EventType": {
+        "description": "The TEXT + CHECK list in migration 0001. Migration 0002 widens it after 16:00.",
+        "enum": [
+          "RECORD_INGESTED",
+          "MATCH_RUN_COMPLETED",
+          "PAIR_SCORED",
+          "LINK_APPROVED",
+          "LINK_REJECTED",
+          "LINK_REVOKED",
+          "ENTITY_MERGED",
+          "ENTITY_SPLIT",
+          "ALERT_RAISED",
+          "ALERT_RETRACTED",
+          "WHATIF_APPLIED",
+          "DEMO_RESET",
+          "DEMO_RESTORED",
+          "EXPLANATION_GENERATED",
+          "EXTERNAL_CALL",
+          "EVAL_RUN_STARTED",
+          "EVAL_RUN_FINISHED",
+          "INTAKE_STARTED",
+          "AGENT_TOOL_CALLED",
+          "INTAKE_HANDOFF_CREATED",
+          "AGENT_TURN_DEGRADED"
+        ],
+        "title": "EventType",
+        "type": "string"
       },
       "EvidenceKind": {
         "enum": [
@@ -1410,6 +1690,15 @@
         "title": "MergePreview",
         "type": "object"
       },
+      "Mode": {
+        "enum": [
+          "LIVE",
+          "LOCAL",
+          "REPLAY"
+        ],
+        "title": "Mode",
+        "type": "string"
+      },
       "NormalizedRecord": {
         "additionalProperties": false,
         "properties": {
@@ -1571,6 +1860,34 @@
           "items"
         ],
         "title": "Page[CandidatePair]",
+        "type": "object"
+      },
+      "Page_EventLogRow_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventLogRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[EventLogRow]",
         "type": "object"
       },
       "Page_HistoryEvent_": {
@@ -2554,6 +2871,91 @@
         "title": "TurnRequest",
         "type": "object"
       },
+      "Versions": {
+        "additionalProperties": false,
+        "description": "Every agent_tool_called event and every replay recording carries promptVersion.",
+        "properties": {
+          "modelId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelid"
+          },
+          "policyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policyversion"
+          },
+          "promptVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Promptversion"
+          },
+          "scorerVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scorerversion"
+          },
+          "thresholdSetId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thresholdsetid"
+          },
+          "toolSchemaVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toolschemaversion"
+          },
+          "transcriptSha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcriptsha256"
+          }
+        },
+        "title": "Versions",
+        "type": "object"
+      },
       "WhatIfButton": {
         "enum": [
           "REMOVE_ADDRESS",
@@ -3446,6 +3848,88 @@
           }
         },
         "summary": "Get Entity Timeline",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "description": "Lane W3a (additive, G16 step 7). The append-only event feed, newest first; bounded list with an opaque keyset cursor over (ts, eventId).",
+        "operationId": "list_events_api_v1_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_EventLogRow_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "List Events",
         "tags": [
           "core"
         ]
