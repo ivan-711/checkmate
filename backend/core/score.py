@@ -106,11 +106,39 @@ def display_probability(raw_score: float, weights: Weights) -> float:
     return sigmoid(-(weights.platt_a * raw_score + weights.platt_b))
 
 
+NICKNAME_FEATURE = "given_nickname"
+# The given-name similarity features a nickname stands in for; an identical name scores 1.0 on each.
+GIVEN_SIMILARITY_FEATURES: tuple[str, ...] = tuple(
+    name for name in FEATURE_NAMES if name.startswith("given_") and name != NICKNAME_FEATURE
+)
+
+
+def capped_nickname_value(values: Mapping[str, float | None], weights: Weights) -> float | None:
+    """The nickname feature's effective value: it may restore at most what the given name lost.
+
+    A nickname pair ("Will" / "Willie") would otherwise earn its full credit on top of a near-identical
+    spelling and outscore the unchanged name. Capping the credit at the gap to an identical given name
+    leaves every pair that lost more than the credit (Bob/Robert, Paco/Francisco) untouched.
+    """
+    value = values.get(NICKNAME_FEATURE)
+    weight = weights.weights[NICKNAME_FEATURE]
+    if value is None or value == 0.0 or weight <= 0.0:
+        return value
+    identical = math.fsum(weights.weights[name] for name in GIVEN_SIMILARITY_FEATURES)
+    actual = math.fsum(weights.weights[name] * (values.get(name) or 0.0) for name in GIVEN_SIMILARITY_FEATURES)
+    room = max(0.0, identical - actual)
+    return min(value, room / weight)
+
+
 def score_pair(fv: FeatureVector, weights: Weights) -> ScoreResult:
-    """Contributions are weight x value in logit space and sum to ``raw_score - intercept``."""
+    """Contributions are weight x value in logit space and sum to ``raw_score - intercept``.
+
+    Each contribution's ``value`` is the value that was weighted; for ``given_nickname`` that is the
+    capped value (``capped_nickname_value``), which can be below the raw feature in ``fv``.
+    """
     contributions: list[Contribution] = []
     for name in FEATURE_NAMES:
-        value = fv.values.get(name)
+        value = capped_nickname_value(fv.values, weights) if name == NICKNAME_FEATURE else fv.values.get(name)
         logit = 0.0 if value is None else weights.weights[name] * value
         contributions.append(Contribution(feature=name, logit=logit, value=value))
     for group, flag in fv.missing.items():
@@ -132,11 +160,9 @@ def score_pair(fv: FeatureVector, weights: Weights) -> ScoreResult:
 # band-changer; siblings sharing surname, address and phone never reach AUTO_LINK. The trained
 # scorer replaces these and they are never called calibrated. backend/core/weights/handset-0.json
 # is this object on disk; a test keeps the two equal.
-# The intercept moved from -11.0 to -12.5 when equal given names began earning the nickname credit
-# (+1.5), so every score above is unchanged.
 HANDSET_WEIGHTS = Weights(
     scorer_version=HANDSET_SCORER_VERSION,
-    intercept=-12.5,
+    intercept=-11.0,
     weights={
         # The folded forms carry more weight than the accented ones so an accent or hyphen
         # variant loses little; the nickname table is the only way "Paco" reaches "Francisco".

@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,12 +25,11 @@ from typing import Any
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, roc_auc_score
-from sklearn.model_selection import GroupKFold
 
 from backend.core.block import candidate_pairs
-from backend.core.features import FEATURE_NAMES, MISSING_GROUPS, compute_features
+from backend.core.features import FEATURE_NAMES, MISSING_GROUPS, FeatureVector, compute_features
 from backend.core.normalize import Normalized, normalize_record
-from backend.core.score import ALL_WEIGHT_NAMES, WEIGHTS_DIR, Weights, save_weights
+from backend.core.score import ALL_WEIGHT_NAMES, WEIGHTS_DIR, Weights, save_weights, score_pair
 from contracts.version import BLOCK_MAX_RECORDS
 
 DEFAULT_FOLDS = 5
@@ -44,6 +44,7 @@ class TruthRow:
     entity_id: str
     component_id: str
     partition: str | None
+    cv_fold: int | None = None  # from the splits assignment when the truth table carries it
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,13 @@ class LabeledPair:
     record_a_id: str
     record_b_id: str
     label: int
-    group: str
+    group: str  # the CV fold both records' components belong to, as a string
+
+
+@dataclass(frozen=True)
+class FoldedPairs:
+    pairs: list[LabeledPair]
+    n_dropped_straddling: int  # blocked pairs whose two components sit in different folds
 
 
 def load_records_csv(path: Path) -> dict[str, Normalized]:
@@ -75,58 +82,68 @@ def load_truth_csv(path: Path, partition: str | None = None) -> dict[str, TruthR
         if partition is not None and row_partition != partition:
             continue
         entity = str(row["entity_id"])
+        fold = row.get("cv_fold")
         truth[str(row["record_id"])] = TruthRow(
-            entity_id=entity, component_id=str(row.get("component_id") or entity), partition=row_partition
+            entity_id=entity,
+            component_id=str(row.get("component_id") or entity),
+            partition=row_partition,
+            cv_fold=int(fold) if fold not in (None, "") else None,
         )
     return truth
 
 
-def _fold_groups(component_pairs: Sequence[tuple[str, str]], components: Sequence[str]) -> dict[str, str]:
-    """Union-find over components joined by a blocked pair: each root is one CV group."""
-    parent = {c: c for c in components}
+def component_fold(component_id: str, n_folds: int) -> int:
+    """Fold of one dependency component by hash (evaluation plan section 3, step 2)."""
+    digest = hashlib.sha256(component_id.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") % n_folds
 
-    def find(c: str) -> str:
-        while parent[c] != c:
-            parent[c] = parent[parent[c]]
-            c = parent[c]
-        return c
 
-    for a, b in component_pairs:
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[max(ra, rb)] = min(ra, rb)  # smaller id as root keeps the grouping deterministic
-    return {c: find(c) for c in components}
+def fold_of(row: TruthRow, n_folds: int) -> int:
+    """The splits assignment's fold when the truth table carries one, else the hash fold."""
+    return row.cv_fold if row.cv_fold is not None else component_fold(row.component_id, n_folds)
+
+
+def folded_pairs(
+    records: Mapping[str, Normalized],
+    truth: Mapping[str, TruthRow],
+    n_folds: int = DEFAULT_FOLDS,
+    max_block_records: int | None = BLOCK_MAX_RECORDS,
+) -> FoldedPairs:
+    """Blocked pairs among labeled records whose two components share a fold.
+
+    Each dependency component is assigned to one fold, so no component sits on both sides of a fold.
+    A blocked pair whose two components fall in different folds belongs to neither and is dropped
+    (and counted) rather than re-labelled (evaluation plan section 3, steps 4-5).
+    """
+    labeled = {rid: rec for rid, rec in records.items() if rid in truth}
+    blocked = candidate_pairs(labeled, max_block_records=max_block_records)
+    kept: list[LabeledPair] = []
+    dropped = 0
+    for p in blocked.pairs:
+        ta, tb = truth[p.record_a_id], truth[p.record_b_id]
+        fold_a, fold_b = fold_of(ta, n_folds), fold_of(tb, n_folds)
+        if fold_a != fold_b:
+            dropped += 1
+            continue
+        kept.append(LabeledPair(p.record_a_id, p.record_b_id, int(ta.entity_id == tb.entity_id), str(fold_a)))
+    return FoldedPairs(pairs=kept, n_dropped_straddling=dropped)
 
 
 def build_labeled_pairs(
     records: Mapping[str, Normalized],
     truth: Mapping[str, TruthRow],
     max_block_records: int | None = BLOCK_MAX_RECORDS,
+    n_folds: int = DEFAULT_FOLDS,
 ) -> list[LabeledPair]:
-    """Blocked pairs among labeled records; label 1 when both share an entity.
-
-    Every blocked pair is kept. Its CV group is the connected component of the dependency
-    components it touches, so every component sits on one side of every fold and a pair is never
-    validated by a model that trained on either of its records' components (evaluation plan
-    section 3, steps 4-5).
-    """
-    labeled = {rid: rec for rid, rec in records.items() if rid in truth}
-    blocked = candidate_pairs(labeled, max_block_records=max_block_records)
-    component_pairs = [(truth[p.record_a_id].component_id, truth[p.record_b_id].component_id) for p in blocked.pairs]
-    group_of = _fold_groups(component_pairs, sorted({t.component_id for t in truth.values()}))
-    return [
-        LabeledPair(
-            p.record_a_id,
-            p.record_b_id,
-            int(truth[p.record_a_id].entity_id == truth[p.record_b_id].entity_id),
-            group_of[ca],
-        )
-        for p, (ca, _) in zip(blocked.pairs, component_pairs, strict=True)
-    ]
+    """The training pairs: ``folded_pairs`` without the drop count."""
+    return folded_pairs(records, truth, n_folds=n_folds, max_block_records=max_block_records).pairs
 
 
 def design_row(a: Normalized, b: Normalized) -> list[float]:
-    fv = compute_features(a, b)
+    return design_row_from(compute_features(a, b))
+
+
+def design_row_from(fv: FeatureVector) -> list[float]:
     values = [0.0 if fv.values[name] is None else float(fv.values[name]) for name in FEATURE_NAMES]
     indicators = [1.0 if fv.missing[group] else 0.0 for group in MISSING_GROUPS]
     return values + indicators
@@ -145,8 +162,12 @@ def _new_model(c: float) -> LogisticRegression:
     return LogisticRegression(C=c, max_iter=MAX_ITER, solver="lbfgs")
 
 
-def _raw_scores(model: LogisticRegression, X: np.ndarray) -> np.ndarray:
-    return model.decision_function(X)
+def weights_from_model(model: LogisticRegression, version: str) -> Weights:
+    return Weights(
+        scorer_version=version,
+        intercept=float(model.intercept_[0]),
+        weights={name: float(w) for name, w in zip(ALL_WEIGHT_NAMES, model.coef_[0], strict=True)},
+    )
 
 
 def data_digest(*paths: Path, partition: str | None, c: float, folds: int) -> str:
@@ -158,6 +179,21 @@ def data_digest(*paths: Path, partition: str | None, c: float, folds: int) -> st
     return h.hexdigest()[:DIGEST_CHARS]
 
 
+def fold_stats(y: np.ndarray, groups: np.ndarray, n_folds: int) -> list[dict[str, int]]:
+    out = []
+    for k in range(n_folds):
+        in_fold = groups == str(k)
+        out.append(
+            {
+                "fold": k,
+                "n_pairs": int(in_fold.sum()),
+                "n_positive": int(y[in_fold].sum()),
+                "n_negative": int((y[in_fold] == 0).sum()),
+            }
+        )
+    return out
+
+
 def fit_weights(
     records: Mapping[str, Normalized],
     truth: Mapping[str, TruthRow],
@@ -166,54 +202,76 @@ def fit_weights(
     n_folds: int = DEFAULT_FOLDS,
     c: float = DEFAULT_C,
     provenance: Mapping[str, Any] | None = None,
+    require_negatives_per_fold: bool = False,
 ) -> tuple[Weights, dict[str, Any], list[dict[str, Any]]]:
-    """(weights, out-of-fold report, out-of-fold rows). Raises when a class or group count is too small."""
-    pairs = build_labeled_pairs(records, truth)
+    """(weights, out-of-fold report, out-of-fold rows).
+
+    Out-of-fold raw scores come from ``score_pair`` with each fold's weights, the same function the
+    API serves, so thresholds chosen on them apply to served scores exactly.
+
+    A fold that is empty or has no negatives says nothing about false merges. With
+    ``require_negatives_per_fold`` (the CLI default, i.e. every real-corpus run) that raises; without
+    it the folds are listed in the report under ``folds_without_negatives`` and a warning is emitted,
+    never silently (small unit-test corpora with one entity per component hit this by construction).
+    """
+    if n_folds < 2:
+        raise ValueError(f"need at least 2 folds, got {n_folds}")
+    folded = folded_pairs(records, truth, n_folds=n_folds)
+    pairs = folded.pairs
     if not pairs:
-        raise ValueError("no blocked pairs among labeled records")
-    X, y, groups = design_matrix(pairs, records)
+        raise ValueError("no blocked pairs whose components share a fold")
+    fvs: list[FeatureVector] = [compute_features(records[p.record_a_id], records[p.record_b_id]) for p in pairs]
+    X = np.array([design_row_from(fv) for fv in fvs], dtype=float)
+    y = np.array([p.label for p in pairs], dtype=int)
+    groups = np.array([p.group for p in pairs])
     if y.min() == y.max():
         raise ValueError("training pairs contain only one class")
-    n_groups = len(set(groups))
-    folds = min(n_folds, n_groups)
-    if folds < 2:
-        raise ValueError(f"need at least 2 components for grouped CV, got {n_groups}")
+    per_fold = fold_stats(y, groups, n_folds)
+    folds_without_negatives = [stats["fold"] for stats in per_fold if stats["n_negative"] == 0]
+    if folds_without_negatives:
+        message = f"folds {folds_without_negatives} have no negative pairs: {per_fold}"
+        if require_negatives_per_fold:
+            raise ValueError(message)
+        warnings.warn(message, UserWarning, stacklevel=2)
     oof = np.full(len(pairs), np.nan)
-    for train_idx, test_idx in GroupKFold(n_splits=folds).split(X, y, groups):
+    for k in range(n_folds):
+        test_mask = groups == str(k)
+        train_idx, test_idx = np.flatnonzero(~test_mask), np.flatnonzero(test_mask)
         if y[train_idx].min() == y[train_idx].max():
-            raise ValueError("a training fold has one class; add components or reduce folds")
-        oof[test_idx] = _raw_scores(_new_model(c).fit(X[train_idx], y[train_idx]), X[test_idx])
+            raise ValueError(f"training data outside fold {k} has one class: {per_fold}")
+        fold_weights = weights_from_model(_new_model(c).fit(X[train_idx], y[train_idx]), f"{version}-fold{k}")
+        for i in test_idx:  # an empty fold simply scores nothing
+            oof[i] = score_pair(fvs[i], fold_weights).raw_score
     final = _new_model(c).fit(X, y)
+    n_components = len({t.component_id for t in truth.values()})
+    counts = {
+        "n_pairs": len(pairs),
+        "n_positive": int(y.sum()),
+        "n_components": n_components,
+        "n_folds": n_folds,
+        "n_dropped_straddling_folds": folded.n_dropped_straddling,
+        "per_fold": per_fold,
+        "folds_without_negatives": folds_without_negatives,
+    }
     weights = Weights(
         scorer_version=version,
         intercept=float(final.intercept_[0]),
         weights={name: float(w) for name, w in zip(ALL_WEIGHT_NAMES, final.coef_[0], strict=True)},
-        trained_on={
-            **dict(provenance or {}),  # provenance first: the computed keys below always win
-            "n_pairs": len(pairs),
-            "n_positive": int(y.sum()),
-            "n_components": len({t.component_id for t in truth.values()}),
-            "n_cv_groups": n_groups,
-            "n_folds": folds,
-            "C": c,
-        },
+        trained_on={**dict(provenance or {}), **counts, "C": c},  # computed keys win over provenance
     )
     predicted_positive = oof >= 0.0
     tp = int(((y == 1) & predicted_positive).sum())
     report = {
         "scorer_version": version,
-        "n_pairs": len(pairs),
-        "n_positive": int(y.sum()),
-        "n_components": len({t.component_id for t in truth.values()}),
-        "n_cv_groups": n_groups,
-        "n_folds": folds,
+        **counts,
         "oof_auc": float(roc_auc_score(y, oof)),
         "oof_average_precision": float(average_precision_score(y, oof)),
         "oof_precision_at_raw_0": tp / max(int(predicted_positive.sum()), 1),
         "oof_recall_at_raw_0": tp / max(int(y.sum()), 1),
         "note": (
             "development, out-of-fold, descriptive; thresholds and Platt are chosen elsewhere on these raw scores. "
-            "Components joined by a blocked pair share a CV group, so every component sits on one side of every fold."
+            "Each component is in one fold (by hash, or the splits file's cv_fold); pairs straddling two folds "
+            "are dropped and counted."
         ),
     }
     oof_rows = [
@@ -222,9 +280,9 @@ def fit_weights(
             "record_b_id": p.record_b_id,
             "label": p.label,
             "group": p.group,
-            "raw_score": float(s),
+            "raw_score": float(score),
         }
-        for p, s in zip(pairs, oof, strict=True)
+        for p, score in zip(pairs, oof, strict=True)
     ]
     return weights, report, oof_rows
 
@@ -246,6 +304,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--partition", default=None, help="keep only truth rows with this partition value")
     parser.add_argument("--folds", type=int, default=DEFAULT_FOLDS)
     parser.add_argument("--c", type=float, default=DEFAULT_C)
+    parser.add_argument(
+        "--allow-folds-without-negatives",
+        action="store_true",
+        help="report, rather than fail on, a CV fold with no negative pairs (never for the real corpus)",
+    )
     args = parser.parse_args(argv)
 
     records = load_records_csv(args.records)
@@ -259,7 +322,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         "truth": args.truth.name,
     }
     weights, report, oof_rows = fit_weights(
-        records, truth, version=version, n_folds=args.folds, c=args.c, provenance=provenance
+        records,
+        truth,
+        version=version,
+        n_folds=args.folds,
+        c=args.c,
+        provenance=provenance,
+        require_negatives_per_fold=not args.allow_folds_without_negatives,
     )
     args.out_dir.mkdir(parents=True, exist_ok=True)
     out = args.out_dir / f"{version}.json"

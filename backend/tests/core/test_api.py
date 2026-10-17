@@ -96,3 +96,26 @@ def test_core_api_imports_no_seam_api_or_frontdesk_module():
     )
     out = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, check=True)
     assert out.stdout.strip() == ""
+
+
+def test_row_platt_map_and_display_thresholds_win_and_weights_are_the_fallback():
+    from backend.core.score import display_probability
+
+    a, b = contract_record(A), contract_record(B)
+    row = SeamThresholds("q5", 0.0, 4.0, platt_a=-0.5, platt_b=0.2, t_low_display=0.45, t_high_display=0.86)
+    with_map = CORE.match(a, b, row)
+    assert (with_map.evidence.platt_a, with_map.evidence.platt_b) == (-0.5, 0.2)
+    assert (with_map.evidence.t_low_display, with_map.evidence.t_high_display) == (0.45, 0.86)
+    assert with_map.logit == CORE.match(a, b, SEAM_DEMO).logit  # Platt never moves the raw score
+    assert with_map.band is CORE.match(a, b, SEAM_DEMO).band
+    fallback = CORE.match(a, b, SEAM_DEMO)
+    assert fallback.evidence.platt_a is None
+    assert fallback.evidence.t_high_display == display_probability(DEMO_THRESHOLDS.c_high, HANDSET_WEIGHTS)
+    assert CORE.weights is HANDSET_WEIGHTS  # the row's map is applied per call, never stored
+
+
+def test_a_row_platt_map_that_would_decrease_p_is_rejected():
+    import pytest
+
+    with pytest.raises(ValueError):
+        CORE.match(contract_record(A), contract_record(B), SeamThresholds("bad", 0.0, 4.0, platt_a=0.5, platt_b=0.0))

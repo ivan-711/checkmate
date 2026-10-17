@@ -133,3 +133,35 @@ def test_platt_parameters_round_trip_through_json(tmp_path):
     save_weights(platt, path)
     loaded = Weights.from_json_dict(json.loads(path.read_text()))
     assert loaded == platt and loaded.platt_a == -0.7
+
+
+def _raw(a, b):
+    return score_pair(compute_features(normalize_record(a), normalize_record(b)), HANDSET_WEIGHTS)
+
+
+WILLIE = {**BASE, "given_name": "Willie"}
+
+
+def test_nickname_credit_is_capped_at_what_the_given_name_lost():
+    same = _raw(WILLIE, WILLIE)
+    will = _raw(WILLIE, {**WILLIE, "given_name": "Will"})
+    assert will.raw_score == pytest.approx(same.raw_score, abs=1e-9)  # cap engaged: lands on identical
+    nick = {c.feature: c for c in will.contributions}["given_nickname"]
+    assert 0.0 < nick.value < 1.0 and nick.logit == pytest.approx(
+        HANDSET_WEIGHTS.weights["given_nickname"] * nick.value
+    )
+
+
+def test_nickname_cap_leaves_pairs_that_lost_more_than_the_credit_untouched():
+    robert = {**BASE, "given_name": "Robert"}
+    bob = _raw(robert, {**robert, "given_name": "Bob"})
+    nick = {c.feature: c for c in bob.contributions}["given_nickname"]
+    assert nick.value == 1.0 and nick.logit == HANDSET_WEIGHTS.weights["given_nickname"]
+
+
+def test_nickname_cap_is_inert_for_a_non_positive_weight_and_for_missing_names():
+    from backend.core.score import capped_nickname_value
+
+    flat = Weights(scorer_version="flat", intercept=0.0, weights={**HANDSET_WEIGHTS.weights, "given_nickname": -0.2})
+    assert capped_nickname_value({"given_nickname": 1.0}, flat) == 1.0
+    assert capped_nickname_value({"given_nickname": None}, HANDSET_WEIGHTS) is None

@@ -14,7 +14,7 @@ First written by the integration helper (967fce2); made duck-typed in lane W2.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Protocol
 
 from backend.core.band import evidence_snapshot
@@ -71,12 +71,25 @@ class Core:
         """S3 keys for one record (``NormalizedRecord``, row or ``Normalized``); placeholders never key."""
         return core_block_keys(coerce_normalized(record))
 
+    def display_weights(self, thresholds: ThresholdsLike) -> Weights:
+        """The weights with the threshold row's Platt map when the row carries one.
+
+        The raw score and band never depend on Platt; only ``p`` and the snapshot's display fields do,
+        and they must agree with ``GET /threshold-sets/current``. ``Weights`` rejects ``platt_a >= 0``.
+        """
+        platt_a = getattr(thresholds, "platt_a", None)
+        platt_b = getattr(thresholds, "platt_b", None)
+        if platt_a is None or platt_b is None:
+            return self.weights
+        return replace(self.weights, platt_a=platt_a, platt_b=platt_b)
+
     def match(self, a: Any, b: Any, thresholds: ThresholdsLike) -> CoreMatch:
         """S4-S6 for one pair through ``backend.core.band.match``; pure."""
         ts = to_threshold_set(thresholds)
-        result = core_match(a, b, self.weights, ts)
+        weights = self.display_weights(thresholds)
+        result = core_match(a, b, weights, ts)
         return CoreMatch(
-            evidence=evidence_snapshot(result, self.weights, ts),
+            evidence=evidence_snapshot(result, weights, ts),
             logit=result.raw_score,
             p=result.p,
             band=result.band,

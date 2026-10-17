@@ -168,8 +168,17 @@ def evidence_snapshot(
         c_high=thresholds.c_high,
         platt_a=weights.platt_a,
         platt_b=weights.platt_b,
-        t_low_display=display_probability(thresholds.c_low, weights),
-        t_high_display=display_probability(thresholds.c_high, weights),
+        # The threshold row's display values win, so the snapshot agrees with /threshold-sets/current.
+        t_low_display=(
+            thresholds.t_low_display
+            if thresholds.t_low_display is not None
+            else display_probability(thresholds.c_low, weights)
+        ),
+        t_high_display=(
+            thresholds.t_high_display
+            if thresholds.t_high_display is not None
+            else display_probability(thresholds.c_high, weights)
+        ),
         negative_rules_fired=[r.value for r in result.negative_rules_fired],
         scorer_version=weights.scorer_version,
         threshold_set_id=thresholds.thresholds_id,

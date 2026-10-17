@@ -10,13 +10,16 @@ import os
 import random
 import subprocess
 import sys
+from dataclasses import dataclass, fields
 from itertools import combinations
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import pytest
 from sklearn.model_selection import GroupKFold
 
+from backend.core.api import CORE
 from backend.core.band import (
     DEMO_THRESHOLDS,
     apply_negative_rules,
@@ -38,6 +41,7 @@ from backend.core.features import FEATURE_NAMES, MISSING_GROUPS, compute_feature
 from backend.core.normalize import fold_text, normalize_record
 from backend.core.score import HANDSET_WEIGHTS, Weights, display_probability, load_weights, score_pair, sigmoid
 from backend.core.train import (
+    TruthRow,
     build_labeled_pairs,
     design_matrix,
     design_row,
@@ -46,6 +50,7 @@ from backend.core.train import (
     load_truth_csv,
 )
 from contracts.models.common import Band, NegativeRule
+from contracts.models.records import NormalizedRecord
 from contracts.models.thresholds import ThresholdSet
 from contracts.version import BLOCK_MAX_RECORDS
 
@@ -557,3 +562,195 @@ def test_negative_rules_are_computed_only_from_normalized_fields_and_features():
     )
     assert negative_rules_for(a, b, compute_features(a, b)) == []
     assert raw_score({**FULL, "ssn": "123-45-6789"}, {**FULL, "ssn": "999-99-9999"}) == raw_score(FULL, FULL)
+
+
+# --- second pass: lane/w2 at 6743944 ---------------------------------------------------------
+
+ROBERT = {
+    "given_name": "Robert",
+    "family_name": "Smith",
+    "dob": "1990-03-07",
+    "sex": "M",
+    "phone": "617-555-2368",
+    "address": "12 Main St",
+    "zip": "02139",
+}
+
+# handset-0 under demo-handset-0 at c5a09e3, before the intercept moved from -11.0 to -12.5.
+# Only pairs whose given names differ (or one is missing) are listed: equal-name pairs did not move.
+PRE_FIX_HANDSET_0 = {
+    "nickname_bob": ({"given_name": "Bob"}, 4.116666667),
+    "nickname_rob": ({"given_name": "Rob"}, 5.458333333),
+    "given_typo": ({"given_name": "Robret"}, 4.819444444),
+    "given_missing": ({"given_name": None}, 0.7),
+    "sibling_carmen": ({"given_name": "Carmen", "dob": "1992-03-07"}, 0.588888889),
+}
+
+
+@pytest.mark.parametrize("name", list(PRE_FIX_HANDSET_0))
+def test_handset_0_scores_do_not_move_under_the_same_scorer_version(name):
+    """R2 second pass: the intercept change cancels the new nickname credit only when the given names
+    are equal; every other pair drops by 1.5 logits (3,771 of 4,000 random pairs; 14 change band) while
+    ``scorer_version`` stays ``handset-0``. Same version, different outputs: restore the scores or bump
+    the version and re-pin."""
+    if HANDSET_WEIGHTS.scorer_version != "handset-0":
+        pytest.skip("scorer_version was bumped; these golden values belong to handset-0")
+    edit, expected = PRE_FIX_HANDSET_0[name]
+    assert raw_score(ROBERT, {**ROBERT, **edit}) == pytest.approx(expected, abs=1e-6)
+
+
+GATE_CASES = {
+    "bob_no_phone_no_address": ({}, {"given_name": "Bob", "phone": None, "address": None}),
+    "paco_no_phone_no_address": ({"given_name": "Francisco"}, {"given_name": "Paco", "phone": None, "address": None}),
+    "given_name_missing_rest_exact": ({}, {"given_name": None}),
+}
+
+
+@pytest.mark.parametrize("name", list(GATE_CASES))
+def test_a_nickname_or_nameless_intake_stays_a_candidate_under_the_demo_thresholds(name):
+    """R2 second pass (fail-open direction): under handset-0 + demo-handset-0 these were REVIEW at
+    c5a09e3 and are KEEP_SEPARATE at 6743944, so the gate's CANDIDATE_IN_REVIEW_OR_HIGHER check no
+    longer stops propose_new_chart for a "Paco" intake of a "Francisco" chart."""
+    edit_a, edit_b = GATE_CASES[name]
+    result = match({**ROBERT, **edit_a}, {**ROBERT, **edit_b}, HANDSET_WEIGHTS, DEMO_THRESHOLDS)
+    assert result.band is not Band.KEEP_SEPARATE, (result.raw_score, result.band)
+
+
+def test_demo_thresholds_are_untouched():
+    assert (DEMO_THRESHOLDS.thresholds_id, DEMO_THRESHOLDS.c_low, DEMO_THRESHOLDS.c_high) == (
+        "demo-handset-0",
+        0.0,
+        4.0,
+    )
+    assert DEMO_THRESHOLDS.auto_link_enabled is False and DEMO_THRESHOLDS.is_calibrated is False
+
+
+def _realistic_corpus(seed: int, n_persons: int = 400, n_zips: int = 120):
+    """Zipf-skewed names and ZIPs, 2-3 records per person, 10% grafted siblings sharing a component."""
+    rng = random.Random(seed)
+    surnames = FAMILY + [f"Fam{i}" for i in range(150)]
+    given = GIVEN + [f"Giv{i}" for i in range(60)]
+    zips = [f"0{1000 + 13 * i:04d}" for i in range(n_zips)]
+
+    def zipf(seq, s):
+        return rng.choices(seq, weights=[1 / (i + 1) ** s for i in range(len(seq))])[0]
+
+    comp = {p: f"c{p:04d}" for p in range(n_persons)}
+    people = []
+    for _ in range(n_persons):
+        people.append(
+            {
+                "given_name": zipf(given, 0.8),
+                "family_name": zipf(surnames, 0.9),
+                "dob": f"{rng.randint(1920, 2020)}-{rng.randint(1, 12):02d}-{rng.randint(1, 28):02d}",
+                "sex": rng.choice("MF"),
+                "phone": f"617{rng.randint(200, 999)}{rng.randint(1000, 9999)}",
+                "address": f"{rng.randint(1, 999)} Main St",
+                "zip": zipf(zips, 0.7),
+            }
+        )
+    for p in range(n_persons):
+        if rng.random() < 0.10:
+            donor = rng.randrange(n_persons)
+            people[p].update({k: people[donor][k] for k in ("family_name", "address", "zip", "phone")})
+            old, new = sorted((comp[p], comp[donor]))[::-1]
+            for q, c in list(comp.items()):
+                if c == old:
+                    comp[q] = new
+    records, truth = {}, {}
+    for p, base in enumerate(people):
+        for k in range(rng.choice([2, 2, 3])):
+            rec = dict(base)
+            if k:
+                rec[rng.choice(["phone", "address", "zip", "sex"])] = None
+            rid = f"p{p:04d}r{k}"
+            records[rid] = normalize_record({"record_id": rid, **rec})
+            truth[rid] = TruthRow(entity_id=f"p{p:04d}", component_id=comp[p], partition="development")
+    return records, truth
+
+
+@pytest.mark.parametrize("seed", [1, 2])
+def test_grouped_folds_hold_on_a_realistic_corpus_with_negatives_in_every_fold(seed):
+    records, truth = _realistic_corpus(seed)
+    pairs = build_labeled_pairs(records, truth)
+    X, y, groups = design_matrix(pairs, records)
+    assert (y == 0).sum() > (y == 1).sum() > 0
+    for train_idx, test_idx in GroupKFold(n_splits=5).split(X, y, groups):
+
+        def comps(idx):
+            return {truth[pairs[i].record_a_id].component_id for i in idx} | {
+                truth[pairs[i].record_b_id].component_id for i in idx
+            }
+
+        assert not comps(train_idx) & comps(test_idx)
+        assert (y[test_idx] == 0).any() and (y[test_idx] == 1).any()
+        assert (y[train_idx] == 0).any() and (y[train_idx] == 1).any()
+
+
+# --- CORE adapter behind W3a's match seam (86d1582) ------------------------------------------
+
+
+@dataclass(frozen=True)
+class SeamThresholdsRow:
+    """The fields of W3a's ``backend.match.seam.Thresholds`` (the ``threshold_set`` row)."""
+
+    threshold_set_id: str
+    c_low: float
+    c_high: float
+    platt_a: float | None = None
+    platt_b: float | None = None
+    t_low_display: float | None = None
+    t_high_display: float | None = None
+
+
+def _contract(raw: dict) -> NormalizedRecord:
+    return NormalizedRecord(**normalize_record({"record_id": str(uuid4()), **raw}).to_contract_dict())
+
+
+def test_core_adapter_agrees_with_match_on_random_contract_records():
+    rng = random.Random(86)
+    row = SeamThresholdsRow("demo-handset-0", DEMO_THRESHOLDS.c_low, DEMO_THRESHOLDS.c_high)
+    for _ in range(300):
+        a, b = _contract(random_raw(rng)), _contract(random_raw(rng))
+        direct, via = match(a, b, HANDSET_WEIGHTS, DEMO_THRESHOLDS), CORE.match(a, b, row)
+        assert (via.logit, via.p, via.band) == (direct.raw_score, direct.p, direct.band)
+        assert via.evidence.raw_score == via.logit
+        assert via.evidence.negative_rules_fired == [r.value for r in direct.negative_rules_fired]
+        assert {f.name for f in fields(via)} == {"evidence", "logit", "p", "band"}
+        for key in CORE.block_keys(a):
+            assert isinstance(key.key_type, str) and isinstance(key.key_value, str)
+
+
+def test_core_adapter_freezes_the_threshold_rows_display_map_into_the_snapshot():
+    """R2 second pass: W3a's ``threshold_set`` row carries ``platt_a``/``platt_b`` and
+    ``t_low_display``/``t_high_display`` (W3a's stand-in copies them into the snapshot and
+    ``GET /threshold-sets/current`` serves them). ``CORE`` drops the row's Platt map and recomputes
+    T_low/T_high from the weights, so once Q5 writes a map the snapshot and p disagree with the
+    threshold endpoint. Display-only, but the snapshot is the frozen evidence (ADR-001)."""
+    row = SeamThresholdsRow("q5", 0.0, 4.0, platt_a=-0.5, platt_b=0.2, t_low_display=0.45, t_high_display=0.86)
+    via = CORE.match(_contract(ROBERT), _contract({**ROBERT, "dob": "1990-07-03"}), row)
+    assert (via.evidence.platt_a, via.evidence.platt_b) == (row.platt_a, row.platt_b)
+    assert (via.evidence.t_low_display, via.evidence.t_high_display) == (row.t_low_display, row.t_high_display)
+    assert via.p == pytest.approx(
+        display_probability(
+            via.logit,
+            Weights(
+                scorer_version="x",
+                intercept=HANDSET_WEIGHTS.intercept,
+                weights=HANDSET_WEIGHTS.weights,
+                platt_a=row.platt_a,
+                platt_b=row.platt_b,
+            ),
+        )
+    )
+
+
+def test_core_package_imports_nothing_from_the_seam_api_or_frontdesk():
+    offenders = [
+        f"{path.name}: {line.strip()}"
+        for path in (REPO_ROOT / "backend" / "core").rglob("*.py")
+        for line in path.read_text().splitlines()
+        if line.lstrip().startswith(("import ", "from "))
+        and any(m in line for m in ("backend.match", "backend.api", "backend.frontdesk", "backend.app"))
+    ]
+    assert offenders == []

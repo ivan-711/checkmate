@@ -131,3 +131,54 @@ def test_single_class_data_is_rejected(tmp_path):
     rp, tp = write_csvs(tmp_path, records, truth)
     with pytest.raises(ValueError):
         fit_weights(load_records_csv(rp), load_truth_csv(tp), version="x")
+
+
+def test_folds_come_from_components_and_straddling_pairs_are_counted(tmp_path):
+    from backend.core.train import TruthRow, component_fold, fold_of, folded_pairs
+
+    records, truth = synthetic_corpus(seed=11)
+    _rp, tp = write_csvs(tmp_path, records, truth)
+    recs, tru = load_records_csv(tmp_path / "records.csv"), load_truth_csv(tp)
+    folded = folded_pairs(recs, tru)
+    assert folded.pairs
+    for p in folded.pairs:
+        assert p.group == str(component_fold(tru[p.record_a_id].component_id, 5))
+        assert fold_of(tru[p.record_a_id], 5) == fold_of(tru[p.record_b_id], 5)
+    blocked_total = len(folded.pairs) + folded.n_dropped_straddling
+    assert blocked_total >= len(folded.pairs)
+    assert fold_of(TruthRow("e", "c1", None, cv_fold=3), 5) == 3  # the splits file's fold wins
+
+
+def test_cv_fold_column_is_read_from_the_truth_table(tmp_path):
+    records, truth = synthetic_corpus(seed=11)
+    truth = [{**t, "cv_fold": str(int(t["component_id"][1:]) % 5)} for t in truth]
+    _rp, tp = write_csvs(tmp_path, records, truth)
+    tru = load_truth_csv(tp)
+    assert all(row.cv_fold == int(row.component_id[1:]) % 5 for row in tru.values())
+
+
+def test_a_fold_without_negatives_warns_in_the_library_and_fails_in_strict_mode_and_the_cli(tmp_path):
+    """Folds pinned through cv_fold: sibling components (the negatives) spread over folds 0-3, and
+    one single-entity component alone in fold 4, so fold 4 has a positive and no negative."""
+    records, truth = synthetic_corpus(seed=11)
+
+    def fold(component: str) -> int:
+        e = int(component[1:])
+        if e == 1:
+            return 4
+        return (e // 4) % 4 if e % 4 == 0 else e % 4
+
+    truth = [{**t, "cv_fold": str(fold(t["component_id"]))} for t in truth]
+    rp, tp = write_csvs(tmp_path, records, truth)
+    recs, tru = load_records_csv(rp), load_truth_csv(tp)
+    with pytest.warns(UserWarning, match="no negative pairs"):
+        _weights, report, _oof = fit_weights(recs, tru, version="x")
+    assert report["folds_without_negatives"] == [4]
+    assert report["per_fold"][4]["n_positive"] >= 1 and report["per_fold"][4]["n_negative"] == 0
+    with pytest.raises(ValueError, match="no negative pairs"):
+        fit_weights(recs, tru, version="x", require_negatives_per_fold=True)
+    cli = ["--records", str(rp), "--truth", str(tp), "--out-dir", str(tmp_path / "w")]
+    with pytest.raises(ValueError, match="no negative pairs"):
+        main(cli)
+    with pytest.warns(UserWarning, match="no negative pairs"):
+        assert main([*cli, "--allow-folds-without-negatives"]) == 0

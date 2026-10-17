@@ -171,10 +171,10 @@ def compute_features(a: Normalized, b: Normalized) -> FeatureVector:
             )
         )
         values["given_dmeta"] = 1.0 if phonetic_codes_match(a.given_tokens[0], b.given_tokens[0]) else 0.0
-        # Equal tokens count as their own nickname, so a nickname variant can never outscore the
-        # unchanged name; the TWIN rule reads the tokens directly, not this feature.
+        # Only a genuinely different token is a nickname; a shared token is token overlap. The score
+        # stage caps this credit so a nickname variant never outscores the unchanged name.
         values["given_nickname"] = (
-            1.0 if any(same_nickname_family(x, y) for x in a.given_tokens for y in b.given_tokens) else 0.0
+            1.0 if any(x != y and same_nickname_family(x, y) for x in a.given_tokens for y in b.given_tokens) else 0.0
         )
         values["given_initial"] = 1.0 if a.given_tokens[0][0] == b.given_tokens[0][0] else 0.0
 
