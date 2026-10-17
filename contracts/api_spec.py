@@ -89,7 +89,8 @@ def build_app(implemented: frozenset[Route] = frozenset()) -> FastAPI:
         return error_envelope(ErrorCode.INTERNAL, str(exc.detail))
 
     p = API_PREFIX
-    common_errors = _err(ErrorCode.VALIDATION_ERROR, ErrorCode.INTERNAL, ErrorCode.NOT_IMPLEMENTED)
+    common_errors = _err(ErrorCode.VALIDATION_ERROR, ErrorCode.INTERNAL, ErrorCode.NOT_IMPLEMENTED,
+                         ErrorCode.UPSTREAM_UNAVAILABLE)  # any route answers 503 when the database is down
 
     @app.get(p + "/health", response_model=Health, tags=["core"], responses=common_errors,
              description="Lane: plumbing (lead session). Dependency status and versions.")
