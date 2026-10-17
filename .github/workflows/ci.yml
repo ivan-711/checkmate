@@ -1,0 +1,341 @@
+# CheckMate CI (lane W5). Installs only from lock files; every action pinned by commit SHA; no secrets
+# beyond GITHUB_TOKEN; agents and CI use only the Replay adapter (CLAUDE.md rule 6).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  UV_VERSION: "0.10.9"
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+  SCHEMATHESIS_VERSION: "4.31.1"
+  DATABASE_URL: postgresql://checkmate:checkmate@127.0.0.1:5432/checkmate
+  FRONTDESK_AGENT_MODE: REPLAY
+
+jobs:
+  lint-and-tests:
+    name: mirror, ruff, openapi snapshot, pytest
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: CLAUDE.md and AGENTS.md are byte-identical
+        run: cmp CLAUDE.md AGENTS.md
+      - uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c # v7.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install from the lock file only
+        run: uv sync --frozen
+      - name: ruff
+        run: uv run ruff check .
+      - name: openapi.json snapshot is current
+        run: uv run python -m contracts.build_openapi --check
+      - name: pytest (contracts, backend, harness, invariants, data)
+        run: uv run pytest -q
+
+  protected-paths:
+    name: protected expectations unchanged unless the PR is a fork
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+      - name: Fail when eval/acceptance or eval/expectations change without the fork label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if ! git ls-tree -d "$BASE_SHA" eval/expectations | grep -q .; then
+            echo "base has no eval/expectations yet: bootstrap PR, check skipped"; exit 0
+          fi
+          changed=$(git diff --name-only "$BASE_SHA"...HEAD -- eval/acceptance eval/expectations || true)
+          if [ -z "$changed" ]; then echo "protected paths untouched"; exit 0; fi
+          labels=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name' || true)
+          if echo "$labels" | grep -qx fork; then echo "fork-labeled PR; protected change allowed:"; echo "$changed"; exit 0; fi
+          echo "protected paths changed without the fork label (CLAUDE.md rule 5):"; echo "$changed"; exit 1
+
+  contract-test:
+    name: schemathesis against the running API
+    runs-on: ubuntu-24.04
+    services:
+      db:
+        image: timescale/timescaledb-ha:pg18@sha256:75b1a432956ae6efc31551413ba51b6601ec0910dbad123a64617face989dc7c
+        env:
+          POSTGRES_USER: checkmate
+          POSTGRES_PASSWORD: checkmate
+          POSTGRES_DB: checkmate
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U checkmate -d checkmate"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c # v7.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --frozen
+      - name: Apply migrations
+        run: uv run python -m contracts.migrations.apply
+      - name: Start the API and wait for health
+        run: |
+          set -euo pipefail
+          nohup uv run uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 > request.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null; then echo "API up after ${i}s"; exit 0; fi
+            sleep 1
+          done
+          echo "API did not come up"; cat request.log; exit 1
+      - name: Contract test (contracts/README.md command; stubs answer 501 so not_a_server_error is excluded)
+        run: uvx --from "schemathesis==${SCHEMATHESIS_VERSION}" schemathesis run http://127.0.0.1:8000/openapi.json --checks all --exclude-checks not_a_server_error
+      - name: No 5xx other than 501 in the request log
+        run: |
+          set -euo pipefail
+          if grep -E 'status=5[0-9]{2}' request.log | grep -v 'status=501' | grep -q .; then
+            echo "non-501 server errors in the request log:"; grep -E 'status=5[0-9]{2}' request.log | grep -v 'status=501'; exit 1
+          fi
+          echo "request log: $(grep -c 'status=' request.log) requests, no non-501 5xx"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: contract-request-log
+          path: request.log
+          retention-days: 7
+
+  fixture-check:
+    name: hero selector regenerates scenario.json; fixture_check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c # v7.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --frozen
+      - name: Regenerate data/scenarios/hero and diff (architecture section 18, replay integrity)
+        run: |
+          set -euo pipefail
+          uv run python -m data.hero_select
+          git diff --exit-code -- data/scenarios/hero
+      - name: fixture_check (section 9.1 checks; policy and replay checks skip until their lanes land)
+        run: uv run python -m data.fixture_check
+
+  acceptance-typecheck:
+    name: acceptance script type-checks and lists
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: eval/acceptance
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: eval/acceptance/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npx playwright test --list
+
+  frontend-build:
+    name: frontend build (when frontend/package.json exists)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - id: probe
+        run: |
+          if [ -f frontend/package.json ]; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; echo "no frontend yet"; fi
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        if: steps.probe.outputs.exists == 'true'
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - if: steps.probe.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm ci
+      - if: steps.probe.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm run build
+
+  secret-scan:
+    name: gitleaks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  acceptance-run:
+    # The G16 script against the real app. Gated by the repository variable ACCEPTANCE_CI=1, which the
+    # merge captain sets once the G16 path is live; until then the script only type-checks above.
+    name: G16 acceptance script against the running app
+    if: vars.ACCEPTANCE_CI == '1'
+    runs-on: ubuntu-24.04
+    services:
+      db:
+        image: timescale/timescaledb-ha:pg18@sha256:75b1a432956ae6efc31551413ba51b6601ec0910dbad123a64617face989dc7c
+        env:
+          POSTGRES_USER: checkmate
+          POSTGRES_PASSWORD: checkmate
+          POSTGRES_DB: checkmate
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U checkmate -d checkmate"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c # v7.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: uv sync --frozen
+      - run: uv run python -m contracts.migrations.apply
+      - name: Start the API
+        run: |
+          set -euo pipefail
+          nohup uv run uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 > request.log 2>&1 &
+          for _ in $(seq 1 60); do curl -sf http://127.0.0.1:8000/api/v1/health > /dev/null && exit 0; sleep 1; done
+          cat request.log; exit 1
+      - name: Build and start the frontend on 3000
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          nohup npm run start -- --hostname 127.0.0.1 --port 3000 > ../frontend.log 2>&1 &
+          for _ in $(seq 1 90); do curl -sf http://127.0.0.1:3000/ > /dev/null && exit 0; sleep 1; done
+          cat ../frontend.log; exit 1
+      - name: Run the acceptance script
+        working-directory: eval/acceptance
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+          npx playwright test
+      - name: No 5xx other than 501 in the request log (eval plan section 9, acceptance invariant)
+        run: |
+          if grep -E 'status=5[0-9]{2}' request.log | grep -v 'status=501' | grep -q .; then
+            grep -E 'status=5[0-9]{2}' request.log | grep -v 'status=501'; exit 1
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: acceptance-artifacts
+          path: |
+            request.log
+            frontend.log
+            eval/acceptance/test-results
+            eval/acceptance/playwright-report
+          retention-days: 7
+          if-no-files-found: ignore
+
+  harness-on-main:
+    # Fast config on every merge to main: posts per-band precision and recall with n as a commit
+    # comment, compares against the last green main run, and opens a revert PR beyond tolerance.
+    name: harness (fast) on merge to main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint-and-tests, contract-test, fixture-check]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c # v7.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv sync --frozen
+      - name: Run the fast harness (P0 families, one seed, development components only)
+        id: harness
+        env:
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          uv run python -m eval.harness.run --fast --seed 20261017 --out eval/runs | tee harness.out
+          run_dir=$(find eval/runs -mindepth 1 -maxdepth 1 -type d | head -1)
+          echo "run_dir=${run_dir%/}" >> "$GITHUB_OUTPUT"
+          uv run python -m eval.harness.summary "${run_dir%/}" | tee summary.md
+      - name: Download the last green main run as the baseline
+        id: baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          previous=$(gh run list --workflow ci.yml --branch main --event push --status success --json databaseId --jq '.[0].databaseId' || true)
+          if [ -n "$previous" ] && gh run download "$previous" -n harness-run -D baseline 2>/dev/null; then
+            echo "baseline run $previous downloaded"; echo "dir=baseline" >> "$GITHUB_OUTPUT"
+          else
+            echo "no baseline run yet"; echo "dir=" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Compare against tolerance (eval/expectations/tolerance.json)
+        id: compare
+        run: |
+          set +e
+          if [ -n "${{ steps.baseline.outputs.dir }}" ]; then
+            uv run python -m eval.compare --baseline "${{ steps.baseline.outputs.dir }}" --candidate "${{ steps.harness.outputs.run_dir }}" | tee compare.out
+          else
+            uv run python -m eval.compare --candidate "${{ steps.harness.outputs.run_dir }}" | tee compare.out
+          fi
+          echo "status=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+      - name: Post per-band precision and recall with n as a commit comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          { cat summary.md; echo; echo '```'; cat compare.out; echo '```'; } > comment.md
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" -F body=@comment.md > /dev/null
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: harness-run
+          path: ${{ steps.harness.outputs.run_dir }}
+          retention-days: 30
+      - name: Open a revert PR when the merge is beyond tolerance
+        if: steps.compare.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          short=$(git rev-parse --short "$GITHUB_SHA")
+          git config user.name "checkmate-ci"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout -b "revert/${short}"
+          git revert --no-edit -m 1 "$GITHUB_SHA" 2>/dev/null || git revert --no-edit "$GITHUB_SHA"
+          git commit --amend -q -m "revert: ${short} moved the harness beyond eval/expectations/tolerance.json [AI-assisted]"
+          git push origin "revert/${short}"
+          gh label create revert --color B60205 --description "harness beyond tolerance" --force
+          { echo "Product impact: the merge ${short} moved a published number beyond the tolerance in eval/expectations/tolerance.json; this revert restores the last green main."; echo; echo "Lane: W5 (automated). Owner: Ivan."; echo; echo '```'; cat compare.out; echo '```'; } > revert.md
+          gh pr create --base main --head "revert/${short}" --label revert \
+            --title "revert: ${short} beyond eval tolerance [AI-assisted]" --body-file revert.md
+          echo "harness beyond tolerance; revert PR opened"; exit 1
