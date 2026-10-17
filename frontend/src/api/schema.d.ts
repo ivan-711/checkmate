@@ -33,7 +33,7 @@ export interface paths {
         };
         /**
          * List Candidate Pairs
-         * @description Lane W3a. Review queue ordered by |p-0.5|. Bounded list.
+         * @description Lane W3a. Review queue ordered by |p-0.5|. Bounded list. `recordId` (additive) keeps only pairs that include that source record, so the UI binds the hero pair in one request.
          */
         get: operations["list_candidate_pairs_api_v1_candidate_pairs_get"];
         put?: never;
@@ -318,6 +318,26 @@ export interface paths {
          * @description Lane W1/W3a. Reset: truncate state, load the scenario, append DEMO_RESET.
          */
         post: operations["create_session_api_v1_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Current Session
+         * @description Lane W3a (additive). The current demo session, so a reloaded page rebinds the hero without a reset; 404 before the first reset.
+         */
+        get: operations["get_current_session_api_v1_sessions_current_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1205,7 +1225,10 @@ export interface components {
             scenarioId: string;
             /** Scorerversion */
             scorerVersion: string;
-            /** Sources */
+            /**
+             * Sources
+             * @description the scenario's showcase source cards (the hero pair's records), never the whole loaded corpus
+             */
             sources: components["schemas"]["SourceCard"][];
             /** Thresholdsetid */
             thresholdSetId: string;
@@ -1589,6 +1612,7 @@ export interface operations {
                 band?: components["schemas"]["Band"] | null;
                 status?: components["schemas"]["DecisionStatus"] | null;
                 origin?: components["schemas"]["PairOrigin"] | null;
+                recordId?: string | null;
                 limit?: number;
                 cursor?: string | null;
             };
@@ -2546,6 +2570,71 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            /** @description NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description VALIDATION_ERROR */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description INTERNAL */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description NOT_IMPLEMENTED */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_current_session_api_v1_sessions_current_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
