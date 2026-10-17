@@ -282,12 +282,15 @@ def _csv_ref(base: MemberResources, file: str, row: Mapping, index: int) -> Sour
                      base.is_constructed or _truthy(row.get("CONSTRUCTED", "")), TimelineVerification.CSV_DERIVED)
 
 
-def _csv_code(row: Mapping) -> Coding | None:
+def _csv_code(row: Mapping, *, always_rxnorm: bool = False) -> Coding | None:
+    """``always_rxnorm`` for medications.csv, which has no SYSTEM column: its CODE is RxNorm by the
+    Synthea CSV data dictionary. allergies.csv mixes RxNorm and SNOMED under SYSTEM "Unknown", so
+    there an unstated system is RxNorm only when the terminology cache knows the code."""
     code = str(row.get("CODE") or "").strip()
     if not code:
         return None
     system: str | None = str(row.get("SYSTEM") or "").strip()
-    if system.lower() == "rxnorm":
+    if always_rxnorm or system.lower() == "rxnorm":
         system = RXNORM_SYSTEM
     elif system.lower() in CSV_UNSTATED_SYSTEMS:
         system = RXNORM_SYSTEM if load_terminology().knows(code) else None
@@ -316,7 +319,7 @@ def _csv_allergy(base: MemberResources, row: Mapping, index: int) -> AllergyReco
 
 
 def _csv_order(base: MemberResources, row: Mapping, index: int) -> OrderRecord:
-    code = _csv_code(row)
+    code = _csv_code(row, always_rxnorm=True)
     return OrderRecord(
         ref=_csv_ref(base, MEDICATION_FILE, row, index),
         code=code, codings=(code,) if code else (),
