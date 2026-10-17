@@ -29,8 +29,8 @@ train = [
 [tool.uv]
 package = true
 
-[tool.setuptools]
-packages = ["contracts", "contracts.models", "contracts.migrations", "backend", "backend.app", "backend.core"]
+[tool.setuptools.packages.find]
+include = ["contracts*", "backend*"]
 
 [tool.setuptools.package-data]
 "backend.core" = ["weights/*.json"]
