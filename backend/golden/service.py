@@ -5,7 +5,9 @@ normalized rows and raw payloads. Nothing is cached (ADR-014).
 """
 from __future__ import annotations
 
+import base64
 from collections.abc import Sequence
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import text
@@ -120,15 +122,31 @@ def read_alerts(conn: Connection, entity_id: UUID, *, status: AlertStatus | None
     return [a for a in alerts if status is None or a.status == status]
 
 
+def _alert_key(alert: SafetyAlert) -> tuple[datetime, str]:
+    return (alert.identified_at, str(alert.id))
+
+
+def _encode_alert_cursor(alert: SafetyAlert) -> str:
+    return base64.urlsafe_b64encode(f"{alert.identified_at.isoformat()}|{alert.id}".encode()).decode()
+
+
+def _decode_alert_cursor(cursor: str) -> tuple[datetime, str]:
+    try:
+        ts, alert_id = base64.urlsafe_b64decode(cursor.encode()).decode().split("|", 1)
+        when = datetime.fromisoformat(ts)
+        UUID(alert_id)
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise BadCursor("cursor is not one this endpoint issued") from exc
+    if when.tzinfo is None:
+        raise BadCursor("cursor is not one this endpoint issued")
+    return (when, alert_id)
+
+
 def alert_page(alerts: Sequence[SafetyAlert], limit: int, cursor: str | None) -> Page[SafetyAlert]:
-    """Keyset on (identified_at, id); the cursor is the last item's id. Raises BadCursor for an unknown one."""
-    start = 0
-    if cursor:
-        ids = [str(a.id) for a in alerts]
-        if cursor not in ids:
-            raise BadCursor("cursor is not one this endpoint issued")
-        start = ids.index(cursor) + 1
-    items = list(alerts[start:start + limit])
-    next_cursor = str(items[-1].id) if items and start + limit < len(alerts) else None
+    """Keyset on (identified_at, id): a cursor stays valid when the alert it names is retracted later."""
+    after = _decode_alert_cursor(cursor) if cursor else None
+    remaining = [a for a in alerts if after is None or _alert_key(a) > after]
+    items = remaining[:limit]
+    next_cursor = _encode_alert_cursor(items[-1]) if len(remaining) > limit and items else None
     return Page[SafetyAlert](items=items, next_cursor=next_cursor)
 

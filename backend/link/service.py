@@ -19,7 +19,7 @@ from sqlalchemy.engine import Connection
 from backend.golden.service import load_members, read_alerts, read_entity
 from backend.link.events import EventContext, write_event
 from backend.link.union_find import components
-from backend.rule.bl_amox_01 import RuleFlag, evaluate, to_safety_alert
+from backend.rule.bl_amox_01 import RuleFlag, alert_key, evaluate, to_safety_alert
 from backend.rule.terminology import load_terminology
 from contracts.models.alerts import AlertStatus, SafetyAlert
 from contracts.models.common import ActorType, DecisionStatus, EventType, Mode, ReasonCode
@@ -82,6 +82,7 @@ _INSERT_ALERT = text(
     "CAST(:citation AS jsonb), :constructed_scenario, :identified_at)"
 )
 _RETRACT_ALERT = text("UPDATE safety_alert SET status = 'RETRACTED', retracted_at = :at WHERE id = :id")
+_LOCK_PAIR = text("SELECT id FROM candidate_pair WHERE id = :pair_id FOR UPDATE")
 _INSERT_REVOKED_DECISION = text(
     "INSERT INTO match_decision (id, pair_id, version, logit, p, raw_score, band, negative_rules_fired, "
     "evidence_snapshot, status, actor, actor_type, reason_code, note, scorer_version, threshold_set_id) "
@@ -173,11 +174,6 @@ def _split_entity(conn: Connection, entity_id: UUID, groups: list[frozenset[UUID
 
 # Rule run and alert reconciliation --------------------------------------------------------
 
-def _alert_key(alert: SafetyAlert) -> tuple[UUID, str, UUID, str, str]:
-    return (alert.allergy_ref.source_record_id, alert.allergy_ref.resource_id,
-            alert.order_ref.source_record_id, alert.order_ref.resource_id, alert.tier.value)
-
-
 def _raise_alert(conn: Connection, ctx: EventContext, entity_id: UUID, flag: RuleFlag, at: datetime) -> SafetyAlert:
     alert = to_safety_alert(flag, alert_id=uuid4(), entity_id=entity_id, identified_at=at)
     conn.execute(_INSERT_ALERT, {
@@ -213,7 +209,8 @@ def reconcile_alerts(conn: Connection, ctx: EventContext, entity_id: UUID) -> tu
     retracted: list[UUID] = []
     kept: set[tuple] = set()
     for alert in read_alerts(conn, entity_id, status=AlertStatus.PRELIMINARY):
-        key = _alert_key(alert)
+        key = alert_key(alert.allergy_ref.source_record_id, alert.allergy_ref.resource_id,
+                        alert.order_ref.source_record_id, alert.order_ref.resource_id, alert.tier)
         if key in wanted:
             kept.add(key)
         else:
@@ -321,6 +318,7 @@ def apply_split(conn: Connection, entity_id: UUID, source_record_ids: list[UUID]
             remaining.append((a, b, pair_id))
             continue
         decision_id = uuid4()
+        conn.execute(_LOCK_PAIR, {"pair_id": pair_id})  # same lock as the review path: versions never collide
         conn.execute(_INSERT_REVOKED_DECISION, {"id": decision_id, "pair_id": pair_id, "actor": actor,
                                                 "actor_type": actor_type.value, "reason_code": reason_code.value, "note": note})
         write_event(conn, ctx, EventType.LINK_REVOKED, entity_id=entity_id, pair_id=pair_id, decision_id=decision_id,

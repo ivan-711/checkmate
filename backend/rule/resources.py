@@ -164,13 +164,15 @@ def _is_constructed_resource(resource: Mapping) -> bool:
     return any(t.get("system") == CONSTRUCTED_TAG_SYSTEM and t.get("code") == CONSTRUCTED_TAG_CODE for t in tags)
 
 
-def _fhir_ref(base: MemberResources, resource: Mapping) -> SourceRef:
-    rid = f"{resource['resourceType']}/{resource.get('id', '?')}"
+def _fhir_ref(base: MemberResources, resource: Mapping, index: int) -> SourceRef:
+    """``Type/id``; a resource without an id gets its position in the payload so two such
+    resources never share a reference."""
+    rid = f"{resource['resourceType']}/{resource.get('id') or f'_{index}'}"
     return SourceRef(base.source_record_id, base.source_system, base.source_local_id, rid,
                      base.is_constructed or _is_constructed_resource(resource), TimelineVerification.CODED)
 
 
-def _fhir_allergy(base: MemberResources, r: Mapping) -> AllergyRecord:
+def _fhir_allergy(base: MemberResources, r: Mapping, index: int) -> AllergyRecord:
     reactions = []
     for reaction in r.get("reaction") or []:
         manifestations = reaction.get("manifestation") or []
@@ -178,28 +180,28 @@ def _fhir_allergy(base: MemberResources, r: Mapping) -> AllergyRecord:
         display = next((c.display for m in manifestations if (c := _first_coding(m)) and c.display), None)
         reactions.append(Reaction((reaction.get("severity") or None), codes, display))
     return AllergyRecord(
-        ref=_fhir_ref(base, r), code=_first_coding(r.get("code")), type=r.get("type"),
+        ref=_fhir_ref(base, r, index), code=_first_coding(r.get("code")), type=r.get("type"),
         clinical_status=_first_code(r.get("clinicalStatus")), verification_status=_first_code(r.get("verificationStatus")),
         criticality=r.get("criticality"), reactions=tuple(reactions), recorded_at=parse_timestamp(r.get("recordedDate")),
     )
 
 
-def _fhir_order(base: MemberResources, r: Mapping, medications: Mapping[str, Mapping]) -> OrderRecord:
+def _fhir_order(base: MemberResources, r: Mapping, index: int, medications: Mapping[str, Mapping]) -> OrderRecord:
     concept = r.get("medicationCodeableConcept")
     if concept is None and (ref := (r.get("medicationReference") or {}).get("reference")):
         med = medications.get(ref.split("/")[-1].replace("urn:uuid:", ""))
         concept = (med or {}).get("code")
     return OrderRecord(
-        ref=_fhir_ref(base, r), code=_first_coding(concept), status=r.get("status"), intent=r.get("intent"),
+        ref=_fhir_ref(base, r, index), code=_first_coding(concept), status=r.get("status"), intent=r.get("intent"),
         authored_at=parse_timestamp(r.get("authoredOn")), requester_display=(r.get("requester") or {}).get("display"),
     )
 
 
-def _fhir_encounter(base: MemberResources, r: Mapping) -> EncounterRecord:
+def _fhir_encounter(base: MemberResources, r: Mapping, index: int) -> EncounterRecord:
     period = r.get("period") or {}
     types = r.get("type") or []
     return EncounterRecord(
-        ref=_fhir_ref(base, r), class_code=(r.get("class") or {}).get("code"),
+        ref=_fhir_ref(base, r, index), class_code=(r.get("class") or {}).get("code"),
         type=_first_coding(types[0]) if types else None, start=parse_timestamp(period.get("start")),
         end=parse_timestamp(period.get("end")), service_provider=(r.get("serviceProvider") or {}).get("display"),
     )
@@ -208,9 +210,9 @@ def _fhir_encounter(base: MemberResources, r: Mapping) -> EncounterRecord:
 def _parse_fhir(base: MemberResources, payload: Any) -> MemberResources:
     resources = list(_walk_resources(payload))
     medications = {r.get("id"): r for r in resources if r["resourceType"] == "Medication"}
-    allergies = tuple(_fhir_allergy(base, r) for r in resources if r["resourceType"] == "AllergyIntolerance")
-    orders = tuple(_fhir_order(base, r, medications) for r in resources if r["resourceType"] == "MedicationRequest")
-    encounters = tuple(_fhir_encounter(base, r) for r in resources if r["resourceType"] == "Encounter")
+    allergies = tuple(_fhir_allergy(base, r, i) for i, r in enumerate(resources) if r["resourceType"] == "AllergyIntolerance")
+    orders = tuple(_fhir_order(base, r, i, medications) for i, r in enumerate(resources) if r["resourceType"] == "MedicationRequest")
+    encounters = tuple(_fhir_encounter(base, r, i) for i, r in enumerate(resources) if r["resourceType"] == "Encounter")
     return MemberResources(**{**base.__dict__, "allergies": allergies, "orders": orders, "encounters": encounters})
 
 

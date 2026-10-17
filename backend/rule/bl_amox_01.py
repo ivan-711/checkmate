@@ -46,6 +46,15 @@ CLOSING = ("This is a rule-based flag on synthetic data. It does not say what th
            "or what should be prescribed. A clinician decides.")
 
 
+AlertKey = tuple[UUID, str, UUID, str, str]
+
+
+def alert_key(allergy_record_id: UUID, allergy_resource_id: str, order_record_id: UUID, order_resource_id: str,
+              tier: AlertTier) -> AlertKey:
+    """What makes two flags the same alert across re-evaluations; the service keys rows by it too."""
+    return (allergy_record_id, allergy_resource_id, order_record_id, order_resource_id, tier.value)
+
+
 @dataclass(frozen=True)
 class RuleFlag:
     tier: AlertTier
@@ -57,10 +66,9 @@ class RuleFlag:
     constructed_scenario: bool
 
     @property
-    def key(self) -> tuple[UUID, str, UUID, str, str]:
-        """What makes two flags the same alert across re-evaluations."""
-        return (self.allergy.ref.source_record_id, self.allergy.ref.resource_id,
-                self.order.ref.source_record_id, self.order.ref.resource_id, self.tier.value)
+    def key(self) -> AlertKey:
+        return alert_key(self.allergy.ref.source_record_id, self.allergy.ref.resource_id,
+                         self.order.ref.source_record_id, self.order.ref.resource_id, self.tier)
 
 
 # Eligibility ----------------------------------------------------------------------------

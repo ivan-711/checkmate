@@ -247,3 +247,14 @@ def test_csv_unknown_system_is_rxnorm_only_for_cached_codes():
     systems = {a.code.code: a.code.system for a in member.allergies}
     assert systems["7984"] == RXNORM and systems["91930004"] is None
     assert evaluate([member, HERO_ORDER]) and all(f.allergy.code.code == "7984" for f in evaluate([member, HERO_ORDER]))
+
+
+def test_idless_fhir_resources_get_distinct_references():
+    a1 = fhir_allergy(); a2 = fhir_allergy(code="733", display="Ampicillin")
+    del a1["id"], a2["id"]
+    member = parse_member(source_record_id=ER, source_system="ER_FHIR", source_local_id="ER-MRN-1", kind=SourceKind.FHIR_PATIENT,
+                          is_constructed=False, ingested_at=T0,
+                          raw_payload={"resourceType": "Bundle", "entry": [{"resource": a1}, {"resource": a2}, {"resource": fhir_order()}]})
+    refs = {a.ref.resource_id for a in member.allergies}
+    assert len(refs) == 2 and all(r.startswith("AllergyIntolerance/_") for r in refs)
+    assert len({f.key for f in evaluate([member])}) == 2

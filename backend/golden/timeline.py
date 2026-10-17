@@ -95,9 +95,12 @@ class BadCursor(ValueError):
 def decode_cursor(cursor: str) -> tuple[datetime, str, str]:
     try:
         ts, rid, res = base64.urlsafe_b64decode(cursor.encode()).decode().split("|", 2)
-        return (datetime.fromisoformat(ts), rid, res)
+        when = datetime.fromisoformat(ts)
     except (ValueError, UnicodeDecodeError) as exc:
         raise BadCursor("cursor is not one this endpoint issued") from exc
+    if when.tzinfo is None:  # every minted cursor carries an offset; a naive one is not ours
+        raise BadCursor("cursor is not one this endpoint issued")
+    return (when, rid, res)
 
 
 def page(events: Sequence[TimelineEvent], limit: int, cursor: str | None) -> tuple[list[TimelineEvent], str | None]:

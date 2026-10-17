@@ -1,7 +1,6 @@
 """read_entity, read_timeline and the routes, over the test database."""
 from __future__ import annotations
 
-import os
 from uuid import uuid4
 
 import pytest
@@ -65,14 +64,14 @@ def committed_entity(engine):
             c.execute(text("DELETE FROM source_record WHERE id IN (:a, :b)"), {"a": clinic, "b": er})
 
 
-@pytest.fixture(scope="module")
-def client():
-    from backend.tests.conftest import TEST_DATABASE_URL
-    os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+@pytest.fixture
+def client(engine, monkeypatch):
+    """The routes read through the module-level engine; point it at the test database explicitly."""
     from fastapi.testclient import TestClient
 
-    from backend.app.main import app
-    return TestClient(app)
+    from backend.app import main
+    monkeypatch.setattr(main, "engine", engine)
+    return TestClient(main.app)
 
 
 def test_routes_entity_timeline_alerts(client, committed_entity):
@@ -113,3 +112,17 @@ def test_routes_bad_cursor_is_422_and_limit_is_clamped(client, committed_entity)
     big = client.get(f"/api/v1/entities/{entity.id}/timeline", params={"limit": 5000})
     assert big.status_code == 200 and big.json()["nextCursor"] is None
     assert client.get("/api/v1/alerts", params={"entityId": str(uuid4())}).status_code == 404
+
+
+def test_alert_cursor_survives_a_retraction_and_naive_timeline_cursor_is_422(client, committed_entity, engine):
+    import base64
+
+    from backend.golden.service import alert_page, read_alerts
+    entity, alerts, _ = committed_entity
+    page = alert_page(alerts, 1, None)
+    assert page.items == alerts[:1] and page.next_cursor is None
+    naive = base64.urlsafe_b64encode(b"2025-01-01T00:00:00|x|y").decode()
+    r = client.get(f"/api/v1/entities/{entity.id}/timeline", params={"cursor": naive})
+    assert r.status_code == 422
+    with engine.connect() as c:
+        assert read_alerts(c, entity.id)[0].id == alerts[0].id
