@@ -1,4 +1,5 @@
 """One engine, one pool per process (architecture §2). Connections are short-lived."""
+
 from __future__ import annotations
 
 from sqlalchemy import create_engine, text
@@ -16,7 +17,11 @@ def make_engine(database_url: str) -> Engine:
         max_overflow=POOL_MAX_OVERFLOW,
         pool_timeout=POOL_TIMEOUT_S,
         pool_pre_ping=True,
-        connect_args={"options": f"-c statement_timeout={STATEMENT_TIMEOUT_S * 1000}"},
+        hide_parameters=True,  # a DBAPIError message never carries bound parameters (record fields)
+        connect_args={
+            "options": f"-c statement_timeout={STATEMENT_TIMEOUT_S * 1000}",
+            "connect_timeout": POOL_TIMEOUT_S,
+        },
     )
 
 
