@@ -19,6 +19,10 @@ FROZEN_PATHS = (
     "/api/v1/intake-sessions", "/api/v1/intake-sessions/{session_id}/turns",
     "/api/v1/intake-sessions/{session_id}", "/api/v1/metrics/tiles",
 )
+ADDITIVE_PATHS = (  # reversible forks after the freeze, flagged in the log
+    "/api/v1/entities/{entity_id}/timeline", "/api/v1/entities/{entity_id}/history",
+    "/api/v1/alerts", "/api/v1/threshold-sets/current",
+)
 
 
 def render() -> str:
