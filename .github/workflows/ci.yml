@@ -139,9 +139,32 @@ jobs:
             sleep 1
           done
           echo "API did not come up"; cat request.log; exit 1
-      - name: Contract test (contracts/README.md command; stubs answer 501 so not_a_server_error is excluded)
-        # schemathesis is a locked dev dependency (uv.lock), never resolved live
-        run: uv run schemathesis run http://127.0.0.1:8000/openapi.json --checks all --exclude-checks not_a_server_error
+      # Contract test: the contracts/README.md command, every check on, `not_a_server_error` excluded while stub
+      # routes answer 501 (a separate step below asserts zero non-501 5xx in the request log).
+      #
+      # One scoped exclusion. These operations answer 422 to requests that are schema-valid but wrong by design:
+      # an opaque `cursor` that does not decode, a `since` without a time component, an `Idempotency-Key`
+      # reused with a different body. `positive_data_acceptance` ("API rejected schema-compliant request")
+      # flags exactly those, so it is off for these seven operations only; every other check stays on for
+      # them, and every check stays on for every other operation. A per-operation setting in a
+      # schemathesis.toml does not work here: the CLI's `--checks all` overrides it (verified on 4.31.1), so
+      # the scope is two runs split by operation name. eval/tests/test_ci_workflow.py keeps this list equal
+      # to the operations in contracts/openapi.json that take `cursor`, `since` or `Idempotency-Key`.
+      - name: Contract test (all checks; positive_data_acceptance off only where a 422 is correct by design)
+        env:
+          DESIGNED_422_OPERATIONS: >-
+            GET /api/v1/alerts|GET /api/v1/candidate-pairs|GET /api/v1/entities/{entity_id}/history|GET /api/v1/entities/{entity_id}/timeline|GET /api/v1/events|POST /api/v1/candidate-pairs/{pair_id}/reviews|POST /api/v1/intake-sessions/{session_id}/turns
+        run: |
+          set -uo pipefail
+          spec=http://127.0.0.1:8000/openapi.json
+          include=(); exclude=()
+          IFS='|' read -ra designed <<< "$DESIGNED_422_OPERATIONS"
+          for op in "${designed[@]}"; do include+=(--include-name "$op"); exclude+=(--exclude-name "$op"); done
+          uv run schemathesis run "$spec" --checks all --exclude-checks not_a_server_error "${exclude[@]}"; every=$?
+          uv run schemathesis run "$spec" --checks all --exclude-checks not_a_server_error,positive_data_acceptance \
+            "${include[@]}"; designed_status=$?
+          echo "all other operations: exit ${every}; designed-422 operations: exit ${designed_status}"
+          exit $(( every | designed_status ))
       - name: No 5xx other than 501 in the request log
         run: |
           set -euo pipefail
