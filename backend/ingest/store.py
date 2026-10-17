@@ -2,7 +2,10 @@
 
 Idempotent: a draft whose (source_system, source_local_id) already exists with the same payload
 hash is skipped; the same local id with a different payload is an error, because raw payloads
-are immutable. Postgres is the source of truth; nothing here caches.
+are immutable. The derived rows are not immutable: for a skipped record the normalized row and its
+block keys are re-derived and replaced when they differ, so a database loaded by an older
+normalizer or key vocabulary (issue #10) is brought in line by a reload instead of keeping keys the
+gate can no longer match. Postgres is the source of truth; nothing here caches.
 """
 
 from __future__ import annotations
@@ -14,7 +17,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from backend.ingest.blocking import block_keys
-from backend.ingest.normalize import normalize_identity
+from backend.ingest.normalize import normalized_row
 from backend.ingest.records import SourceRecordDraft
 
 BATCH_SIZE = 100
@@ -29,6 +32,7 @@ class IngestResult:
     records_seen: int = 0
     records_inserted: int = 0
     records_skipped: int = 0
+    records_rederived: int = 0  # skipped records whose normalized row or block keys were out of date
     keys_inserted: int = 0
     inserted_ids: list[str] = field(default_factory=list)
 
@@ -55,10 +59,18 @@ NORMALIZED_COLUMNS = (
     "address_line",
     "zip5",
 )
-INSERT_NORMALIZED = (
-    f"INSERT INTO normalized_record (record_id, {', '.join(NORMALIZED_COLUMNS)}) "
-    f"VALUES ({', '.join(['%s'] * (len(NORMALIZED_COLUMNS) + 1))}) ON CONFLICT (record_id) DO NOTHING"
+_COLUMN_LIST = ", ".join(NORMALIZED_COLUMNS)
+_EXCLUDED_LIST = ", ".join(f"EXCLUDED.{column}" for column in NORMALIZED_COLUMNS)
+_STORED_LIST = ", ".join(f"normalized_record.{column}" for column in NORMALIZED_COLUMNS)
+# Insert, or replace only when a column differs: rowcount is 0 exactly when the stored row is current.
+UPSERT_NORMALIZED = (
+    f"INSERT INTO normalized_record (record_id, {_COLUMN_LIST}) "
+    f"VALUES ({', '.join(['%s'] * (len(NORMALIZED_COLUMNS) + 1))}) "
+    f"ON CONFLICT (record_id) DO UPDATE SET ({_COLUMN_LIST}) = ({_EXCLUDED_LIST}) "
+    f"WHERE ({_STORED_LIST}) IS DISTINCT FROM ({_EXCLUDED_LIST})"
 )
+SELECT_KEYS = "SELECT key_type, key_value FROM block_key WHERE record_id = %s"
+DELETE_KEYS = "DELETE FROM block_key WHERE record_id = %s"
 INSERT_BLOCK_KEY = "INSERT INTO block_key (key_type, key_value, record_id) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING"
 
 
@@ -84,16 +96,30 @@ def _write_one(cur: psycopg.Cursor, draft: SourceRecordDraft, result: IngestResu
                 f"{draft.source_system}:{draft.source_local_id} already exists with a different payload"
             )
         result.records_skipped += 1
+        if _write_derived(cur, draft, result):
+            result.records_rederived += 1
         return
-    # core's normalized_record row; the keys come from that row exactly as the gate re-reads it
-    row = normalize_identity(draft.identity).to_row_dict()
-    cur.execute(INSERT_NORMALIZED, (draft.id, *(row[column] for column in NORMALIZED_COLUMNS)))
-    keys = block_keys(row)
-    if keys:
-        cur.executemany(INSERT_BLOCK_KEY, [(key_type, key_value, draft.id) for key_type, key_value in keys])
-    result.keys_inserted += len(keys)
+    _write_derived(cur, draft, result)
     result.records_inserted += 1
     result.inserted_ids.append(str(draft.id))
+
+
+def _write_derived(cur: psycopg.Cursor, draft: SourceRecordDraft, result: IngestResult) -> bool:
+    """Bring the record's normalized row and block keys in line with the payload; True if anything changed.
+
+    The keys are computed from the stored row, exactly as the gate and match runs re-read it.
+    """
+    row = normalized_row(draft.identity)
+    cur.execute(UPSERT_NORMALIZED, (draft.id, *(row[column] for column in NORMALIZED_COLUMNS)))
+    changed = cur.rowcount == 1
+    keys = block_keys(row)
+    stored = {tuple(key) for key in cur.execute(SELECT_KEYS, (draft.id,)).fetchall()}
+    if stored != set(keys):
+        cur.execute(DELETE_KEYS, (draft.id,))
+        cur.executemany(INSERT_BLOCK_KEY, [(key_type, key_value, draft.id) for key_type, key_value in keys])
+        result.keys_inserted += len(keys)
+        changed = True
+    return changed
 
 
 def ingest(conn: psycopg.Connection, drafts: Iterable[SourceRecordDraft], batch_size: int = BATCH_SIZE) -> IngestResult:
@@ -115,14 +141,6 @@ def ingest(conn: psycopg.Connection, drafts: Iterable[SourceRecordDraft], batch_
             flush()
     flush()
     return result
-
-
-def clear_records(conn: psycopg.Connection) -> None:
-    """Test fixtures only: empty the three ingest tables from Python (never TRUNCATE from a shell)."""
-    with conn.transaction():
-        conn.execute("DELETE FROM block_key")
-        conn.execute("DELETE FROM normalized_record")
-        conn.execute("DELETE FROM source_record")
 
 
 def pair_candidates_by_key_type(conn: psycopg.Connection) -> dict[str, int]:

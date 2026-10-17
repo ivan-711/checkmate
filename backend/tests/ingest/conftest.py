@@ -69,10 +69,13 @@ def db():
     """One REPEATABLE READ transaction per test, always rolled back.
 
     Every worktree on main runs these tests against the same default database, so nothing a test
-    does may be committed: its DELETE and inserts stay invisible to other sessions, two concurrent
-    runs wait on each other's row locks instead of wiping each other's rows, and a corpus a CLI
-    load committed to the same database survives. ``clear_records`` and ``ingest`` open nested
-    ``transaction()`` blocks, which become savepoints inside this one.
+    does may be committed. What that buys: its DELETE and inserts stay invisible to other sessions;
+    two concurrent runs of these tests (which never commit) wait on each other's row locks instead
+    of wiping each other's rows; a corpus a CLI load committed survives; and a suite run before
+    this one in the same process (CI's single URL) cannot break the clear. What it does not: if
+    another process *commits* a row these tests also write while a test is open, Postgres raises a
+    serialization error, so the test fails loudly rather than passing on a count it did not make.
+    ``clear_test_state`` and ``ingest`` open nested ``transaction()`` blocks, which become savepoints.
     """
     if "checkmate_test" not in TEST_DATABASE_URL:
         pytest.skip("refusing to run destructive fixtures against a non-test database")
