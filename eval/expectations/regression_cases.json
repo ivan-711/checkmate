@@ -1,0 +1,249 @@
+{
+  "description": "Regression cases through the engine the app uses (eval.harness.product.load_engine), banded at the app's current threshold row (eval.harness.current_thresholds). Inputs are scorer inputs only; the expected outcome is kept apart and never reaches the engine. Identities are invented for this file: no showcase (hero) or evaluation patient appears here.",
+  "author": "Gojo (evaluation harness, lane W5)",
+  "cases": [
+    {
+      "id": "same-person-nickname-typo-missing-phone",
+      "kind": "same_person",
+      "why": "one person, two messy records: nickname, one-letter surname typo, phone missing, street spelled out",
+      "inputs": {
+        "a": {
+          "given_name": "Robert",
+          "family_name": "Okafor",
+          "birth_date": "1979-03-14",
+          "sex": "MALE",
+          "phone": "+19205550142",
+          "address_line": "1210 Elm St",
+          "zip5": "54301"
+        },
+        "b": {
+          "given_name": "Bob",
+          "family_name": "Okafur",
+          "birth_date": "1979-03-14",
+          "sex": "MALE",
+          "phone": null,
+          "address_line": "1210 Elm Street",
+          "zip5": "54301"
+        }
+      },
+      "expected": {
+        "band_in": [
+          "AUTO_LINK",
+          "REVIEW"
+        ]
+      }
+    },
+    {
+      "id": "same-person-spanish-surname-moved",
+      "kind": "same_person",
+      "why": "one person: Ma. abbreviation, accents dropped, maternal surname dropped, new address",
+      "inputs": {
+        "a": {
+          "given_name": "María Guadalupe",
+          "family_name": "Hernández López",
+          "birth_date": "1988-11-02",
+          "sex": "FEMALE",
+          "phone": "+19205550199",
+          "address_line": "77 Oak Ave",
+          "zip5": "54302"
+        },
+        "b": {
+          "given_name": "Ma. Guadalupe",
+          "family_name": "Hernandez",
+          "birth_date": "1988-11-02",
+          "sex": "FEMALE",
+          "phone": "+19205550199",
+          "address_line": "15 Pine St",
+          "zip5": "54303"
+        }
+      },
+      "expected": {
+        "band_in": [
+          "AUTO_LINK",
+          "REVIEW"
+        ]
+      }
+    },
+    {
+      "id": "same-person-dob-swap-address-missing",
+      "kind": "same_person",
+      "why": "one person: day and month transposed, address missing on one record",
+      "inputs": {
+        "a": {
+          "given_name": "Katherine",
+          "family_name": "Whitaker",
+          "birth_date": "1990-03-07",
+          "sex": "FEMALE",
+          "phone": "+19205550111",
+          "address_line": "40 Birch Ln",
+          "zip5": "54311"
+        },
+        "b": {
+          "given_name": "Katherine",
+          "family_name": "Whitaker",
+          "birth_date": "1990-07-03",
+          "sex": "FEMALE",
+          "phone": "+19205550111",
+          "address_line": null,
+          "zip5": null
+        }
+      },
+      "expected": {
+        "band_in": [
+          "AUTO_LINK",
+          "REVIEW"
+        ]
+      }
+    },
+    {
+      "id": "relatives-siblings-one-address",
+      "kind": "different_people",
+      "why": "siblings at one address and phone, birth years two apart, different given names",
+      "inputs": {
+        "a": {
+          "given_name": "Daniel",
+          "family_name": "Ruiz",
+          "birth_date": "1990-06-12",
+          "sex": "MALE",
+          "phone": "+19205550123",
+          "address_line": "300 Cedar St",
+          "zip5": "54304"
+        },
+        "b": {
+          "given_name": "Diego",
+          "family_name": "Ruiz",
+          "birth_date": "1992-06-12",
+          "sex": "MALE",
+          "phone": "+19205550123",
+          "address_line": "300 Cedar St",
+          "zip5": "54304"
+        }
+      },
+      "expected": {
+        "band_not": [
+          "AUTO_LINK"
+        ]
+      }
+    },
+    {
+      "id": "relatives-twins-one-address",
+      "kind": "different_people",
+      "why": "twins: same surname, DOB, address and phone; different given names",
+      "inputs": {
+        "a": {
+          "given_name": "Ana",
+          "family_name": "Torres",
+          "birth_date": "2001-04-09",
+          "sex": "FEMALE",
+          "phone": "+19205550177",
+          "address_line": "9 Willow Ct",
+          "zip5": "54313"
+        },
+        "b": {
+          "given_name": "Sofia",
+          "family_name": "Torres",
+          "birth_date": "2001-04-09",
+          "sex": "FEMALE",
+          "phone": "+19205550177",
+          "address_line": "9 Willow Ct",
+          "zip5": "54313"
+        }
+      },
+      "expected": {
+        "band_not": [
+          "AUTO_LINK"
+        ]
+      }
+    },
+    {
+      "id": "relatives-parent-child-junior",
+      "kind": "different_people",
+      "why": "parent and child: same full name (Jr), same address and phone, 26 years apart",
+      "inputs": {
+        "a": {
+          "given_name": "James",
+          "family_name": "Carter",
+          "birth_date": "1958-02-20",
+          "sex": "MALE",
+          "phone": "+19205550155",
+          "address_line": "12 Spruce Rd",
+          "zip5": "54115"
+        },
+        "b": {
+          "given_name": "James",
+          "family_name": "Carter Jr",
+          "birth_date": "1984-02-20",
+          "sex": "MALE",
+          "phone": "+19205550155",
+          "address_line": "12 Spruce Rd",
+          "zip5": "54115"
+        }
+      },
+      "expected": {
+        "band_not": [
+          "AUTO_LINK"
+        ]
+      }
+    },
+    {
+      "id": "relatives-cousins-similar-name-and-date",
+      "kind": "different_people",
+      "why": "cousins at one address: given names one letter apart, DOB five days apart",
+      "inputs": {
+        "a": {
+          "given_name": "Maria",
+          "family_name": "Garcia Lopez",
+          "birth_date": "1985-07-03",
+          "sex": "FEMALE",
+          "phone": null,
+          "address_line": "5 Main St",
+          "zip5": "54301"
+        },
+        "b": {
+          "given_name": "Mario",
+          "family_name": "Garcia Lopez",
+          "birth_date": "1985-07-08",
+          "sex": "MALE",
+          "phone": null,
+          "address_line": "5 Main St",
+          "zip5": "54301"
+        }
+      },
+      "expected": {
+        "band_not": [
+          "AUTO_LINK"
+        ]
+      }
+    },
+    {
+      "id": "thin-record-stays-in-review",
+      "kind": "thin_record",
+      "why": "a thin record (name and DOB only) against a full record of the same name: the registrar decides",
+      "inputs": {
+        "a": {
+          "given_name": "Linh",
+          "family_name": "Nguyen",
+          "birth_date": "1995-08-30",
+          "sex": null,
+          "phone": null,
+          "address_line": null,
+          "zip5": null
+        },
+        "b": {
+          "given_name": "Linh",
+          "family_name": "Nguyen",
+          "birth_date": "1995-08-30",
+          "sex": "FEMALE",
+          "phone": "+19205550188",
+          "address_line": "61 Aspen Dr",
+          "zip5": "54155"
+        }
+      },
+      "expected": {
+        "band_in": [
+          "REVIEW"
+        ]
+      }
+    }
+  ]
+}
