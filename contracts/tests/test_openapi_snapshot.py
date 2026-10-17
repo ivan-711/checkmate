@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from contracts.api_spec import build_app
 from contracts.build_openapi import FROZEN_PATHS, SNAPSHOT, render
 
-LIST_ROUTES = {"/api/v1/candidate-pairs"}
+LIST_ROUTES = {"/api/v1/candidate-pairs", "/api/v1/events"}
 IDEMPOTENT_POSTS = {"/api/v1/candidate-pairs/{pair_id}/reviews", "/api/v1/intake-sessions/{session_id}/turns"}
 
 
