@@ -33,6 +33,7 @@ from backend.core.score import ALL_WEIGHT_NAMES, WEIGHTS_DIR, Weights, save_weig
 from contracts.version import BLOCK_MAX_RECORDS
 
 DEFAULT_FOLDS = 5
+DEVELOPMENT_PARTITION = "development"
 DEFAULT_C = 1.0  # L2 strength; features are already in [0, 1] so no scaling is applied
 MAX_ITER = 2_000
 VERSION_PREFIX = "logreg"
@@ -73,16 +74,36 @@ def load_records_csv(path: Path) -> dict[str, Normalized]:
     return records
 
 
-def load_truth_csv(path: Path, partition: str | None = None) -> dict[str, TruthRow]:
+# W1's truth.csv names the splits fold ``fold``; ``cv_fold`` is accepted as an alias.
+FOLD_COLUMNS: tuple[str, ...] = ("fold", "cv_fold")
+
+
+def load_truth_csv(path: Path, partition: str | None = None, require_fold: bool = False) -> dict[str, TruthRow]:
+    """Truth rows, optionally one partition, with the splits fold when the table carries one.
+
+    The fold must come from the splits assignment (evaluation plan section 3, step 2). With
+    ``require_fold`` (the CLI default) a table without a fold column, or a kept row with an empty
+    fold, is an error. Otherwise the components are hashed with W1's formula and a warning says so.
+    """
     with path.open(newline="", encoding="utf-8") as fh:
-        rows = list(csv.DictReader(fh))
+        reader = csv.DictReader(fh)
+        rows = list(reader)
+        columns = reader.fieldnames or []
+    fold_column = next((c for c in FOLD_COLUMNS if c in columns), None)
+    if fold_column is None:
+        message = f"{path}: no fold column ({' or '.join(FOLD_COLUMNS)}); folds would be hashed, not the splits'"
+        if require_fold:
+            raise ValueError(message)
+        warnings.warn(message, UserWarning, stacklevel=2)
     truth: dict[str, TruthRow] = {}
     for row in rows:
         row_partition = row.get("partition") or None
         if partition is not None and row_partition != partition:
             continue
         entity = str(row["entity_id"])
-        fold = row.get("cv_fold")
+        fold = row.get(fold_column) if fold_column else None
+        if require_fold and fold in (None, ""):
+            raise ValueError(f"{path}: record {row['record_id']} ({row_partition}) has no {fold_column}")
         truth[str(row["record_id"])] = TruthRow(
             entity_id=entity,
             component_id=str(row.get("component_id") or entity),
@@ -93,14 +114,18 @@ def load_truth_csv(path: Path, partition: str | None = None) -> dict[str, TruthR
 
 
 def component_fold(component_id: str, n_folds: int) -> int:
-    """Fold of one dependency component by hash (evaluation plan section 3, step 2)."""
-    digest = hashlib.sha256(component_id.encode("utf-8")).digest()
-    return int.from_bytes(digest[:8], "big") % n_folds
+    """Fold of one dependency component by hash: W1's formula (``backend/ingest/corruptor.py``), so
+    the fallback agrees with splits.json for the same components (evaluation plan section 3, step 2)."""
+    return int(hashlib.sha256(component_id.encode("utf-8")).hexdigest(), 16) % n_folds
 
 
 def fold_of(row: TruthRow, n_folds: int) -> int:
     """The splits assignment's fold when the truth table carries one, else the hash fold."""
-    return row.cv_fold if row.cv_fold is not None else component_fold(row.component_id, n_folds)
+    if row.cv_fold is None:
+        return component_fold(row.component_id, n_folds)
+    if not 0 <= row.cv_fold < n_folds:
+        raise ValueError(f"component {row.component_id} has fold {row.cv_fold}, outside 0..{n_folds - 1}")
+    return row.cv_fold
 
 
 def folded_pairs(
@@ -301,7 +326,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--version", default=None, help=f"defaults to {VERSION_PREFIX}-<data digest>")
     parser.add_argument("--out-dir", type=Path, default=WEIGHTS_DIR)
     parser.add_argument("--oof-out", type=Path, default=None)
-    parser.add_argument("--partition", default=None, help="keep only truth rows with this partition value")
+    parser.add_argument(
+        "--partition",
+        default=DEVELOPMENT_PARTITION,
+        help="truth rows to fit on (default: development; test and showcase rows never train the scorer)",
+    )
+    parser.add_argument(
+        "--hash-folds",
+        action="store_true",
+        help="allow a truth table without a fold column and hash components instead (never for the real corpus)",
+    )
     parser.add_argument("--folds", type=int, default=DEFAULT_FOLDS)
     parser.add_argument("--c", type=float, default=DEFAULT_C)
     parser.add_argument(
@@ -312,7 +346,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     records = load_records_csv(args.records)
-    truth = load_truth_csv(args.truth, partition=args.partition)
+    truth = load_truth_csv(args.truth, partition=args.partition, require_fold=not args.hash_folds)
+    if not truth:
+        raise ValueError(f"{args.truth}: no truth rows in partition {args.partition!r}")
     digest = data_digest(args.records, args.truth, partition=args.partition, c=args.c, folds=args.folds)
     version = args.version or f"{VERSION_PREFIX}-{digest}"
     provenance = {
