@@ -14,7 +14,7 @@ export function EvidenceRail({ detail }: { detail: CandidatePairDetail }) {
   const scale = Math.max(...ranked.map((c) => Math.abs(c.logit)), Number.EPSILON);
 
   return (
-    <section data-testid="evidence-rail" aria-labelledby="evidence-heading" className="space-y-4">
+    <section data-testid="evidence-rail" aria-labelledby="evidence-heading" className="space-y-2">
       <h2 id="evidence-heading" className="text-[18px] font-semibold uppercase tracking-wider">
         Evidence{" "}
         <span className="font-normal normal-case tracking-normal text-ink-2">
@@ -23,18 +23,18 @@ export function EvidenceRail({ detail }: { detail: CandidatePairDetail }) {
       </h2>
       <div>
         <div className="flex items-center gap-3">
-          <span className="text-[56px] font-bold leading-[60px] tabular-nums">{decision.p.toFixed(2)}</span>
+          <span className="text-[40px] font-bold leading-[44px] tabular-nums">{decision.p.toFixed(2)}</span>
           <span data-testid="pair-band" className="inline-flex">
             <BandChip band={decision.band} />
           </span>
         </div>
-        <p className="text-[16px] text-ink-2">
+        <p className="text-[14px] text-ink-2">
           Probability estimate fitted on our synthetic development distribution
         </p>
       </div>
       <div>
-        <p className="mb-2 text-[16px] text-ink-3">Evidence weight (log-odds): against ← 0 → for</p>
-        <ul aria-label="Top evidence" className="space-y-1">
+        <p className="mb-1 text-[14px] text-ink-3">Evidence weight (log-odds): against ← 0 → for</p>
+        <ul aria-label="Top evidence" className="space-y-0.5">
           {ranked.map((c) => (
             <li
               key={c.feature}

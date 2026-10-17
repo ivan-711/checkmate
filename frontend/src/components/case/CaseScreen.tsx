@@ -122,7 +122,7 @@ export function CaseScreen() {
           {detail && (resolved || linked) ? (
             <div
               data-testid="candidate-pair"
-              className="space-y-4 rounded-lg border border-border-subtle bg-surface p-4"
+              className="space-y-3 rounded-lg border border-border-subtle bg-surface p-3"
             >
               <EvidenceRail detail={detail} />
               <ReviewPanel detail={detail} onDecided={onDecided} />
