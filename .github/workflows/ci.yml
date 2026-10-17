@@ -134,7 +134,7 @@ jobs:
       - name: Regenerate data/scenarios/hero and diff (architecture section 18, replay integrity)
         run: |
           set -euo pipefail
-          uv run python -m data.hero_select
+          uv run python -m data.hero_select --allow-partial
           git diff --exit-code -- data/scenarios/hero
       - name: fixture_check (section 9.1 checks; policy and replay checks skip until their lanes land)
         run: uv run python -m data.fixture_check

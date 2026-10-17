@@ -198,7 +198,7 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
                          .replace("MedicationRequest/PLACEHOLDER", order_ref))
     scenario["thresholds"].update(thresholdsId=thresholds_id, cLow=c_low, cHigh=c_high,
                                   tLowDisplay=round(_sigmoid(c_low), 6), tHighDisplay=round(_sigmoid(c_high), 6),
-                                  autoLinkEnabled=False, isCalibrated=False, sourceRunId=result.run_id)
+                                  autoLinkEnabled=False, isCalibrated=False, sourceRunId=None)  # the selector's run dir is temporary
     recall = held_out_recall(result.numbers)
     baseline_state = score_state(base)
     scenario["whatIfs"] = {}
