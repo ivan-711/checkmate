@@ -9,7 +9,9 @@ RULE_ID = "BL-AMOX-01"
 RULE_VERSION = "v1"
 
 # FrontDesk agent loop (ADR-016 §8, architecture §22.2)
-MODEL_TIMEOUT_MS = 8_000          # per model call
+MODEL_TIMEOUT_MS = 10_000         # per model call; the API rejects any deadline under 10 s
+                                  # (400 'Minimum allowed deadline is 10s', measured 2026-10-17 13:58 CT);
+                                  # raised from 8 s as an additive fork approved by Ivan at 14:12
 TURN_BUDGET_S = 25                # per typed turn
 TURN_LEASE_S = 40                 # IN_PROGRESS older than this is marked FAILED
 MAX_TOOL_CALLS_PER_TURN = 6
