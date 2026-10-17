@@ -37,3 +37,22 @@ def conn(engine):
             yield c
         finally:
             tx.rollback()
+
+
+def purge(engine, record_ids) -> None:
+    """Delete everything committed for these source records: route tests commit through the app's
+    own pool, so they clean up after themselves (test database only; the guard above refuses the dev one)."""
+    ids = list(record_ids)
+    if not ids:
+        return
+    with engine.begin() as c:
+        pairs = [r[0] for r in c.execute(text(
+            "SELECT id FROM candidate_pair WHERE record_a_id = ANY(:ids) OR record_b_id = ANY(:ids)"), {"ids": ids})]
+        entities = [r[0] for r in c.execute(text(
+            "SELECT DISTINCT entity_id FROM entity_member WHERE source_record_id = ANY(:ids)"), {"ids": ids})]
+        c.execute(text("DELETE FROM event_log WHERE entity_id = ANY(:e) OR pair_id = ANY(:p)"), {"e": entities, "p": pairs})
+        c.execute(text("DELETE FROM entity WHERE id = ANY(:e)"), {"e": entities})  # cascades members and alerts
+        c.execute(text("DELETE FROM not_a_match WHERE record_a_id = ANY(:ids) OR record_b_id = ANY(:ids)"), {"ids": ids})
+        c.execute(text("DELETE FROM match_decision WHERE pair_id = ANY(:p)"), {"p": pairs})
+        c.execute(text("DELETE FROM candidate_pair WHERE id = ANY(:p)"), {"p": pairs})
+        c.execute(text("DELETE FROM source_record WHERE id = ANY(:ids)"), {"ids": ids})

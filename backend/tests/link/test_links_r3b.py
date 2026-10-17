@@ -13,6 +13,7 @@ from sqlalchemy import text
 
 from backend.golden.service import read_alerts, read_entity, read_timeline
 from backend.link.service import CannotLinkConflict, LinkError, apply_approve, apply_reject, apply_split
+from backend.tests.link.seed import rows_touching
 from contracts.models.alerts import AlertStatus, AlertTier
 from contracts.models.common import DecisionStatus, ReasonCode, SourceKind
 
@@ -106,7 +107,7 @@ def test_merge_keeps_the_entity_of_the_earliest_ingested_member(conn):
     assert merged.id == e_cd.id, "c (ingested first) sits in e_cd, so e_cd keeps its id"
     assert {m.source_record_id for m in merged.members} == {a, b, c, d}
     assert conn.execute(text("SELECT count(*) FROM entity WHERE id = :e"), {"e": e_ab.id}).scalar() == 0
-    assert conn.execute(text("SELECT count(*) FROM entity_member")).scalar() == 4
+    assert rows_touching(conn, "entity_member", [a, b, c, d]) == 4
 
 
 def test_merge_singleton_into_entity_keeps_entity_id_even_when_the_singleton_is_older(conn):
@@ -258,5 +259,5 @@ def test_rejected_pair_never_builds_an_entity_or_an_alert(conn):
     rejected = decision(conn, pid, DecisionStatus.REJECTED, reason=ReasonCode.INSUFFICIENT_EVIDENCE.value)
     apply_reject(conn, pid, rejected)
     assert conn.execute(text("SELECT count(*) FROM entity_member WHERE source_record_id IN (:a, :b)"), {"a": clinic, "b": er}).scalar() == 0
-    assert conn.execute(text("SELECT count(*) FROM safety_alert")).scalar() == 0
+    assert rows_touching(conn, "safety_alert", [clinic, er]) == 0
     assert read_entity(conn, uuid4()) is None

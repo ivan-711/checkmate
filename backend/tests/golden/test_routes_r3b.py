@@ -16,16 +16,17 @@ def client(monkeypatch):
     return TestClient(main.app, raise_server_exceptions=False), main, monkeypatch
 
 
-def test_database_down_answers_the_internal_envelope_with_a_request_id(client):
+def test_database_down_answers_upstream_unavailable_with_a_request_id(client):
+    """W3a's composition root maps a database outage to 503 UPSTREAM_UNAVAILABLE (the brief's error table)."""
     tc, main, monkeypatch = client
     # port 1 on loopback: refused at once, no timeout wait
-    monkeypatch.setattr(main, "engine", make_engine("postgresql://x:x@127.0.0.1:1/x"))
+    monkeypatch.setattr(main.app.state, "engine", make_engine("postgresql://x:x@127.0.0.1:1/x"))
     for path in (f"/api/v1/entities/{uuid4()}", f"/api/v1/entities/{uuid4()}/timeline", f"/api/v1/alerts?entityId={uuid4()}"):
         r = tc.get(path)
-        assert r.status_code == 500, path
+        assert r.status_code == 503, path
         assert r.headers.get("X-Request-Id"), path
         body = r.json()
-        assert body["error"]["code"] == "INTERNAL", body
+        assert body["error"]["code"] == "UPSTREAM_UNAVAILABLE", body
         assert "127.0.0.1" not in body["error"]["message"] and "x:x@" not in body["error"]["message"], "no connection detail leaks"
 
 

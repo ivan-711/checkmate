@@ -53,8 +53,9 @@ def insert_decision(conn, pair_id: UUID, version: int, status: DecisionStatus, *
     return did
 
 
-def hero_records(conn, *, order_status: str = "active") -> tuple[UUID, UUID]:
-    """Clinic CSV allergy (ingested first) and ER FHIR constructed order (ingested later)."""
+def hero_records(conn, *, order_status: str = "active", er_birth_date: str = "1985-07-03") -> tuple[UUID, UUID]:
+    """Clinic CSV allergy (ingested first) and ER FHIR constructed order (ingested later).
+    ``er_birth_date`` lets a test give the ER record the hero's day/month-swapped DOB."""
     clinic = insert_record(conn, system="CLINIC_CSV", local_id="CLINIC-7", kind=SourceKind.CSV_ROW,
                            raw_payload={"Id": "p", "allergies": [csv_allergy_row()], "medications": [],
                                         "encounters": [{"START": "2024-03-02", "STOP": "2024-03-02", "CODE": "185349003",
@@ -67,7 +68,7 @@ def hero_records(conn, *, order_status: str = "active") -> tuple[UUID, UUID]:
                                            "type": [{"coding": [{"system": "http://snomed.info/sct", "code": "50849002",
                                                                  "display": "Emergency room admission (procedure)"}]}],
                                            "period": {"start": "2026-10-17T14:00:00Z"}, "serviceProvider": {"display": "ER"}}),
-                       ingested_at=T0 + timedelta(minutes=1), family="Placeholder-Family")
+                       ingested_at=T0 + timedelta(minutes=1), family="Placeholder-Family", birth_date=er_birth_date)
     return clinic, er
 
 
@@ -77,3 +78,17 @@ def linked_pair(conn, a: UUID, b: UUID) -> tuple[UUID, UUID]:
     insert_decision(conn, pair, 1, DecisionStatus.PROPOSED, actor="system:scorer", actor_type="SYSTEM")
     decision = insert_decision(conn, pair, 2, DecisionStatus.LINKED)
     return pair, decision
+
+
+# Closed map: the columns that tie a table's rows to source records. Assertions count only the rows a
+# test's own records touch, because other suites (W3a's API tests) may commit rows to a shared database.
+_RECORD_COLUMNS = {
+    "entity_member": ("source_record_id",),
+    "safety_alert": ("allergy_record_id", "order_record_id"),
+    "not_a_match": ("record_a_id", "record_b_id"),
+}
+
+
+def rows_touching(conn, table: str, record_ids) -> int:
+    where = " OR ".join(f"{column} = ANY(:ids)" for column in _RECORD_COLUMNS[table])
+    return conn.execute(text(f"SELECT count(*) FROM {table} WHERE {where}"), {"ids": list(record_ids)}).scalar()

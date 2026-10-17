@@ -4,10 +4,10 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import text
 
 from backend.golden.service import read_entity, read_timeline
 from backend.link.service import apply_approve
+from backend.tests.conftest import purge
 from backend.tests.link.seed import hero_records, linked_pair
 from contracts.models.entities import TimelineVerification
 
@@ -47,21 +47,26 @@ def test_timeline_keeps_source_verification_and_constructed_flag_and_pages(conn)
 
 
 @pytest.fixture
-def committed_entity(engine):
-    """The routes read committed rows through the app's own pool, so this one commits and cleans up after itself."""
-    with engine.begin() as c:
-        clinic, er = hero_records(c)
-        pair, decision = linked_pair(c, clinic, er)
-        entity, alerts = apply_approve(c, pair, decision)
-    try:
-        yield entity, alerts, pair
-    finally:
+def commit_hero(engine):
+    """The routes read committed rows through the app's own pool: commit an approved hero pair
+    (options as ``hero_records``) and purge everything it created afterwards."""
+    made: list = []
+
+    def make(**hero_options):
         with engine.begin() as c:
-            c.execute(text("DELETE FROM event_log WHERE entity_id = :e OR pair_id = :p"), {"e": entity.id, "p": pair})
-            c.execute(text("DELETE FROM entity WHERE id = :e"), {"e": entity.id})
-            c.execute(text("DELETE FROM match_decision WHERE pair_id = :p"), {"p": pair})
-            c.execute(text("DELETE FROM candidate_pair WHERE id = :p"), {"p": pair})
-            c.execute(text("DELETE FROM source_record WHERE id IN (:a, :b)"), {"a": clinic, "b": er})
+            clinic, er = hero_records(c, **hero_options)
+            made.extend([clinic, er])
+            pair, decision = linked_pair(c, clinic, er)
+            entity, alerts = apply_approve(c, pair, decision)
+        return entity, alerts, pair
+
+    yield make
+    purge(engine, made)
+
+
+@pytest.fixture
+def committed_entity(commit_hero):
+    return commit_hero()
 
 
 @pytest.fixture
@@ -70,7 +75,7 @@ def client(engine, monkeypatch):
     from fastapi.testclient import TestClient
 
     from backend.app import main
-    monkeypatch.setattr(main, "engine", engine)
+    monkeypatch.setattr(main.app.state, "engine", engine)
     return TestClient(main.app)
 
 
@@ -103,14 +108,16 @@ def test_routes_404_use_the_error_envelope(client):
     assert client.get("/api/v1/entities/not-a-uuid").status_code == 422
 
 
-def test_routes_bad_cursor_is_422_and_limit_is_clamped(client, committed_entity):
+def test_routes_bad_cursor_and_limit_over_max_are_422(client, committed_entity):
     entity, _, _ = committed_entity
     bad = client.get(f"/api/v1/entities/{entity.id}/timeline", params={"cursor": "not-a-cursor"})
     assert bad.status_code == 422 and bad.json()["error"]["code"] == "VALIDATION_ERROR"
     bad_alert = client.get("/api/v1/alerts", params={"entityId": str(entity.id), "cursor": str(uuid4())})
     assert bad_alert.status_code == 422
-    big = client.get(f"/api/v1/entities/{entity.id}/timeline", params={"limit": 5000})
-    assert big.status_code == 200 and big.json()["nextCursor"] is None
+    # the brief (9238cc7) and the frozen schema: limit above LIST_LIMIT_MAX is a 422 at the boundary
+    big = client.get(f"/api/v1/entities/{entity.id}/timeline", params={"limit": 201})
+    assert big.status_code == 422 and big.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert client.get(f"/api/v1/entities/{entity.id}/timeline", params={"limit": 200}).status_code == 200
     assert client.get("/api/v1/alerts", params={"entityId": str(uuid4())}).status_code == 404
 
 
@@ -126,3 +133,28 @@ def test_alert_cursor_survives_a_retraction_and_naive_timeline_cursor_is_422(cli
     assert r.status_code == 422
     with engine.connect() as c:
         assert read_alerts(c, entity.id)[0].id == alerts[0].id
+
+
+# Swapped DOBs (the hero's day/month transposition): ADR-014 majority, else CONFLICT_UNRESOLVED ---
+
+SWAPPED = {("1985-07-03", "CLINIC_CSV", "CLINIC-7"), ("1985-03-07", "ER_FHIR", "ER-MRN-1")}
+
+
+def test_swapped_dobs_give_conflict_unresolved_with_both_values_and_their_crosswalks(conn):
+    clinic, er = hero_records(conn, er_birth_date="1985-03-07")
+    entity, _ = apply_approve(conn, *linked_pair(conn, clinic, er))
+    golden = {g.field: g for g in entity.golden if g.rule != "UNION"}
+    dob = golden["birthDate"]
+    assert dob.value is None and dob.rule == "CONFLICT_UNRESOLVED"
+    assert {(a.value, a.crosswalk.source_system, a.crosswalk.source_record_id) for a in dob.alternates} == SWAPPED
+    assert (dob.crosswalk.source_system, dob.crosswalk.source_record_id) in {(s, r) for _, s, r in SWAPPED}
+    assert golden["sex"].rule == "MAJORITY" and golden["sex"].value == "FEMALE", "only the DOB is in conflict"
+
+
+def test_route_serializes_the_unresolved_dob_as_null_with_both_alternates(client, commit_hero):
+    entity, _, _ = commit_hero(er_birth_date="1985-03-07")
+    body = client.get(f"/api/v1/entities/{entity.id}").json()
+    (dob,) = [g for g in body["golden"] if g["field"] == "birthDate"]
+    assert "value" in dob and dob["value"] is None, "the null is sent, not dropped, so the UI can say why"
+    assert dob["rule"] == "CONFLICT_UNRESOLVED"
+    assert {(a["value"], a["crosswalk"]["sourceSystem"], a["crosswalk"]["sourceRecordId"]) for a in dob["alternates"]} == SWAPPED

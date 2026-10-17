@@ -9,7 +9,15 @@ from sqlalchemy import text
 from backend.golden.service import load_members, read_alerts
 from backend.link.service import CannotLinkConflict, LinkError, apply_approve, apply_reject, apply_revoke, apply_split
 from backend.rule.bl_amox_01 import evaluate
-from backend.tests.link.seed import T0, hero_records, insert_decision, insert_pair, insert_record, linked_pair
+from backend.tests.link.seed import (
+    T0,
+    hero_records,
+    insert_decision,
+    insert_pair,
+    insert_record,
+    linked_pair,
+    rows_touching,
+)
 from contracts.models.alerts import AlertStatus, AlertTier
 from contracts.models.common import DecisionStatus, ReasonCode, SourceKind
 
@@ -70,7 +78,7 @@ def test_rejected_link_leaves_the_rule_silent_and_no_alert_row(conn):
     decision = insert_decision(conn, pair, 2, DecisionStatus.REJECTED, reason_code=ReasonCode.DIFFERENT_PERSON.value)
     assert apply_reject(conn, pair, decision) is None
     apply_reject(conn, pair, decision)  # a retry is harmless
-    assert conn.execute(text("SELECT count(*) FROM safety_alert")).scalar() == 0
+    assert rows_touching(conn, "safety_alert", [clinic, er]) == 0
     assert conn.execute(text("SELECT count(*) FROM entity_member WHERE source_record_id IN (:a, :b)"), {"a": clinic, "b": er}).scalar() == 0
     assert conn.execute(text("SELECT count(*) FROM not_a_match WHERE decision_id = :d"), {"d": decision}).scalar() == 1
     assert events(conn, pair_id=pair) == []
@@ -81,7 +89,7 @@ def test_insufficient_evidence_reject_writes_no_not_a_match(conn):
     pair = insert_pair(conn, clinic, er)
     decision = insert_decision(conn, pair, 1, DecisionStatus.REJECTED, reason_code=ReasonCode.INSUFFICIENT_EVIDENCE.value)
     apply_reject(conn, pair, decision)
-    assert conn.execute(text("SELECT count(*) FROM not_a_match")).scalar() == 0
+    assert rows_touching(conn, "not_a_match", [clinic, er]) == 0
 
 
 def test_unapproved_auto_link_proposal_never_merges(conn):
@@ -90,8 +98,8 @@ def test_unapproved_auto_link_proposal_never_merges(conn):
     proposed = insert_decision(conn, pair, 1, DecisionStatus.PROPOSED, actor="system:scorer", actor_type="SYSTEM", band="AUTO_LINK")
     with pytest.raises(LinkError):
         apply_approve(conn, pair, proposed)
-    assert conn.execute(text("SELECT count(*) FROM entity_member")).scalar() == 0
-    assert conn.execute(text("SELECT count(*) FROM safety_alert")).scalar() == 0
+    assert rows_touching(conn, "entity_member", [clinic, er]) == 0
+    assert rows_touching(conn, "safety_alert", [clinic, er]) == 0
 
 
 def test_approve_refuses_when_not_a_match_sits_inside_the_component(conn):
@@ -117,7 +125,7 @@ def test_approve_then_split_retracts_the_flag(conn):
     assert status == "REVOKED" and result.revoked_decision_ids
     # events in one transaction share ts = now(), so compare the multiset, not the order
     assert sorted(events(conn, entity_id=entity.id)) == sorted(["ENTITY_MERGED", "ALERT_RAISED", "LINK_REVOKED", "ENTITY_SPLIT", "ALERT_RETRACTED"])
-    assert conn.execute(text("SELECT count(*) FROM not_a_match")).scalar() == 0
+    assert rows_touching(conn, "not_a_match", [clinic, er]) == 0
     for e in result.entities:
         assert evaluate(load_members(conn, e.id)) == [], "each side alone is silent"
         assert read_alerts(conn, e.id, status=AlertStatus.PRELIMINARY) == []
@@ -127,7 +135,7 @@ def test_split_with_different_person_writes_not_a_match(conn):
     clinic, er = hero_records(conn)
     entity, _ = apply_approve(conn, *linked_pair(conn, clinic, er))
     apply_split(conn, entity.id, [clinic], actor="registrar:Registrar C", reason_code=ReasonCode.DIFFERENT_PERSON)
-    assert conn.execute(text("SELECT count(*) FROM not_a_match")).scalar() == 1
+    assert rows_touching(conn, "not_a_match", [clinic, er]) == 1
 
 
 def test_direct_revocation_retracts_the_flag(conn):
@@ -175,7 +183,7 @@ def test_split_moves_an_alert_whose_records_move_together(conn):
     assert result.entities[0].id == entity.id and {m.source_record_id for m in result.entities[0].members} == {z}
     moved = read_alerts(conn, result.entities[1].id, status=AlertStatus.PRELIMINARY)
     assert [a.id for a in moved] == [alerts[0].id]
-    assert "ALERT_RETRACTED" not in events(conn)
+    assert "ALERT_RETRACTED" not in events(conn, entity_id=entity.id) + events(conn, entity_id=result.entities[1].id)
 
 
 def test_revoke_that_does_not_disconnect_writes_no_split_event(conn):
@@ -246,8 +254,8 @@ def test_system_written_linked_row_never_links_or_fires(conn):
     auto = insert_decision(conn, pair, 1, DecisionStatus.LINKED, actor="system:scorer", actor_type="SYSTEM", band="AUTO_LINK")
     with pytest.raises(LinkError):
         apply_approve(conn, pair, auto)
-    assert conn.execute(text("SELECT count(*) FROM entity_member")).scalar() == 0
-    assert conn.execute(text("SELECT count(*) FROM safety_alert")).scalar() == 0
+    assert rows_touching(conn, "entity_member", [clinic, er]) == 0
+    assert rows_touching(conn, "safety_alert", [clinic, er]) == 0
     # a system LINKED row on another pair is not an edge either: the human approval below links two records, not three
     third = insert_record(conn, system="ER_FHIR", local_id="ER-MRN-3", kind=SourceKind.FHIR_PATIENT,
                           raw_payload={"resourceType": "Patient", "id": "p3"}, ingested_at=T0 + timedelta(minutes=9))
