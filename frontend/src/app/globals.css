@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+/* Design tokens. Components use the Tailwind names mapped below, never a hex value.
+   The venue runs light; dark follows the system unless data-theme pins one. */
+:root {
+  --page: #fafaf7;
+  --surface: #ffffff;
+  --sunken: #f3f3ef;
+  --kiosk-bg: #f2f5f4;
+  --border-subtle: #e4e4df;
+  --border-strong: #7e848d;
+  --ink-1: #111827;
+  --ink-2: #374151;
+  --ink-3: #5b6472;
+  --accent: #0b5d57;
+  --accent-hover: #094b46;
+  --on-accent: #ffffff;
+  --accent-soft: #e4f0ee;
+  --focus: #111827;
+  --denied-bg: #fdf2d0;
+  --denied-ink: #7a4b00;
+  --denied-border: #b7791f;
+  --error-ink: #8c3a12;
+  --error-bg: #fceee6;
+  --banner-bg: #111827;
+  --on-banner: #ffffff;
+  --evidence-for: #0072b2;
+  --evidence-against: #d55e00;
+  --band-auto: #0b5d57;
+  --on-band-auto: #ffffff;
+  --band-review: #f2b705;
+  --on-band-review: #111827;
+  --band-keep: #4b5563;
+  --on-band-keep: #ffffff;
+
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-move: 300ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #0f1315;
+    --surface: #171c1f;
+    --sunken: #0b0e10;
+    --kiosk-bg: #121a1a;
+    --border-subtle: #2a3034;
+    --border-strong: #6b757a;
+    --ink-1: #ecefee;
+    --ink-2: #c3cbc9;
+    --ink-3: #97a19f;
+    --accent: #4fc1b3;
+    --accent-hover: #6fd0c3;
+    --on-accent: #0b1413;
+    --accent-soft: #12302c;
+    --focus: #ecefee;
+    --denied-bg: #2b2310;
+    --denied-ink: #f4c863;
+    --denied-border: #c98500;
+    --error-ink: #f2a07a;
+    --error-bg: #341a10;
+    --evidence-for: #3987e5;
+    --evidence-against: #d95926;
+    --band-auto: #4fc1b3;
+    --on-band-auto: #0b1413;
+  }
+}
+
+:root[data-theme="dark"] {
+  --page: #0f1315;
+  --surface: #171c1f;
+  --sunken: #0b0e10;
+  --kiosk-bg: #121a1a;
+  --border-subtle: #2a3034;
+  --border-strong: #6b757a;
+  --ink-1: #ecefee;
+  --ink-2: #c3cbc9;
+  --ink-3: #97a19f;
+  --accent: #4fc1b3;
+  --accent-hover: #6fd0c3;
+  --on-accent: #0b1413;
+  --accent-soft: #12302c;
+  --focus: #ecefee;
+  --denied-bg: #2b2310;
+  --denied-ink: #f4c863;
+  --denied-border: #c98500;
+  --error-ink: #f2a07a;
+  --error-bg: #341a10;
+  --evidence-for: #3987e5;
+  --evidence-against: #d95926;
+  --band-auto: #4fc1b3;
+  --on-band-auto: #0b1413;
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-kiosk: var(--kiosk-bg);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-focus: var(--focus);
+  --color-denied-bg: var(--denied-bg);
+  --color-denied-ink: var(--denied-ink);
+  --color-denied-border: var(--denied-border);
+  --color-error-ink: var(--error-ink);
+  --color-error-bg: var(--error-bg);
+  --color-banner: var(--banner-bg);
+  --color-on-banner: var(--on-banner);
+  --color-evidence-for: var(--evidence-for);
+  --color-evidence-against: var(--evidence-against);
+  --color-band-auto: var(--band-auto);
+  --color-on-band-auto: var(--on-band-auto);
+  --color-band-review: var(--band-review);
+  --color-on-band-review: var(--on-band-review);
+  --color-band-keep: var(--band-keep);
+  --color-on-band-keep: var(--on-band-keep);
+  --font-sans: var(--font-plex-sans), system-ui, "Segoe UI", sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink-1);
+  line-height: 1.4;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The approve moment: the golden record, timeline and flag card enter in that order.
+   Transitions rather than keyframes, so a fast Reset retargets cleanly. */
+.enter {
+  transition:
+    opacity var(--dur-move) var(--ease-out-strong),
+    transform var(--dur-move) var(--ease-out-strong);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+}
+.enter-late {
+  transition-delay: 400ms;
+}
+.enter-last {
+  transition-delay: 700ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter {
+    transition: opacity var(--dur-fast) linear;
+    transition-delay: 0ms;
+    @starting-style {
+      transform: none;
+    }
+  }
+}
