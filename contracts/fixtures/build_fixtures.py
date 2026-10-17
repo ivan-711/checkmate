@@ -191,7 +191,9 @@ def build_hard_negative() -> dict:
     b = card(22, "CLINIC_CSV", SourceKind.CSV_ROW, "Clinic CSV", "PLACEHOLDER-TWIN-B", "PLACEHOLDER-FAMILY", "1985-07-03", "100 Placeholder St")
     c = contribs({"given_name_jw": 0.2, "family_name_jw": 0.9, "family_metaphone": 0.5, "dob_exact": 0.8,
                   "sex_match": 0.2, "phone_match": 0.4, "address_jaccard": 0.7, "zip_match": 0.3})
-    detail = pair_detail(30, a, b, 0.4, 0.55, Band.KEEP_SEPARATE, ["TWIN"], PairOrigin.MATCH_RUN,
+    # raw score below c_low (0.0): KEEP_SEPARATE on the cutoff itself; TWIN is listed as fired so the UI shows the rule,
+    # but negative rules only ever demote AUTO_LINK to REVIEW (architecture §3 S6), never produce KEEP_SEPARATE.
+    detail = pair_detail(30, a, b, -0.6, 0.35, Band.KEEP_SEPARATE, ["TWIN"], PairOrigin.MATCH_RUN,
                          DecisionStatus.PROPOSED, "system:scorer", ActorType.SYSTEM, False, c)
     return {"placeholder": True, "kind": "HARD_NEGATIVE_TWIN",
             "note": "Same surname, DOB, address and phone; different given names: the TWIN rule keeps them separate.",
