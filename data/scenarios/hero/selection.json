@@ -1,6 +1,6 @@
 {
   "ok": false,
-  "reason": "no hero qualifies at any relaxation level in the showcase pool (21 entities, 13 with one ER FHIR and one Clinic CSV record); test-split fallback not enabled (--allow-test-fallback); best partial d2f739cb-ae51-5065-bee9-1784d4b1e817 misses ['change_birth_year_keep_separate']",
+  "reason": "no hero qualifies at any relaxation level in the showcase pool (21 entities, 13 with one ER FHIR and one Clinic CSV record); test-split fallback not enabled (--allow-test-fallback); best partial d2f739cb-ae51-5065-bee9-1784d4b1e817 misses ['change_birth_year_keep_separate', 'swap_dob_day_month_robust']",
   "seed": 20261017,
   "scorer_version": "handset-1",
   "thresholds_id": "provisional-1",
@@ -14,7 +14,7 @@
     "0: all criteria, Spanish-language name required",
     "1: Spanish-name requirement dropped",
     "2: robustness tolerance widened from 0.05 to 0.10",
-    "3: band-changers accept a drop at either +1 or -1 birth year",
+    "3: band-changers accept a drop in the shipped birth-year direction (-1, fork #11) instead of both",
     "4: no hero qualifies: best partial candidate shown with the unmet criteria"
   ],
   "qualifier_count_per_level": {
@@ -446,11 +446,17 @@
         "zip_match": 1.0
       }
     },
+    "applicable": {
+      "REMOVE_ADDRESS": true,
+      "CHANGE_BIRTH_YEAR": true,
+      "SWAP_DOB_DAY_MONTH": false,
+      "ACCENT_HYPHEN_SURNAME": true
+    },
     "criteria": {
       "baseline_review": true,
       "remove_address_keep_separate": true,
       "change_birth_year_keep_separate": false,
-      "swap_dob_day_month_robust": true,
+      "swap_dob_day_month_robust": false,
       "accent_hyphen_surname_robust": true,
       "intake_rendering_review": true,
       "fixture_check_bounds": true,
@@ -472,9 +478,9 @@
   "criteria": {
     "baseline_review": "baseline band is REVIEW (never relaxed)",
     "remove_address_keep_separate": "REMOVE_ADDRESS drops to KEEP_SEPARATE (abstention: not enough to link)",
-    "change_birth_year_keep_separate": "CHANGE_BIRTH_YEAR +1 and -1 each drop to KEEP_SEPARATE (level 3: either)",
-    "swap_dob_day_month_robust": "SWAP_DOB_DAY_MONTH moves p by at most the tolerance (0.05; level 2: 0.10)",
-    "accent_hyphen_surname_robust": "ACCENT_HYPHEN_SURNAME moves p by at most the tolerance (0.05; level 2: 0.10)",
+    "change_birth_year_keep_separate": "CHANGE_BIRTH_YEAR +1 and -1 each drop to KEEP_SEPARATE (level 3: the shipped -1)",
+    "swap_dob_day_month_robust": "SWAP_DOB_DAY_MONTH applies (day <= 12, day != month) and moves p by at most the tolerance (0.05; level 2: 0.10)",
+    "accent_hyphen_surname_robust": "ACCENT_HYPHEN_SURNAME changes the name and moves p by at most the tolerance (0.05; level 2: 0.10)",
     "intake_rendering_review": "the intake rendering of the ER fragment lands in REVIEW against the Clinic record",
     "fixture_check_bounds": "p in [0,1]; no AUTO_LINK; no what-if raises p above baseline + 0.005; no negative rule",
     "spanish_name": "Spanish-language name (reported as a fact; required at level 0 only)"
@@ -901,11 +907,17 @@
           "zip_match": 1.0
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": false,
+        "ACCENT_HYPHEN_SURNAME": true
+      },
       "criteria": {
         "baseline_review": true,
         "remove_address_keep_separate": true,
         "change_birth_year_keep_separate": false,
-        "swap_dob_day_month_robust": true,
+        "swap_dob_day_month_robust": false,
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": true,
         "fixture_check_bounds": true,
@@ -1345,12 +1357,18 @@
           "zip_match": 1.0
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": false,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": true,
         "remove_address_keep_separate": false,
         "change_birth_year_keep_separate": false,
-        "swap_dob_day_month_robust": true,
-        "accent_hyphen_surname_robust": true,
+        "swap_dob_day_month_robust": false,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": true,
         "fixture_check_bounds": true,
         "spanish_name": false
@@ -1789,12 +1807,18 @@
           "zip_match": null
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": true,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": true,
         "remove_address_keep_separate": false,
         "change_birth_year_keep_separate": true,
         "swap_dob_day_month_robust": false,
-        "accent_hyphen_surname_robust": true,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": true,
         "fixture_check_bounds": true,
         "spanish_name": false
@@ -2233,12 +2257,18 @@
           "zip_match": 1.0
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": false,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": true,
         "remove_address_keep_separate": false,
         "change_birth_year_keep_separate": false,
-        "swap_dob_day_month_robust": true,
-        "accent_hyphen_surname_robust": true,
+        "swap_dob_day_month_robust": false,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": true,
         "fixture_check_bounds": true,
         "spanish_name": false
@@ -2677,12 +2707,18 @@
           "zip_match": null
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": false,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": true,
         "remove_address_keep_separate": false,
         "change_birth_year_keep_separate": false,
-        "swap_dob_day_month_robust": true,
-        "accent_hyphen_surname_robust": true,
+        "swap_dob_day_month_robust": false,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": true,
         "fixture_check_bounds": true,
         "spanish_name": false
@@ -3121,12 +3157,18 @@
           "zip_match": null
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": false,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": true,
         "remove_address_keep_separate": false,
         "change_birth_year_keep_separate": false,
-        "swap_dob_day_month_robust": true,
-        "accent_hyphen_surname_robust": true,
+        "swap_dob_day_month_robust": false,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": true,
         "fixture_check_bounds": true,
         "spanish_name": false
@@ -3565,12 +3607,18 @@
           "zip_match": null
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": false,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": true,
         "remove_address_keep_separate": false,
         "change_birth_year_keep_separate": false,
-        "swap_dob_day_month_robust": true,
-        "accent_hyphen_surname_robust": true,
+        "swap_dob_day_month_robust": false,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": true,
         "fixture_check_bounds": true,
         "spanish_name": false
@@ -4009,12 +4057,18 @@
           "zip_match": null
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": true,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": true,
         "remove_address_keep_separate": false,
         "change_birth_year_keep_separate": false,
         "swap_dob_day_month_robust": true,
-        "accent_hyphen_surname_robust": true,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": true,
         "fixture_check_bounds": true,
         "spanish_name": false
@@ -4453,12 +4507,18 @@
           "zip_match": null
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": false,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": true,
         "remove_address_keep_separate": false,
         "change_birth_year_keep_separate": false,
-        "swap_dob_day_month_robust": true,
-        "accent_hyphen_surname_robust": true,
+        "swap_dob_day_month_robust": false,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": true,
         "fixture_check_bounds": true,
         "spanish_name": false
@@ -4897,12 +4957,18 @@
           "zip_match": null
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": false,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": true,
         "remove_address_keep_separate": false,
         "change_birth_year_keep_separate": false,
-        "swap_dob_day_month_robust": true,
-        "accent_hyphen_surname_robust": true,
+        "swap_dob_day_month_robust": false,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": true,
         "fixture_check_bounds": true,
         "spanish_name": false
@@ -5341,12 +5407,18 @@
           "zip_match": 1.0
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": true,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": true,
         "remove_address_keep_separate": false,
         "change_birth_year_keep_separate": false,
         "swap_dob_day_month_robust": true,
-        "accent_hyphen_surname_robust": true,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": true,
         "fixture_check_bounds": true,
         "spanish_name": false
@@ -5785,12 +5857,18 @@
           "zip_match": null
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": false,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": true,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": false,
         "remove_address_keep_separate": true,
         "change_birth_year_keep_separate": true,
         "swap_dob_day_month_robust": false,
-        "accent_hyphen_surname_robust": true,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": false,
         "fixture_check_bounds": true,
         "spanish_name": false
@@ -6229,12 +6307,18 @@
           "zip_match": null
         }
       },
+      "applicable": {
+        "REMOVE_ADDRESS": true,
+        "CHANGE_BIRTH_YEAR": true,
+        "SWAP_DOB_DAY_MONTH": true,
+        "ACCENT_HYPHEN_SURNAME": false
+      },
       "criteria": {
         "baseline_review": false,
         "remove_address_keep_separate": true,
-        "change_birth_year_keep_separate": true,
+        "change_birth_year_keep_separate": false,
         "swap_dob_day_month_robust": false,
-        "accent_hyphen_surname_robust": true,
+        "accent_hyphen_surname_robust": false,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
         "spanish_name": false
@@ -6253,5 +6337,23 @@
       "tie_break": "d5be1139a19a6129247f4287eced21683b7c6516ba3283f0d6f7350d90f7699b"
     }
   ],
-  "wording": "a selected showcase satisfying published criteria; aggregate metrics cover the full frozen test set; headline metrics were frozen before selection"
+  "wording": "a selected showcase satisfying published criteria; aggregate metrics cover the full frozen test set; headline metrics were frozen before selection",
+  "pin": {
+    "entityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
+    "decidedBy": "lead session, 2026-10-17 (R5 round 2 on PR #5)",
+    "reason": "keep the current provisional hero until the 20:00 selection run picks the final hero under the fixed criteria; the export is re-rendered with captions computed from what each button does",
+    "removeAt": "the 20:00 selection run: python -m data.hero_select --ignore-pin",
+    "author": "Christian Flores (lane W5)"
+  },
+  "wouldSelect": {
+    "entityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
+    "qualified": false,
+    "relaxationLevel": null,
+    "unmetCriteria": [
+      "change_birth_year_keep_separate",
+      "swap_dob_day_month_robust"
+    ],
+    "baselineRaw": 2.15,
+    "language": "ES"
+  }
 }

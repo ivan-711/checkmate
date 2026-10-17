@@ -2,8 +2,10 @@
   "entityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
   "provisional": true,
   "qualified": false,
+  "pinned": true,
   "unmetCriteria": [
-    "change_birth_year_keep_separate"
+    "change_birth_year_keep_separate",
+    "swap_dob_day_month_robust"
   ],
   "scorerVersion": "handset-1",
   "thresholdsId": "provisional-1",
@@ -474,7 +476,7 @@
     "baseline_review": true,
     "remove_address_keep_separate": true,
     "change_birth_year_keep_separate": false,
-    "swap_dob_day_month_robust": true,
+    "swap_dob_day_month_robust": false,
     "accent_hyphen_surname_robust": true,
     "intake_rendering_review": true,
     "fixture_check_bounds": true,

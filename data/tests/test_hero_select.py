@@ -100,21 +100,18 @@ def test_relaxation_order_drops_spanish_then_widens_tolerance():
     # the accent/hyphen edit moves p by about 0.08: fails at 0.05, passes at 0.10 (level 2)
     sel = _select({"E1": 2.0}, {"address": 3.0, "dob": 3.0, "name": 0.6}, {"E1": "ES"})
     assert sel.ok and sel.relaxation_level == 2
-    # only one birth-year direction drops: level 3 (either direction)
-    corpus, assignment = _corpus({"E1": "ES"})
+    # only the shipped direction (-1, fork #11) drops: level 3; only +1 drops: no level qualifies
+    for dropping_year, qualifies in (("1984-07-03", True), ("1986-07-03", False)):
+        corpus, assignment = _corpus({"E1": "ES"})
 
-    def one_sided(a, b, weights, thresholds):
-        s = 2.0
-        if a.get("address_line") is None:
-            s -= 3.0
-        if a["birth_date"] == "1986-07-03":
-            s -= 3.0
-        from eval.harness.types import band_for
+        def one_sided(a, b, weights, thresholds, dropping_year=dropping_year):
+            s = 2.0
+            if a.get("address_line") is None or a["birth_date"] == dropping_year:
+                s -= 3.0
+            return MatchResult(raw_score=s, p=standin.display_p(s, {}), band=band_for(s, C_LOW, C_HIGH))
 
-        return MatchResult(raw_score=s, p=standin.display_p(s, {}), band=band_for(s, C_LOW, C_HIGH))
-
-    sel = hs.select_hero(corpus, assignment, one_sided, {}, C_LOW, C_HIGH, 1, "test", "t")
-    assert sel.ok and sel.relaxation_level == 3
+        sel = hs.select_hero(corpus, assignment, one_sided, {}, C_LOW, C_HIGH, 1, "test", "t")
+        assert sel.ok is qualifies and (sel.relaxation_level == 3 if qualifies else sel.relaxation_level is None)
 
 
 def test_baseline_review_is_never_relaxed_and_failure_is_reasoned():
@@ -157,3 +154,28 @@ def test_bands_are_read_from_raw_cutoffs(band):
 
     s = MID if band == BAND_REVIEW else C_LOW - 1
     assert band_for(s, C_LOW, C_HIGH) == band
+
+
+def test_inapplicable_edits_are_captioned_plainly_and_never_as_an_effect():
+    from eval.harness import whatifs
+
+    day16 = {"birth_date": "1964-05-16", "family_name": "Mesa", "given_name": "Sofia", "address_line": None}
+    assert not whatifs.is_applicable(whatifs.SWAP_DOB_DAY_MONTH, day16)
+    assert whatifs.caption_of(whatifs.SWAP_DOB_DAY_MONTH, day16, "REVIEW", "REVIEW", 0.0) == \
+        "This birth date has no day/month swap: the day is above 12."
+    same = {"birth_date": "1964-05-05"}
+    assert "the day and the month are the same" in whatifs.caption_of(whatifs.SWAP_DOB_DAY_MONTH, same, "REVIEW", "REVIEW", 0.0)
+    assert whatifs.caption_of(whatifs.REMOVE_ADDRESS, day16, "REVIEW", "REVIEW", 0.0) == "This record has no address to remove."
+    assert whatifs.caption_of(whatifs.ACCENT_HYPHEN_SURNAME, day16, "REVIEW", "REVIEW", 0.0) == \
+        "This name has no accents or hyphens to change."
+    applies = {"birth_date": "1964-05-06"}
+    assert "named feature" in whatifs.caption_of(whatifs.SWAP_DOB_DAY_MONTH, applies, "REVIEW", "REVIEW", 0.01)
+
+
+def test_pin_and_would_select(tmp_path):
+    assert hs.load_pin(tmp_path) is None
+    (tmp_path / hs.PIN_FILE).write_text('{"entityId": "E9"}')
+    assert hs.load_pin(tmp_path) == {"entityId": "E9"}
+    sel = _select({"E1": 5.0}, {"address": 3.0, "dob": 3.0}, {"E1": "ES"})
+    picked = hs.would_select(sel)
+    assert picked["entityId"] == "E1" and picked["qualified"] is False and "baseline_review" in picked["unmetCriteria"]

@@ -36,6 +36,7 @@ from contracts.models.thresholds import ThresholdSet
 from contracts.models.tiles import TilesResponse
 from contracts.models.whatifs import WhatIfResponse
 from data import hero_overlay as overlay
+from data.hero_export import iso_date
 from data.hero_select import P_RAISE_BOUND, ROBUSTNESS_TOLERANCE, intake_rendering
 from eval.harness import product, standin, whatifs
 from eval.harness.types import BAND_AUTO_LINK, BAND_KEEP_SEPARATE, BAND_REVIEW, band_for
@@ -148,15 +149,19 @@ def run_checks(d: Path, strict: bool = False) -> list[Check]:
         s["band"] == band_for(s["raw_score"], c_low, c_high, s["negative_rules_fired"]) for s in every) else FAIL))
 
     # the selection criteria
+    er_iso = {**er, "birth_date": iso_date(er.get("birth_date"))}
     criteria = {
         "baseline in REVIEW": base["band"] == BAND_REVIEW,
         "REMOVE_ADDRESS drops to KEEP_SEPARATE": what[whatifs.REMOVE_ADDRESS]["band"] == BAND_KEEP_SEPARATE,
         "CHANGE_BIRTH_YEAR +1 and -1 drop to KEEP_SEPARATE": all(
             what[f"{whatifs.CHANGE_BIRTH_YEAR}:{d}"]["band"] == BAND_KEEP_SEPARATE for d in ("+1", "-1")),
-        f"SWAP_DOB_DAY_MONTH moves p by <= {ROBUSTNESS_TOLERANCE}":
-            abs(what[whatifs.SWAP_DOB_DAY_MONTH]["p"] - base["p"]) <= ROBUSTNESS_TOLERANCE,
-        f"ACCENT_HYPHEN_SURNAME moves p by <= {ROBUSTNESS_TOLERANCE}":
-            abs(what[whatifs.ACCENT_HYPHEN_SURNAME]["p"] - base["p"]) <= ROBUSTNESS_TOLERANCE,
+        # robustness is met only when the edit applies to the ER record (an unapplied edit is not evidence)
+        f"SWAP_DOB_DAY_MONTH applies and moves p by <= {ROBUSTNESS_TOLERANCE}":
+            whatifs.is_applicable(whatifs.SWAP_DOB_DAY_MONTH, er_iso)
+            and abs(what[whatifs.SWAP_DOB_DAY_MONTH]["p"] - base["p"]) <= ROBUSTNESS_TOLERANCE,
+        f"ACCENT_HYPHEN_SURNAME applies and moves p by <= {ROBUSTNESS_TOLERANCE}":
+            whatifs.is_applicable(whatifs.ACCENT_HYPHEN_SURNAME, er_iso)
+            and abs(what[whatifs.ACCENT_HYPHEN_SURNAME]["p"] - base["p"]) <= ROBUSTNESS_TOLERANCE,
         "intake rendering lands in REVIEW against the Clinic record": intake["band"] == BAND_REVIEW,
     }
     for name, ok in criteria.items():
@@ -234,9 +239,13 @@ def _caption_checks(scenario: dict, hero: dict, strict: bool) -> list[Check]:
     """Every shipped caption and alert flag matches the band it ships with (R5 #1/#13; independent #2)."""
     out: list[Check] = []
     mismatched, hidden_wrong, unchanged = [], [], []
+    er = dict(hero["records"]["ER_FHIR"])
+    er["birth_date"] = iso_date(er.get("birth_date"))
     for button, wi in scenario["whatIfs"].items():
         base_band, band = wi["baseline"]["band"], wi["whatIf"]["band"]
-        expected = whatifs.caption_for(button, base_band, band, wi["whatIf"]["p"] - wi["baseline"]["p"])
+        # recomputed from what the button does on the ER record: a caption claiming an effect that the
+        # numbers (or an inapplicable edit) do not show fails
+        expected = whatifs.caption_of(button, er, base_band, band, wi["whatIf"]["p"] - wi["baseline"]["p"])
         if wi["caption"] != expected or ("not enough to link" in wi["caption"].lower() and band != BAND_KEEP_SEPARATE):
             mismatched.append(f"{button}: {wi['caption']!r} ships with {band}")
         if wi["alertWouldBeHidden"] != (band == BAND_KEEP_SEPARATE):

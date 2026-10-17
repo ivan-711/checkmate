@@ -18,8 +18,14 @@
   },
   "heldOutFamilies": {
     "seed": 20261017,
-    "drawn": [],
-    "note": "5 P1 families drawn without replacement by seed (at least one of S4/S7/S8, one N, one D or L); W1 fills the drawn list at the 19:00 P1 commit via a fork; held out from training, not unseen"
+    "drawn": [
+      "S4",
+      "N5",
+      "D5",
+      "L4",
+      "C3"
+    ],
+    "note": "5 P1 families drawn without replacement by seed (at least one of S4/S7/S8, one N, one D or L), equal to backend.ingest.corruptor.draw_heldout_families(seed) and checked against it; excluded from training, thresholds and per-merge runs and scored once in the test pass; say held out from training, not unseen"
   },
   "wording": "design choices, not guarantees; development numbers are descriptive"
 }

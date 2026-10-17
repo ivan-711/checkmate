@@ -180,8 +180,11 @@ def load_corpus(seed: int, raw_dir: Path = DEFAULT_RAW_DIR) -> tuple[Corpus, dic
     bundles, csv_patients = cli.load_sample(raw_dir)
     out = corruptor.build_corpus(seed, bundles, csv_patients)
     donors: dict[str, list[str]] = {}
+    graft_families: dict[str, set[str]] = {}
     for g in out.grafts:
         donors.setdefault(g.recipient_id, []).append(g.donor_id)
+        # W1 labels the hard negative on the graft (GraftSpec.family), not on the recipient's records
+        graft_families.setdefault(g.recipient_id, set()).add(g.family)
     records: list[Record] = []
     truth: list[TruthRow] = []
     person_language: dict[str, str] = {}
@@ -195,7 +198,7 @@ def load_corpus(seed: int, raw_dir: Path = DEFAULT_RAW_DIR) -> tuple[Corpus, dic
             "source_system": rec.draft.source_system, "given_name": ident.given, "family_name": ident.family,
             "birth_date": ident.birth_date, "sex": ident.sex, "phone": ident.phone,
             "address_line": ident.address_line, "zip5": ident.postal_code, "language": language,
-            "categories": [] if rec.family in NO_EDIT_FAMILIES else [rec.family],
+            "categories": sorted(({rec.family} - NO_EDIT_FAMILIES) | graft_families.get(rec.synthea_id, set())),
             "donor_person_ids": sorted(donors.get(rec.synthea_id, [])),
             "allergies": [dict(row) for row in getattr(rec.share, "allergies", None) or []]
             if rec.draft.source_system == "CLINIC_CSV" else [],

@@ -66,7 +66,7 @@ RELAXATION_LEVELS = (
     "0: all criteria, Spanish-language name required",
     "1: Spanish-name requirement dropped",
     "2: robustness tolerance widened from 0.05 to 0.10",
-    "3: band-changers accept a drop at either +1 or -1 birth year",
+    "3: band-changers accept a drop in the shipped birth-year direction (-1, fork #11) instead of both",
     "4: no hero qualifies: best partial candidate shown with the unmet criteria",
 )
 
@@ -113,6 +113,7 @@ class Candidate:
     baseline: Scored
     what_ifs: dict[str, Scored]
     intake: Scored
+    applicable: dict[str, bool] = field(default_factory=dict)  # does each what-if change the ER record at all
     criteria: dict[str, bool] = field(default_factory=dict)
     level: int | None = None
     required: list[str] = field(default_factory=list)
@@ -187,22 +188,29 @@ def score_candidate(entity_id: str, er: Record, clinic: Record, match: MatchFn, 
         whatifs.ACCENT_HYPHEN_SURNAME: Scored.of(match(whatifs.accent_plus_hyphen(er), clinic, weights, thresholds)),
     }
     intake = Scored.of(match(intake_rendering(er), clinic, weights, thresholds))
+    applicable = {b: whatifs.is_applicable(b, er) for b in whatifs.BUTTONS}
     return Candidate(entity_id=entity_id, person_id=er["person_id"], language=language, er_record_id=er["record_id"],
                      clinic_record_id=clinic["record_id"], baseline=Scored.of(base), what_ifs=what, intake=intake,
-                     tie_break=hashlib.sha256(entity_id.encode()).hexdigest())
+                     applicable=applicable, tie_break=hashlib.sha256(entity_id.encode()).hexdigest())
 
 
 def evaluate(c: Candidate, level: Level, midpoint: float) -> Candidate:
     base_p = c.baseline.p
     plus, minus = c.what_ifs[f"{whatifs.CHANGE_BIRTH_YEAR}:+1"], c.what_ifs[f"{whatifs.CHANGE_BIRTH_YEAR}:-1"]
     year_drops = [plus.band == BAND_KEEP_SEPARATE, minus.band == BAND_KEEP_SEPARATE]
+    shipped_year = c.what_ifs[f"{whatifs.CHANGE_BIRTH_YEAR}:{HERO_BIRTH_YEAR_DELTA:+d}"]
     every = [c.baseline, c.intake, *c.what_ifs.values()]
     c.criteria = {
         "baseline_review": c.baseline.band == BAND_REVIEW,
         "remove_address_keep_separate": c.what_ifs[whatifs.REMOVE_ADDRESS].band == BAND_KEEP_SEPARATE,
-        "change_birth_year_keep_separate": all(year_drops) if level.birth_year_both else any(year_drops),
-        "swap_dob_day_month_robust": abs(c.what_ifs[whatifs.SWAP_DOB_DAY_MONTH].p - base_p) <= level.tolerance,
-        "accent_hyphen_surname_robust": abs(c.what_ifs[whatifs.ACCENT_HYPHEN_SURNAME].p - base_p) <= level.tolerance,
+        # levels 0-2: both directions drop; level 3 relaxes to the shipped direction (fork #11: -1), never +1 only
+        "change_birth_year_keep_separate": (all(year_drops) if level.birth_year_both
+                                            else shipped_year.band == BAND_KEEP_SEPARATE),
+        # robustness counts only when the edit happens: an unchanged score from an unapplied edit is not evidence
+        "swap_dob_day_month_robust": (c.applicable.get(whatifs.SWAP_DOB_DAY_MONTH, False)
+                                      and abs(c.what_ifs[whatifs.SWAP_DOB_DAY_MONTH].p - base_p) <= level.tolerance),
+        "accent_hyphen_surname_robust": (c.applicable.get(whatifs.ACCENT_HYPHEN_SURNAME, False)
+                                         and abs(c.what_ifs[whatifs.ACCENT_HYPHEN_SURNAME].p - base_p) <= level.tolerance),
         "intake_rendering_review": c.intake.band == BAND_REVIEW,
         "fixture_check_bounds": (all(0.0 <= s.p <= 1.0 for s in every) and all(s.band != BAND_AUTO_LINK for s in every)
                                  and all(s.p <= base_p + P_RAISE_BOUND for s in c.what_ifs.values())
@@ -238,9 +246,11 @@ def select_hero(corpus: Corpus, assignment: Assignment, match: MatchFn, weights:
     criteria_text = {
         "baseline_review": "baseline band is REVIEW (never relaxed)",
         "remove_address_keep_separate": "REMOVE_ADDRESS drops to KEEP_SEPARATE (abstention: not enough to link)",
-        "change_birth_year_keep_separate": "CHANGE_BIRTH_YEAR +1 and -1 each drop to KEEP_SEPARATE (level 3: either)",
-        "swap_dob_day_month_robust": "SWAP_DOB_DAY_MONTH moves p by at most the tolerance (0.05; level 2: 0.10)",
-        "accent_hyphen_surname_robust": "ACCENT_HYPHEN_SURNAME moves p by at most the tolerance (0.05; level 2: 0.10)",
+        "change_birth_year_keep_separate": "CHANGE_BIRTH_YEAR +1 and -1 each drop to KEEP_SEPARATE (level 3: the shipped -1)",
+        "swap_dob_day_month_robust": ("SWAP_DOB_DAY_MONTH applies (day <= 12, day != month) and moves p by at most "
+                                      "the tolerance (0.05; level 2: 0.10)"),
+        "accent_hyphen_surname_robust": ("ACCENT_HYPHEN_SURNAME changes the name and moves p by at most the tolerance "
+                                         "(0.05; level 2: 0.10)"),
         "intake_rendering_review": "the intake rendering of the ER fragment lands in REVIEW against the Clinic record",
         "fixture_check_bounds": "p in [0,1]; no AUTO_LINK; no what-if raises p above baseline + 0.005; no negative rule",
         "spanish_name": "Spanish-language name (reported as a fact; required at level 0 only)",
@@ -296,6 +306,24 @@ def select_hero(corpus: Corpus, assignment: Assignment, match: MatchFn, weights:
                          criteria=criteria_text, candidates=sorted(candidates, key=_rank_key))
 
 
+PIN_FILE = "pin.json"
+
+
+def load_pin(out: Path) -> dict | None:
+    """A lead decision to keep the provisional hero until the 20:00 selection run (``--ignore-pin`` there)."""
+    path = out / PIN_FILE
+    return json.loads(path.read_text()) if path.exists() else None
+
+
+def would_select(selection: HeroSelection) -> dict:
+    """What the selector picks without the pin: the qualifier, else the best partial and its unmet criteria."""
+    chosen = selection.hero or selection.best_partial
+    if chosen is None:
+        return {"entityId": None, "qualified": False}
+    return {"entityId": chosen.entity_id, "qualified": selection.ok, "relaxationLevel": selection.relaxation_level,
+            "unmetCriteria": chosen.unmet(), "baselineRaw": chosen.baseline.raw_score, "language": chosen.language}
+
+
 def development_run(seed: int, engine: Engine, corpus_loader=None, fixture: FixtureConfig | None = None,
                     operating_point: CurrentThresholds | None = None) -> RunResult:
     """The development run with the same seed (fast config) through ``engine``, banded at the current row."""
@@ -316,6 +344,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--engine", choices=("product", "standin"), default="product",
                         help="product (default): W1's corpus and W2's engine; standin: harness self-test only")
     parser.add_argument("--raw", type=Path, default=None, help="extracted Synthea sample (data/download.py)")
+    parser.add_argument("--ignore-pin", action="store_true",
+                        help="the 20:00 selection run: ignore data/scenarios/hero/pin.json and export the selected hero")
     parser.add_argument("--allow-partial", action="store_true",
                         help="when no hero qualifies, export the best partial candidate with its unmet criteria "
                              "(architecture 9.1: the pitch narrates the band changes that actually occur); exit 0")
@@ -341,8 +371,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                             op.c_low, op.c_high, args.seed, engine.scorer_version, op.thresholds_id,
                             allow_test_fallback=args.allow_test_fallback, require_spanish=not args.no_require_spanish)
     args.out.mkdir(parents=True, exist_ok=True)
-    (args.out / "selection.json").write_text(json.dumps(selection.as_json(), indent=2, ensure_ascii=False) + "\n")
+    pin = None if args.ignore_pin else load_pin(args.out)
+    report = selection.as_json()
+    if pin is not None:
+        pinned = next((c for c in selection.candidates if c.entity_id == pin["entityId"]), None)
+        if pinned is None:
+            print(f"PINNED HERO {pin['entityId']} is not a candidate in the showcase pool", file=sys.stderr)
+            return 1
+        report["pin"] = pin
+        report["wouldSelect"] = would_select(selection)
+    (args.out / "selection.json").write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
     print(selection.reason)
+    if pin is not None:
+        export(selection, result, args.out, provisional=True, hero=pinned, engine=engine, pinned=True)
+        print(f"PINNED: kept hero {pinned.entity_id} (unmet {pinned.unmet()}); the fixed selector would pick "
+              f"{report['wouldSelect']}", file=sys.stderr)
+        return 0
     if selection.ok:
         export(selection, result, args.out, provisional=True, engine=engine)
         print(f"hero {selection.hero.entity_id} exported to {args.out}")
