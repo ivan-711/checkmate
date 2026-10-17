@@ -252,5 +252,6 @@ def test_system_written_linked_row_never_links_or_fires(conn):
     third = insert_record(conn, system="ER_FHIR", local_id="ER-MRN-3", kind=SourceKind.FHIR_PATIENT,
                           raw_payload={"resourceType": "Patient", "id": "p3"}, ingested_at=T0 + timedelta(minutes=9))
     insert_decision(conn, insert_pair(conn, er, third), 1, DecisionStatus.LINKED, actor="system:scorer", actor_type="SYSTEM")
-    entity, _ = apply_approve(conn, *linked_pair(conn, clinic, er))
+    human = insert_decision(conn, pair, 2, DecisionStatus.LINKED)
+    entity, _ = apply_approve(conn, pair, human)
     assert {m.source_record_id for m in entity.members} == {clinic, er}
