@@ -32,6 +32,8 @@ KEY_TYPES: tuple[str, ...] = (
     KEY_ZIP5_INITIAL,
 )
 PHONE_LAST_DIGITS = 7
+# Inclusion-exclusion over hot blocks is exact up to this many; beyond it the sum is reported as a bound.
+MAX_EXACT_HOT_BLOCKS = 8
 
 RecordId = Hashable
 PairKey = tuple[str, str]  # (str(a), str(b)) with a < b, the contract's ordering
@@ -71,6 +73,8 @@ class BlockingResult:
     n_excluded_not_a_match: int
     oversized_blocks: tuple[OversizedBlock, ...] = ()
     pairs_skipped_oversized: int = 0
+    # True only when more hot blocks overlap than the exact count covers (MAX_EXACT_HOT_BLOCKS).
+    pairs_skipped_is_upper_bound: bool = False
     block_sizes: Mapping[str, int] = field(default_factory=dict)
 
 
@@ -153,22 +157,37 @@ def candidate_pairs(
                 excluded_seen.add(pair)
                 continue
             keys_by_pair[pair].append(str(key))
-    # An oversized block is never expanded, not even to count: pairs it would have produced that
-    # some expanded block also produced are found by scanning the (bounded) candidate set, so the
-    # cost is O(|B|) per hot block instead of O(n^2). A pair inside two hot blocks is counted in
-    # each, so the total is an upper bound; the per-block numbers are exact.
-    oversized: list[OversizedBlock] = []
-    total_skipped = 0
-    for key, members in skipped:
-        member_set = {str(m) for m in members}
-        in_block = len(members) * (len(members) - 1) // 2
-        produced_elsewhere = sum(1 for a, b in keys_by_pair if a in member_set and b in member_set)
+    # An oversized block is never expanded, not even to count. Pairs inside it that an expanded
+    # block also produced, or that are excluded, are found by scanning the bounded candidate and
+    # exclusion sets, so the cost is O(|B|) per hot block instead of O(n^2). The total across hot
+    # blocks is the exact union by inclusion-exclusion while there are few of them.
+    member_sets = [{str(m) for m in members} for _, members in skipped]
+
+    def pairs_only_within(member_set: set[str]) -> int:
+        size = len(member_set)
+        in_block = size * (size - 1) // 2
+        produced = sum(1 for a, b in keys_by_pair if a in member_set and b in member_set)
         excluded_here = sum(1 for a, b in excluded if a in member_set and b in member_set)
-        only_here = in_block - produced_elsewhere - excluded_here
-        total_skipped += only_here
-        oversized.append(
-            OversizedBlock(key=str(key), size=len(members), pairs_in_block=in_block, pairs_skipped=only_here)
+        return in_block - produced - excluded_here
+
+    oversized = [
+        OversizedBlock(
+            key=str(key),
+            size=len(members),
+            pairs_in_block=len(members) * (len(members) - 1) // 2,
+            pairs_skipped=pairs_only_within(member_set),
         )
+        for (key, members), member_set in zip(skipped, member_sets, strict=True)
+    ]
+    is_upper_bound = len(member_sets) > MAX_EXACT_HOT_BLOCKS
+    if is_upper_bound or len(member_sets) <= 1:
+        total_skipped = sum(block.pairs_skipped for block in oversized)
+    else:
+        total_skipped = 0
+        for size in range(1, len(member_sets) + 1):
+            sign = 1 if size % 2 else -1
+            for subset in combinations(member_sets, size):
+                total_skipped += sign * pairs_only_within(set.intersection(*subset))
     n = len(records)
     n_total = n * (n - 1) // 2
     pairs = tuple(
@@ -184,6 +203,7 @@ def candidate_pairs(
         n_excluded_not_a_match=len(excluded_seen),
         oversized_blocks=tuple(oversized),
         pairs_skipped_oversized=total_skipped,
+        pairs_skipped_is_upper_bound=is_upper_bound,
         block_sizes={str(k): len(v) for k, v in index.items()},
     )
 

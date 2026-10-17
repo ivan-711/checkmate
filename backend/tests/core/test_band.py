@@ -96,3 +96,15 @@ def test_handset_demo_bands_separate_same_person_from_sibling():
     sibling = match(BASE, {**BASE, "given_name": "Zachary", "dob": "1992-11-20"}, HANDSET_WEIGHTS, DEMO_THRESHOLDS)
     assert same.band is Band.AUTO_LINK
     assert sibling.band is Band.KEEP_SEPARATE
+
+
+def test_handset_demo_claims_hold():
+    """Pins the behaviour the HANDSET_WEIGHTS comment promises for the checkpoint."""
+    swap = match(BASE, {**BASE, "dob": "1990-07-03"}, HANDSET_WEIGHTS, DEMO_THRESHOLDS)
+    day_edit = match(BASE, {**BASE, "dob": "1990-03-17"}, HANDSET_WEIGHTS, DEMO_THRESHOLDS)
+    year_edit = match(BASE, {**BASE, "dob": "1991-03-07"}, HANDSET_WEIGHTS, DEMO_THRESHOLDS)
+    assert swap.band is Band.AUTO_LINK and day_edit.band is Band.AUTO_LINK
+    assert year_edit.band is Band.REVIEW
+    for given, dob in (("Carmen", "1992-03-07"), ("Zachary", "1988-11-20"), ("Carmen", "1990-03-07")):
+        sibling = match(BASE, {**BASE, "given_name": given, "dob": dob, "sex": "F"}, HANDSET_WEIGHTS, DEMO_THRESHOLDS)
+        assert sibling.band is not Band.AUTO_LINK

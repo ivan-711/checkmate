@@ -110,6 +110,7 @@ def test_fit_weights_separates_matches_out_of_fold_and_writes_loadable_json(tmp_
     )
     loaded = load_weights(out_dir / "logreg-test.json")
     assert loaded.scorer_version == "logreg-test"
+    assert loaded.trained_on["partition"] is None and len(loaded.trained_on["data_digest"]) == 8
     assert loaded.weights["dob_exact"] > 0.0
     assert (tmp_path / "oof.csv").read_text().startswith("record_a_id,record_b_id,label,group,raw_score")
 

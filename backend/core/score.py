@@ -122,10 +122,12 @@ def score_pair(fv: FeatureVector, weights: Weights) -> ScoreResult:
     )
 
 
-# Hand-set weights for the 15:30 checkpoint. Logit units, chosen so an identical full record
-# scores +5.5, a day/month swap or one-digit DOB edit stays above the demo c_high of 4.0, and
-# two siblings with the same surname score below 0; the trained scorer replaces them and they
-# are never called calibrated. backend/core/weights/handset-0.json is this object on disk.
+# Hand-set weights for the 15:30 checkpoint, in logit units, under DEMO_THRESHOLDS (c_high 4.0):
+# an identical full record scores +5.5; a day/month swap (4.7) or a one-digit day edit (4.3)
+# stays AUTO_LINK; any year change (3.5 or lower) drops to REVIEW, which is the CHANGE_BIRTH_YEAR
+# band-changer; siblings sharing surname, address and phone never reach AUTO_LINK. The trained
+# scorer replaces these and they are never called calibrated. backend/core/weights/handset-0.json
+# is this object on disk; a test keeps the two equal.
 HANDSET_WEIGHTS = Weights(
     scorer_version=HANDSET_SCORER_VERSION,
     intercept=-11.0,

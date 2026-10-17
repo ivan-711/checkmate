@@ -118,12 +118,34 @@ def test_oversized_block_counting_subtracts_pairs_found_elsewhere_and_exclusions
     assert block.pairs_skipped == block.pairs_in_block - 1 - 1 == result.pairs_skipped_oversized
 
 
-def test_large_hot_block_is_cheap_to_report():
-    import time
-
+def test_hot_block_is_reported_without_expansion():
     n = 3000
     records = {f"r{i:05d}": rec(given_name="g", dob="1990-03-25") for i in range(n)}
-    start = time.perf_counter()
     result = candidate_pairs(records)
-    assert time.perf_counter() - start < 2.0
+    assert result.n_candidate_pairs == 0
     assert result.oversized_blocks[0].pairs_skipped == n * (n - 1) // 2
+    assert result.pairs_skipped_is_upper_bound is False
+
+
+def test_pair_inside_two_hot_blocks_is_counted_once():
+    n = BLOCK_MAX_RECORDS + 1
+    records = {f"r{i:03d}": rec(given_name="g", dob="1990-03-25", phone="617-555-2368") for i in range(n)}
+    result = candidate_pairs(records)
+    assert len(result.oversized_blocks) == 2
+    assert all(b.pairs_skipped == n * (n - 1) // 2 for b in result.oversized_blocks)
+    assert result.pairs_skipped_oversized == n * (n - 1) // 2 == result.n_total_pairs
+    assert result.pairs_skipped_is_upper_bound is False
+
+
+def test_particle_surnames_do_not_share_a_surname_block():
+    cruz = {
+        k.key_value
+        for k in block_keys(rec(given_name="Ana", family_name="De la Cruz", dob="1990-03-07"))
+        if k.key_type == KEY_DMETA_FAMILY_YEAR
+    }
+    torre = {
+        k.key_value
+        for k in block_keys(rec(given_name="Ana", family_name="De la Torre", dob="1990-03-07"))
+        if k.key_type == KEY_DMETA_FAMILY_YEAR
+    }
+    assert cruz and torre and not (cruz & torre)

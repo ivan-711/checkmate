@@ -166,6 +166,7 @@ def fit_weights(
             "n_components": n_groups,
             "n_folds": folds,
             "C": c,
+            **dict(provenance or {}),
         },
     )
     predicted_positive = oof >= 0.0

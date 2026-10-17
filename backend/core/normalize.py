@@ -24,7 +24,7 @@ from datetime import date
 from typing import Any
 
 from backend.core.phonetics import double_metaphone
-from backend.core.placeholders import is_placeholder_name
+from backend.core.placeholders import PLACEHOLDER_DOB_PARTS, is_placeholder_name
 
 # Generation suffixes carried as a separate field so "Jr" vs "Sr" can fire a negative rule
 # and a dropped suffix (taxonomy T5) does not disturb the surname comparison. Only the last
@@ -110,9 +110,9 @@ class Normalized:
     family_name_folded: str | None = None
     given_tokens: tuple[str, ...] = ()
     family_tokens: tuple[str, ...] = ()
-    family_primary: str | None = None  # the paternal / first non-particle surname token
-    family_codes: tuple[str, ...] = ()  # Double Metaphone codes of every family token
     suffix: str | None = None  # JR, SR, II, III, IV, V
+    # Derived in __post_init__ from the folded tokens, whichever constructor built the record.
+    family_codes: tuple[str, ...] = ()  # Double Metaphone codes of the non-particle family tokens
     name_is_placeholder: bool = False
     birth_year: int | None = None
     birth_month: int | None = None
@@ -123,6 +123,12 @@ class Normalized:
     address_line: str | None = None
     address_tokens: tuple[str, ...] = ()
     zip5: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "family_codes", surname_codes(self.family_tokens))
+        object.__setattr__(
+            self, "name_is_placeholder", is_placeholder_name(self.given_name_folded, self.family_name_folded)
+        )
 
     @property
     def birth_date(self) -> date | None:
@@ -139,11 +145,16 @@ class Normalized:
 
         The contract has no year/month/day parts, so a year-only DOB does not survive this
         shape; store and pass ``to_row_dict()`` (the ``normalized_record`` row) when it must.
+        The generation suffix has no field either, so it rides at the end of ``family_name``
+        (``smith jr``) where re-normalizing splits it off again.
         """
+        family = self.family_name
+        if self.suffix:
+            family = f"{family} {self.suffix.lower()}" if family else self.suffix.lower()
         return {
             "record_id": self.record_id,
             "given_name": self.given_name,
-            "family_name": self.family_name,
+            "family_name": family,
             "given_name_folded": self.given_name_folded,
             "family_name_folded": self.family_name_folded,
             "birth_date": self.birth_date,
@@ -194,12 +205,22 @@ def strip_synthea_digits(text: str | None) -> str | None:
 
 
 def _remove_tokens_from_accented(accented: str | None, removed: list[str]) -> str | None:
-    """Drop the title/suffix tokens from the accented form too, so both forms agree."""
-    if not accented:
+    """Drop the title/suffix words from the accented form too, matching each word by its fold.
+
+    A word glued to its title with no space (``Dr.Robert``) is one word whose fold is two
+    tokens; it is kept whole rather than guessed at.
+    """
+    if not accented or not removed:
         return accented
-    for tok in removed:
-        accented = re.sub(rf"(?<!\w){re.escape(tok)}\.?(?!\w)", " ", accented)
-    out = _WHITESPACE.sub(" ", accented).strip(" ,")
+    pending = list(removed)
+    kept = []
+    for word in accented.split(" "):
+        folded = fold_text(word)
+        if folded in pending:
+            pending.remove(folded)
+            continue
+        kept.append(word)
+    out = " ".join(kept).strip(" ,")
     return out or None
 
 
@@ -220,11 +241,14 @@ def _split_name_tokens(tokens: list[str], suffix_allowed: bool) -> tuple[list[st
     return kept, suffix, removed
 
 
-def primary_surname(tokens: tuple[str, ...]) -> str | None:
-    for tok in tokens:
-        if tok not in _PARTICLES:
-            return tok
-    return tokens[0] if tokens else None
+def surname_codes(tokens: tuple[str, ...]) -> tuple[str, ...]:
+    """Double Metaphone codes of the family tokens that can stand for the family.
+
+    Particles ("de", "la", "van") share codes across unrelated families, so they are left out
+    unless the name is nothing but particles.
+    """
+    meaningful = [tok for tok in tokens if tok not in _PARTICLES] or list(tokens)
+    return tuple(sorted({code for tok in meaningful for code in double_metaphone(tok) if code}))
 
 
 # --- field parsers ----------------------------------------------------------------------
@@ -255,18 +279,7 @@ def parse_dob_parts(value: Any) -> tuple[int | None, int | None, int | None]:
         year = int(m.group(1))
     else:
         return None, None, None
-    if year is not None and not MIN_BIRTH_YEAR <= year <= MAX_BIRTH_YEAR:
-        year = None
-    if month is not None and not 1 <= month <= 12:
-        month = None
-    if day is not None and not 1 <= day <= 31:
-        day = None
-    if year is not None and month is not None and day is not None:
-        try:
-            date(year, month, day)
-        except ValueError:
-            day = None
-    return year, month, day
+    return parse_dob_parts_from_components(year, month, day)
 
 
 def _int_or_none(value: Any) -> int | None:
@@ -389,7 +402,6 @@ def normalize_record(raw: Mapping[str, Any]) -> Normalized:
     phone_e164, phone_digits = normalize_phone(_get(raw, "phone"))
     address_line, address_tokens = normalize_address(_get(raw, "address_line"))
     record_id = _get(raw, "record_id")
-    family_codes = tuple(sorted({code for tok in family_tokens for code in double_metaphone(tok) if code}))
     return Normalized(
         record_id=None if record_id is None else str(record_id),
         given_name=given,
@@ -398,10 +410,7 @@ def normalize_record(raw: Mapping[str, Any]) -> Normalized:
         family_name_folded=family_folded,
         given_tokens=given_tokens,
         family_tokens=family_tokens,
-        family_primary=primary_surname(family_tokens),
-        family_codes=family_codes,
         suffix=suffix,
-        name_is_placeholder=is_placeholder_name(given_folded, family_folded),
         birth_year=year,
         birth_month=month,
         birth_day=day,
@@ -417,9 +426,12 @@ def normalize_record(raw: Mapping[str, Any]) -> Normalized:
 def parse_dob_parts_from_components(
     year: int | None, month: int | None, day: int | None
 ) -> tuple[int | None, int | None, int | None]:
-    """Validate already-split parts with the same bounds as ``parse_dob_parts``."""
+    """Validate split parts: a known placeholder date is kept whole so the rules can see it;
+    an out-of-window year drops the whole date (orphan month/day parts mean nothing)."""
+    if (year, month, day) in PLACEHOLDER_DOB_PARTS:
+        return year, month, day
     if year is not None and not MIN_BIRTH_YEAR <= year <= MAX_BIRTH_YEAR:
-        year = None
+        return None, None, None
     if month is not None and not 1 <= month <= 12:
         month = None
     if day is not None and not 1 <= day <= 31:

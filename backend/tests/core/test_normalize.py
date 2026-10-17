@@ -130,11 +130,33 @@ def test_phone_extension_is_dropped_not_fatal():
 def test_date_regex_is_anchored_and_year_bounded():
     assert parse_dob_parts("1990-03-0712") == (None, None, None)
     assert parse_dob_parts("1990-03-07T00:00:00Z") == (1990, 3, 7)
-    assert parse_dob_parts("0000-01-01") == (None, 1, 1)
+    assert parse_dob_parts("0000-01-01") == (None, None, None)
 
 
-def test_primary_surname_skips_particles_and_codes_cover_every_token():
+def test_surname_codes_skip_particles_and_derived_fields_survive_replace():
+    import dataclasses
+
     n = normalize_record({"family_name": "De la Cruz García"})
-    assert n.family_primary == "cruz"
-    assert len(n.family_codes) >= 2
+    assert n.family_codes == normalize_record({"family_name": "Cruz García"}).family_codes
+    assert normalize_record({"family_name": "de la"}).family_codes  # nothing but particles: keep them
     assert normalize_record({"given_name": "Unknown", "family_name": "Unknown"}).name_is_placeholder is True
+    swapped = dataclasses.replace(n, family_tokens=("garcia",), family_name_folded="garcia")
+    assert swapped.family_codes == normalize_record({"family_name": "García"}).family_codes
+
+
+def test_suffix_survives_the_stored_shapes():
+    n = normalize_record({"given_name": "Robert", "family_name": "Smith Jr."})
+    assert n.to_contract_dict()["family_name"] == "smith jr"
+    assert coerce_normalized(n.to_contract_dict()).suffix == "JR"
+    assert coerce_normalized(n.to_row_dict()).family_name == "smith"
+
+
+def test_placeholder_dates_outside_the_year_window_are_kept_whole_for_the_rules():
+    assert parse_dob_parts("0001-01-01") == (1, 1, 1)
+    assert parse_dob_parts("9999-12-31") == (9999, 12, 31)
+    assert parse_dob_parts("0500-06-07") == (None, None, None)
+
+
+def test_accented_title_is_removed_from_the_accented_form_too():
+    n = normalize_record({"given_name": "Doña María"})
+    assert n.given_name == "maría" and n.given_name_folded == "maria"
