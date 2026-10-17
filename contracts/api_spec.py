@@ -15,7 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from contracts.models.alerts import SafetyAlert
+from contracts.models.alerts import AlertStatus, SafetyAlert
 from contracts.models.common import (
     ERROR_STATUS,
     Band,
@@ -163,9 +163,12 @@ def build_app(implemented: frozenset[Route] = frozenset()) -> FastAPI:
                                  cursor: str | None = None):
         return not_implemented("Q8")
 
-    @app.get(p + "/alerts", response_model=Page[SafetyAlert], tags=["core"], responses=common_errors,
-             description="Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity; bounded list.")
+    @app.get(p + "/alerts", response_model=Page[SafetyAlert], tags=["core"],
+             responses=_err(ErrorCode.NOT_FOUND) | common_errors,
+             description="Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity (unknown "
+                         "entityId is a 404) and one status; bounded list.")
     async def list_alerts(entity_id: Annotated[UUID | None, Query(alias="entityId")] = None,
+                          status: AlertStatus | None = None,
                           limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX), cursor: str | None = None):
         return not_implemented("W3b")
 
