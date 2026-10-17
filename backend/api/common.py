@@ -119,16 +119,34 @@ def source_card(conn: Connection, record_id: UUID, include_raw: bool = False) ->
     return SourceCard(record=record, normalized=normalized, display_label=display_label(r.source_system))
 
 
-# Opaque keyset cursor for the review queue: (|p-0.5|, pair id) of the last item served.
+# Opaque keyset cursors: base64url JSON of the last item's sort key. Clients never parse them;
+# anything that does not decode to the expected keys is a 422, never a wider page.
+def pack_cursor(fields: dict) -> str:
+    return base64.urlsafe_b64encode(json.dumps(fields).encode()).decode().rstrip("=")
+
+
+def unpack_cursor(cursor: str) -> dict:
+    try:
+        data = json.loads(base64.urlsafe_b64decode((cursor + "=" * (-len(cursor) % 4)).encode()))
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        raise ApiError(ErrorCode.VALIDATION_ERROR, "cursor is not valid") from None
+    if not isinstance(data, dict):
+        raise ApiError(ErrorCode.VALIDATION_ERROR, "cursor is not valid")
+    return data
+
+
+def invalid_cursor() -> ApiError:
+    return ApiError(ErrorCode.VALIDATION_ERROR, "cursor is not valid")
+
+
+# Review queue: (|p-0.5|, pair id) of the last item served.
 def encode_cursor(distance: float, pair_id: UUID) -> str:
-    raw = json.dumps({"d": distance, "id": str(pair_id)}).encode()
-    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+    return pack_cursor({"d": distance, "id": str(pair_id)})
 
 
 def decode_cursor(cursor: str) -> tuple[float, UUID]:
+    data = unpack_cursor(cursor)
     try:
-        padded = cursor + "=" * (-len(cursor) % 4)
-        data = json.loads(base64.urlsafe_b64decode(padded.encode()))
         return float(data["d"]), UUID(data["id"])
-    except (binascii.Error, ValueError, KeyError, TypeError, AttributeError):
-        raise ApiError(ErrorCode.VALIDATION_ERROR, "cursor is not valid") from None
+    except (ValueError, KeyError, TypeError, AttributeError):
+        raise invalid_cursor() from None

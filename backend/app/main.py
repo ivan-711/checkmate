@@ -15,7 +15,7 @@ from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
 from starlette.responses import Response
 
-from backend.api import match_runs, pairs, reviews, sessions, thresholds, tiles
+from backend.api import events, match_runs, pairs, reviews, sessions, thresholds, tiles
 from backend.app import request_context
 from backend.app.config import load_settings
 from backend.app.db import db_is_up, make_engine
@@ -41,12 +41,21 @@ IMPLEMENTED = frozenset(
         ("POST", API_PREFIX + "/candidate-pairs/{pair_id}/reviews"),  # W3a (link seam: W3b)
         ("GET", API_PREFIX + "/metrics/tiles"),  # W3a
         ("GET", API_PREFIX + "/threshold-sets/current"),  # W3a (stub added to the contract at 256ca4a)
+        ("GET", API_PREFIX + "/events"),  # W3a (additive contract route e591005, G16 step 7)
     }
 )
 app = build_app(implemented=IMPLEMENTED)
 app.state.engine = engine
 app.state.settings = settings
-for router in (sessions.router, match_runs.router, pairs.router, reviews.router, tiles.router, thresholds.router):
+for router in (
+    sessions.router,
+    match_runs.router,
+    pairs.router,
+    reviews.router,
+    tiles.router,
+    thresholds.router,
+    events.router,
+):
     app.include_router(router)
 
 app.add_middleware(
