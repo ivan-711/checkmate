@@ -63,10 +63,6 @@ describe("FixtureSource", () => {
     expect((await s.getCase()).detail.history).toHaveLength(2);
   });
 
-  it("can restore a previous session", () => {
-    expect(source().canRestore).toBe(true);
-  });
-
   it("replays the same response for a retried idempotency key", async () => {
     const s = source();
     const first = await s.review(pairId, reject, "key-retry");
@@ -95,6 +91,7 @@ describe("FixtureSource", () => {
 
   it("reset returns to the fragmented state and restore brings the decision back", async () => {
     const s = source();
+    expect(s.canRestore).toBe(true);
     await s.review(pairId, approve, "key-a");
     const session = await s.reset();
     expect((await s.getCase()).outcome).toBeNull();

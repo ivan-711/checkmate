@@ -23,7 +23,7 @@ export class ApiSource implements DataSource {
 
   async getCase(): Promise<CaseData> {
     const list = await this.client.GET("/api/v1/candidate-pairs", {
-      params: { query: { origin: "MATCH_RUN", band: "REVIEW", limit: 1 } },
+      params: { query: { origin: "MATCH_RUN", limit: 1 } },
     });
     if (!list.data) fail(list.error);
     const first = list.data.items[0];

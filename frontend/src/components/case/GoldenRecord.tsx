@@ -37,13 +37,16 @@ interface Props {
   entity: Entity;
   cards: SourceCard[];
   focusOnMount: boolean;
+  onFocused: () => void;
 }
 
-export function GoldenRecord({ entity, cards, focusOnMount }: Props) {
+export function GoldenRecord({ entity, cards, focusOnMount, onFocused }: Props) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    if (focusOnMount) heading.current?.focus();
-  }, [focusOnMount]);
+    if (!focusOnMount) return;
+    heading.current?.focus();
+    onFocused();
+  }, [focusOnMount, onFocused]);
 
   const golden = entity.golden ?? [];
   return (

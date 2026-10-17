@@ -5,23 +5,14 @@ import { useState } from "react";
 import type { ReviewResponse } from "@/api/types";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { useDataSource } from "@/data/DataSourceProvider";
-import type { CaseData } from "@/data/source";
 import { differingFields } from "@/lib/display";
+import { flagState } from "@/lib/flagState";
 import { EvidenceRail } from "./EvidenceRail";
-import { FlagCard, type FlagState } from "./FlagCard";
+import { FlagCard } from "./FlagCard";
 import { GoldenRecord } from "./GoldenRecord";
 import { ReviewPanel } from "./ReviewPanel";
 import { SourceCardView } from "./SourceCardView";
 import { Timeline } from "./Timeline";
-
-function flagState({ detail, outcome }: CaseData): FlagState {
-  const { status } = detail.pair.decision;
-  if (status === "REJECTED") return { kind: "silent" };
-  if (status !== "LINKED") return { kind: "idle" };
-  if (!outcome) return { kind: "unavailable" };
-  const alert = outcome.alerts?.[0];
-  return alert ? { kind: "raised", alert } : { kind: "none" };
-}
 
 function announcement(response: ReviewResponse): string {
   if (response.decision.status === "REJECTED")
@@ -63,7 +54,12 @@ export function CaseScreen() {
         <div className="space-y-4">
           {linked && entity ? (
             <>
-              <GoldenRecord entity={entity} cards={cards} focusOnMount={justApproved} />
+              <GoldenRecord
+                entity={entity}
+                cards={cards}
+                focusOnMount={justApproved}
+                onFocused={() => setJustApproved(false)}
+              />
               <Timeline events={timeline.data} cards={cards} />
             </>
           ) : (

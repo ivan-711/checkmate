@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 // Screen readers announce a change of text; clearing first lets an identical message repeat.
 const REANNOUNCE_DELAY_MS = 100;
@@ -10,10 +10,13 @@ const AnnounceContext = createContext<(message: string) => void>(() => {});
 
 export function LiveRegionProvider({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState("");
+  const pending = useRef<ReturnType<typeof setTimeout>>(undefined);
   const announce = useCallback((next: string) => {
+    clearTimeout(pending.current); // only the latest message is spoken
     setMessage("");
-    setTimeout(() => setMessage(next), REANNOUNCE_DELAY_MS);
+    pending.current = setTimeout(() => setMessage(next), REANNOUNCE_DELAY_MS);
   }, []);
+  useEffect(() => () => clearTimeout(pending.current), []);
   return (
     <AnnounceContext.Provider value={announce}>
       {children}

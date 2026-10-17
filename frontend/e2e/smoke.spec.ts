@@ -71,7 +71,10 @@ test("reset returns to the separate records and Undo reset brings the link back"
   await page.getByRole("button", { name: "Reset demo" }).click();
   await expect(page.getByRole("article", { name: "ER FHIR record" })).toBeVisible();
   await page.getByRole("button", { name: "Undo reset" }).click();
-  await expect(page.getByRole("heading", { name: "Golden record" })).toBeVisible();
+  const golden = page.getByRole("heading", { name: "Golden record" });
+  await expect(golden).toBeVisible();
+  // Focus moves to the golden record only after an approval made here, not after Undo.
+  await expect(golden).not.toBeFocused();
 });
 
 test("keyboard path reaches Approve link and moves focus to the golden record", async ({ page }) => {

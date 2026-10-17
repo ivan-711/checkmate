@@ -9,17 +9,26 @@ export function ResetButton() {
   const source = useDataSource();
   const queryClient = useQueryClient();
 
+  // Reset, not invalidate, the case: its panels remount, so no half-typed note or stale
+  // error survives. Tiles keep showing their values while they refetch.
+  async function refreshAfterSessionChange() {
+    await Promise.all([
+      queryClient.resetQueries({ queryKey: ["case"] }),
+      queryClient.resetQueries({ queryKey: ["timeline"] }),
+      queryClient.invalidateQueries({ queryKey: ["tiles"] }),
+    ]);
+  }
+
   const restore = useMutation({
     mutationFn: (previousSessionId: string) => source.restore(previousSessionId),
-    onSuccess: () => queryClient.resetQueries(),
+    onSuccess: refreshAfterSessionChange,
     onError: (error) => toast(`Undo failed: ${error.message}`),
   });
 
   const reset = useMutation({
     mutationFn: () => source.reset(),
     onSuccess: async (session) => {
-      // Reset, not invalidate: the screens remount, so no half-typed note or stale error survives.
-      await queryClient.resetQueries();
+      await refreshAfterSessionChange();
       const previous = session.previousSessionId;
       toast("Demo reset.", {
         action:
