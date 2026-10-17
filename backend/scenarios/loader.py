@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import copy
 import csv
+import hashlib
 import json
 import logging
 import os
@@ -47,6 +48,7 @@ HERO_OVERLAY_DIR = REPO_ROOT / "data" / "scenarios" / "hero"
 RAW_DIR = REPO_ROOT / "data" / "raw"
 ER_SOURCE_SYSTEM = "ER_FHIR"
 CLINIC_SOURCE_SYSTEM = "CLINIC_CSV"
+HERO_PAIR = frozenset({ER_SOURCE_SYSTEM, CLINIC_SOURCE_SYSTEM})  # the hero is always one ER and one Clinic record
 DISPLAY_LABEL = {"ER_FHIR": "ER FHIR", "CLINIC_CSV": "Clinic CSV"}
 HERO_SOURCE_FIXTURE = "fixture"
 HERO_SOURCE_CORPUS = "corpus"
@@ -65,6 +67,10 @@ FHIR_LIST_FOR_TYPE = {"Encounter": "encounters", "MedicationRequest": "medicatio
 
 class ScenarioNotFound(LookupError):
     pass
+
+
+class HeroExportInvalid(ValueError):
+    """The hero directory exists but cannot be used as it is; the message names the problem, no path."""
 
 
 class HeroNotFound(ScenarioNotFound):
@@ -172,17 +178,36 @@ def _is_constructed_resource(resource: dict) -> bool:
     )
 
 
+def _hero_record_ids(hero_json: Path) -> dict[str, UUID]:
+    try:
+        data = json.loads(hero_json.read_text())
+    except ValueError as exc:  # json.JSONDecodeError and UnicodeDecodeError are ValueErrors
+        raise HeroExportInvalid(f"{HERO_EXPORT_FILE} is not valid JSON ({exc})") from None
+    records = data.get("records") if isinstance(data, dict) else None
+    if not isinstance(records, dict):
+        raise HeroExportInvalid(f"{HERO_EXPORT_FILE} has no records object")
+    ids = {}
+    for system, record in records.items():
+        raw = record.get("record_id") if isinstance(record, dict) else None
+        try:
+            ids[system] = UUID(str(raw))
+        except ValueError:
+            raise HeroExportInvalid(f"{HERO_EXPORT_FILE} records.{system}.record_id is not a uuid: {raw!r}") from None
+    return ids
+
+
 def _read_hero_dir(hero_dir: Path) -> HeroExport:
     """Reads ``hero.json`` and the overlay's constructed markers: FHIR resources tagged
-    ``urn:chartguard:provenance#constructed-scenario`` and allergy rows with a true ``CONSTRUCTED``."""
-    export = HeroExport()
-    hero_json = hero_dir / HERO_EXPORT_FILE
-    if hero_json.exists():
-        records = json.loads(hero_json.read_text()).get("records", {})
-        export.record_ids.update({system: UUID(r["record_id"]) for system, r in records.items() if r.get("record_id")})
+    ``urn:chartguard:provenance#constructed-scenario`` and allergy rows with a true ``CONSTRUCTED``.
+    Anything unreadable is a ``HeroExportInvalid`` naming the problem."""
+    export = HeroExport(record_ids=_hero_record_ids(hero_dir / HERO_EXPORT_FILE))
     for bundle_path in sorted((hero_dir / "fhir").glob("*.json")):
-        for entry in json.loads(bundle_path.read_text()).get("entry", []):
-            resource = entry.get("resource") or {}
+        try:
+            bundle = json.loads(bundle_path.read_text())
+        except ValueError as exc:
+            raise HeroExportInvalid(f"overlay bundle fhir/{bundle_path.name} is not valid JSON ({exc})") from None
+        for entry in bundle.get("entry", []) if isinstance(bundle, dict) else []:
+            resource = (entry or {}).get("resource") or {}
             if not _is_constructed_resource(resource):
                 continue
             if resource.get("resourceType") == "Patient":  # identity stays exactly as selected
@@ -194,9 +219,22 @@ def _read_hero_dir(hero_dir: Path) -> HeroExport:
         with allergies_csv.open(newline="", encoding="utf-8") as fh:
             for row in csv.DictReader(fh):
                 if (row.get(CONSTRUCTED_COLUMN) or "").strip().lower() in TRUTHY:
+                    if not row.get("PATIENT"):
+                        raise HeroExportInvalid("a constructed allergies.csv row has no PATIENT")
                     export.allergy_rows.append(row)
                     export.csv_patient_ids.add(row["PATIENT"])
     return export
+
+
+def hero_fingerprint(hero_dir: Path) -> str:
+    """The hero directory's contents, so a re-export into the same directory (the 20:00 selection) is never
+    served from a cached copy of the old one. The files are small; this runs on every corpus-mode reset."""
+    digest = hashlib.sha256()
+    if hero_dir.is_dir():
+        for path in sorted(p for p in hero_dir.rglob("*") if p.is_file()):
+            digest.update(str(path.relative_to(hero_dir)).encode())
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
 
 
 def _repoint(value, old_ids: set[str], new_id: str):
@@ -216,7 +254,7 @@ def _with_er_overlay(draft, export: HeroExport):
     for resource in _repoint(export.fhir_resources, export.fhir_patient_ids, patient_id):
         kind = resource.get("resourceType")
         if kind not in FHIR_LIST_FOR_TYPE:
-            raise ValueError(
+            raise HeroExportInvalid(
                 f"the ER overlay carries a constructed {kind}; only {sorted(FHIR_LIST_FOR_TYPE)} are applied"
             )
         payload.setdefault(FHIR_LIST_FOR_TYPE[kind], []).append(resource)
@@ -244,22 +282,44 @@ def _apply_hero_export(drafts: list, export: HeroExport) -> list:
     return [applied.get(d.id, d) for d in drafts]
 
 
+def _refuse(hero_dir: Path, problem: str, message: str):
+    """One log line naming the directory and the problem; the client gets the 404 envelope without paths."""
+    log.warning("corpus mode: cannot use the hero export in %s: %s", hero_dir, problem)
+    raise HeroNotFound(f"hero scenario not found: {message}")
+
+
 @cache
-def _corpus_cards(seed: int, raw_dir: Path, overlay_dir: Path) -> Corpus:
-    """Built once per (seed, raw dir, hero dir): read-only input, the same ids on every reset.
-    The hero dir is part of the key so pointing the env var elsewhere is never silently ignored."""
+def _corpus_cards(seed: int, raw_dir: Path, overlay_dir: Path, fingerprint: str) -> Corpus:
+    """Built once per (seed, raw dir, hero dir and its contents): read-only input, the same ids on every
+    reset. ``fingerprint`` is only a cache key (``hero_fingerprint``). Every way the hero export can be
+    unusable is refused before anything is written, the cheap checks before W1's corpus build."""
     ingested_at = datetime.now(UTC)
-    export = _read_hero_dir(overlay_dir)
-    if not export.record_ids:  # checked before W1's corpus build, which takes seconds
-        log.warning("corpus mode: no hero export (%s) in %s", HERO_EXPORT_FILE, overlay_dir)
-        raise HeroNotFound("hero scenario not found: corpus mode needs the hero export (hero.json)")
+    if not (overlay_dir / HERO_EXPORT_FILE).exists():
+        _refuse(overlay_dir, f"no {HERO_EXPORT_FILE}", "corpus mode needs the hero export (hero.json)")
+    try:
+        export = _read_hero_dir(overlay_dir)
+    except HeroExportInvalid as exc:
+        _refuse(overlay_dir, str(exc), "the hero export is invalid")
+    if set(export.record_ids) != HERO_PAIR:
+        _refuse(
+            overlay_dir,
+            f"{HERO_EXPORT_FILE} names {sorted(export.record_ids)}; the hero is always a pair, it must name both "
+            f"{sorted(HERO_PAIR)}",
+            "hero.json must name both the ER and the Clinic record",
+        )
     drafts = _w1_corpus_drafts(seed, raw_dir)
     loaded = {d.id for d in drafts}
     missing = sorted(f"{system} {rid}" for system, rid in export.record_ids.items() if rid not in loaded)
     if missing:
-        log.warning("corpus mode: hero.json in %s names records the loaded corpus lacks: %s", overlay_dir, missing)
-        raise HeroNotFound("hero scenario not found: hero.json names records the loaded corpus lacks")
-    drafts = _apply_hero_export(drafts, export)
+        _refuse(
+            overlay_dir,
+            f"{HERO_EXPORT_FILE} names records the loaded corpus lacks: {missing}",
+            "hero.json names records the loaded corpus lacks",
+        )
+    try:
+        drafts = _apply_hero_export(drafts, export)
+    except HeroExportInvalid as exc:
+        _refuse(overlay_dir, str(exc), "the hero export is invalid")
     showcase = sorted(export.record_ids.items(), key=lambda item: SHOWCASE_ORDER.get(item[0], len(SHOWCASE_ORDER)))
     return Corpus(
         cards=tuple(_card_from_draft(d, ingested_at) for d in drafts),
@@ -271,10 +331,12 @@ def _all_cards() -> tuple[list[SourceCard], list[SourceCard]]:
     """(every card to load, the showcase). The fixture is the showcase itself."""
     source = os.environ.get("CHECKMATE_HERO_SOURCE", HERO_SOURCE_FIXTURE)
     if source == HERO_SOURCE_CORPUS:
+        hero_dir = Path(os.environ.get("CHECKMATE_HERO_OVERLAY_DIR", str(HERO_OVERLAY_DIR)))
         corpus = _corpus_cards(
             int(os.environ.get("CHECKMATE_CORPUS_SEED", DEFAULT_CORPUS_SEED)),
             Path(os.environ.get("CHECKMATE_RAW_DIR", str(RAW_DIR))),
-            Path(os.environ.get("CHECKMATE_HERO_OVERLAY_DIR", str(HERO_OVERLAY_DIR))),
+            hero_dir,
+            hero_fingerprint(hero_dir),
         )
         by_id = {c.record.id: c for c in corpus.cards}
         return list(corpus.cards), [by_id[i] for i in corpus.showcase_ids]

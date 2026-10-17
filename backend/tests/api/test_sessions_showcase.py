@@ -9,8 +9,10 @@ inserted, so the hero exists once, as two records. Fixtures: see hero_corpus.py.
 
 from __future__ import annotations
 
+import json
 import uuid
 
+import pytest
 from sqlalchemy import text
 
 from backend.tests.api.conftest import API, engine
@@ -181,3 +183,70 @@ def test_sources_are_exactly_the_hero_json_pair_however_many_overlay_records(cli
     body = _reset(client)
     assert [c["record"]["id"] for c in body["sources"]] == [hero_corpus.er_id, hero_corpus.clinic_id]
     assert db_conn.execute(text("SELECT count(*) FROM source_record")).scalar_one() == hero_corpus.corpus_size
+
+
+def _refused_without_state_change(client, db_conn, caplog, hero_dir, problem: str):
+    """The R3a guard: 404 envelope naming the missing hero scenario (no paths), one log line naming the
+    directory and the problem, and no state change."""
+    import logging
+
+    before = db_conn.execute(text("SELECT count(*) FROM source_record")).scalar_one()
+    sessions = db_conn.execute(text("SELECT count(*) FROM demo_session")).scalar_one()
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="checkmate.scenarios"):
+        r = client.post(f"{API}/sessions", json={"scenarioId": "hero"})
+    assert r.status_code == 404, r.text
+    error = r.json()["error"]
+    assert error["code"] == "NOT_FOUND"
+    assert "hero scenario" in error["message"]
+    assert str(hero_dir) not in r.text and "/" not in error["message"]
+    lines = [rec.getMessage() for rec in caplog.records if rec.name == "checkmate.scenarios"]
+    assert len(lines) == 1, lines
+    assert str(hero_dir) in lines[0] and problem in lines[0], lines[0]
+    assert db_conn.execute(text("SELECT count(*) FROM source_record")).scalar_one() == before
+    assert db_conn.execute(text("SELECT count(*) FROM demo_session")).scalar_one() == sessions
+
+
+MALFORMED_HERO_JSON = {
+    "not JSON": ("{records: ", "not valid JSON"),
+    "a list": ("[]", "no records object"),
+    "records is a list": ('{"records": []}', "no records object"),
+    "bad record id": (
+        '{"records": {"ER_FHIR": {"record_id": "not-a-uuid"}, "CLINIC_CSV": {"record_id": "CLINIC"}}}',
+        "not a uuid",
+    ),
+}
+
+
+@pytest.mark.parametrize("case", sorted(MALFORMED_HERO_JSON))
+def test_a_malformed_hero_json_is_refused_like_a_missing_hero(client, hero_corpus, db_conn, caplog, case):
+    _reset(client)
+    content, problem = MALFORMED_HERO_JSON[case]
+    (hero_corpus.hero_dir / "hero.json").write_text(content.replace("CLINIC", hero_corpus.clinic_id))
+    _refused_without_state_change(client, db_conn, caplog, hero_corpus.hero_dir, problem)
+
+
+@pytest.mark.parametrize("only", ["ER_FHIR", "CLINIC_CSV"])
+def test_a_hero_json_naming_one_record_is_refused(client, hero_corpus, db_conn, caplog, only):
+    _reset(client)
+    record_id = hero_corpus.er_id if only == "ER_FHIR" else hero_corpus.clinic_id
+    (hero_corpus.hero_dir / "hero.json").write_text(json.dumps({"records": {only: {"record_id": record_id}}}))
+    _refused_without_state_change(client, db_conn, caplog, hero_corpus.hero_dir, "both")
+
+
+def test_a_malformed_overlay_bundle_is_refused_like_a_missing_hero(client, hero_corpus, db_conn, caplog):
+    _reset(client)
+    (hero_corpus.hero_dir / "fhir" / "hero_er.json").write_text("{not json")
+    _refused_without_state_change(client, db_conn, caplog, hero_corpus.hero_dir, "not valid JSON")
+
+
+def test_a_hero_export_rewritten_in_place_is_used_by_the_next_reset(client, hero_corpus):
+    """The hero is re-exported into the same directory (the 20:00 selection) while the API runs: the next
+    reset must use the new export, not a cached copy of the old one."""
+    assert all(c["record"]["isConstructed"] for c in _reset(client)["sources"])
+    for path in (hero_corpus.hero_dir / "fhir").glob("*.json"):
+        path.unlink()
+    (hero_corpus.hero_dir / "csv" / "allergies.csv").unlink()
+    cards = _reset(client)["sources"]
+    assert [c["record"]["id"] for c in cards] == [hero_corpus.er_id, hero_corpus.clinic_id]
+    assert not any(c["record"]["isConstructed"] for c in cards), "the overlay removed in place is no longer applied"
