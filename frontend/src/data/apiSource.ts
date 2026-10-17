@@ -15,13 +15,16 @@ function fail(error: unknown): never {
 /** Calls FastAPI through the same-origin /api/v1 rewrite in next.config.ts. */
 export class ApiSource implements DataSource {
   readonly mode = "LOCAL" as const;
+  readonly canRestore = false; // no restore route in contracts-v1
   private readonly client = createClient<paths>({ baseUrl: "" });
   // contracts-v1 has no alerts read endpoint, so the outcome of a review made in this
   // tab is kept until the page reloads; after a reload only the decision line shows.
   private lastOutcome: ReviewResponse | null = null;
 
   async getCase(): Promise<CaseData> {
-    const list = await this.client.GET("/api/v1/candidate-pairs", { params: { query: { limit: 1 } } });
+    const list = await this.client.GET("/api/v1/candidate-pairs", {
+      params: { query: { origin: "MATCH_RUN", band: "REVIEW", limit: 1 } },
+    });
     if (!list.data) fail(list.error);
     const first = list.data.items[0];
     if (!first) throw new DataError("NOT_FOUND", "No candidate pair is queued.");

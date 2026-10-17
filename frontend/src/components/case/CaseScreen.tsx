@@ -17,7 +17,8 @@ import { Timeline } from "./Timeline";
 function flagState({ detail, outcome }: CaseData): FlagState {
   const { status } = detail.pair.decision;
   if (status === "REJECTED") return { kind: "silent" };
-  if (status !== "LINKED" || !outcome) return { kind: "idle" };
+  if (status !== "LINKED") return { kind: "idle" };
+  if (!outcome) return { kind: "unavailable" };
   const alert = outcome.alerts?.[0];
   return alert ? { kind: "raised", alert } : { kind: "none" };
 }

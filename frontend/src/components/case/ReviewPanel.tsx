@@ -10,10 +10,11 @@ import type {
   ReviewResponse,
 } from "@/api/types";
 import { useDataSource } from "@/data/DataSourceProvider";
+import { scenario } from "@/data/scenario";
 import { actorName, formatCt } from "@/lib/display";
 
 // Fixture names, recorded as a label on the decision; not an authenticated identity.
-export const REGISTRARS = ["Registrar A", "Registrar B", "Registrar C"] as const;
+const REGISTRARS = scenario.registrarLabels;
 const NOTE_MAX = 500;
 
 export const REASONS: Record<ReasonCode, string> = {
@@ -43,7 +44,7 @@ export function ReviewPanel({ detail, onDecided }: Props) {
   const queryClient = useQueryClient();
   const ids = useId();
   const reasonRef = useRef<HTMLSelectElement>(null);
-  const [registrar, setRegistrar] = useState<string>(REGISTRARS[0]);
+  const [registrar, setRegistrar] = useState(REGISTRARS[0]);
   const [reason, setReason] = useState<ReasonCode | "">("");
   const [note, setNote] = useState("");
   const [reasonMissing, setReasonMissing] = useState(false);

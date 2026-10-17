@@ -3,11 +3,17 @@ import type { SafetyAlert } from "@/api/types";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
 
 export type FlagState =
-  { kind: "idle" } | { kind: "silent" } | { kind: "none" } | { kind: "raised"; alert: SafetyAlert };
+  | { kind: "idle" }
+  | { kind: "silent" }
+  | { kind: "none" }
+  | { kind: "unavailable" }
+  | { kind: "raised"; alert: SafetyAlert };
 
 const QUIET_LINES = {
   idle: "No safety check yet. It runs after a link is approved.",
   silent: "No safety check ran: no link was approved.",
+  unavailable:
+    "Safety check result unavailable in this tab: this source has no alerts read route yet. No conclusion is shown.",
   none: "The rule did not flag this linked record. Absence of a flag is not evidence that no conflict exists.",
 } as const;
 

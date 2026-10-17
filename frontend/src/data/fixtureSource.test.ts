@@ -55,6 +55,18 @@ describe("FixtureSource", () => {
     expect(outcome?.entity?.id).toBe(scenario.entityIfApproved.id);
   });
 
+  it("answers a same-state request with the current decision and no new version", async () => {
+    const s = source();
+    const first = await s.review(pairId, approve, "key-a");
+    const again = await s.review(pairId, { ...approve, actor: "registrar:Registrar C" }, "key-b");
+    expect(again.decision).toEqual(first.decision);
+    expect((await s.getCase()).detail.history).toHaveLength(2);
+  });
+
+  it("can restore a previous session", () => {
+    expect(source().canRestore).toBe(true);
+  });
+
   it("replays the same response for a retried idempotency key", async () => {
     const s = source();
     const first = await s.review(pairId, reject, "key-retry");

@@ -19,6 +19,8 @@ export interface CaseData {
 /** One data layer, two adapters. The UI branches on `mode` only for the badge. */
 export interface DataSource {
   readonly mode: Mode;
+  /** Whether restore() works here; the Undo reset action is offered only when it does. */
+  readonly canRestore: boolean;
   getCase(): Promise<CaseData>;
   review(pairId: string, body: ReviewRequest, idempotencyKey: string): Promise<ReviewResponse>;
   /** null when this source has no timeline for the entity. */

@@ -25,6 +25,7 @@ interface KeyedReview {
  * reset keeps the previous session so Undo can return to it. */
 export class FixtureSource implements DataSource {
   readonly mode = "REPLAY" as const;
+  readonly canRestore = true;
   private current: SessionState;
   private previous: SessionState | null = null;
   private readonly keys = new Map<string, KeyedReview>();
@@ -85,9 +86,13 @@ export class FixtureSource implements DataSource {
   }
 
   private decide(body: ReviewRequest): ReviewResponse {
-    const { history } = this.current;
+    const { history, outcome } = this.current;
     const last = history[history.length - 1];
     const approving = body.action === "APPROVE";
+    if (outcome && last.status === (approving ? "LINKED" : "REJECTED")) return outcome;
+    // The lane brief asks that a second review supersede the first (reject, then approve),
+    // so a REJECTED decision may still move here. contracts-v1 documents "only PROPOSED
+    // moves"; the live API is the authority on that and its 409 is shown as an error.
     const decision: MatchDecision = {
       ...last,
       id: crypto.randomUUID(),

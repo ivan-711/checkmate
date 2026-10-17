@@ -11,17 +11,21 @@ export function ResetButton() {
 
   const restore = useMutation({
     mutationFn: (previousSessionId: string) => source.restore(previousSessionId),
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => queryClient.resetQueries(),
     onError: (error) => toast(`Undo failed: ${error.message}`),
   });
 
   const reset = useMutation({
     mutationFn: () => source.reset(),
     onSuccess: async (session) => {
-      await queryClient.invalidateQueries();
+      // Reset, not invalidate: the screens remount, so no half-typed note or stale error survives.
+      await queryClient.resetQueries();
       const previous = session.previousSessionId;
       toast("Demo reset.", {
-        action: previous ? { label: "Undo reset", onClick: () => restore.mutate(previous) } : undefined,
+        action:
+          previous && source.canRestore
+            ? { label: "Undo reset", onClick: () => restore.mutate(previous) }
+            : undefined,
       });
     },
     onError: (error) => toast(`Reset failed: ${error.message}`),
