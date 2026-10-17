@@ -6,10 +6,12 @@ never skips or repeats a row even when several events share one timestamp.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Query
+from pydantic.alias_generators import to_camel
 from sqlalchemy import text
 
 from backend.api.common import invalid_cursor, pack_cursor, unpack_cursor
@@ -88,8 +90,23 @@ def contract_versions(stored: dict | None) -> dict:
     return {k: v for k, v in (stored or {}).items() if k in VERSION_KEYS}
 
 
+UPPER_SNAKE_ENUM_KEY = re.compile(r"^[A-Z][A-Z0-9_]*$")
+
+
+def camel_keys(value):
+    """Payload keys as the wire wants them (JSON is camelCase), at any depth; values untouched.
+    Stored rows keep the keys their writer chose. A key that is an enum value (band_counts maps
+    AUTO_LINK, REVIEW, KEEP_SEPARATE to counts) stays UPPER_SNAKE, as the contract serves enums."""
+    if isinstance(value, dict):
+        return {(k if UPPER_SNAKE_ENUM_KEY.match(k) else to_camel(k)): camel_keys(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [camel_keys(v) for v in value]
+    return value
+
+
 def event_from_row(row) -> EventLogRow:
     fields = dict(row._mapping)
+    fields["payload"] = camel_keys(fields["payload"] or {})
     fields["evidence_ids"] = fields["evidence_ids"] or []  # the column is nullable; the model's list is not
     fields["versions"] = contract_versions(fields["versions"])
     return EventLogRow.model_validate(fields)

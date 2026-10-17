@@ -214,3 +214,37 @@ def test_since_without_an_offset_is_read_as_utc(client):
         at = _insert_at(conn, since, 1)
     naive = since.replace(tzinfo=None).isoformat()
     assert _ids(client.get(f"{API}/events", params={"since": naive}).json()) == at
+
+
+UPPER_SNAKE_ENUM_KEY = re.compile(r"^[A-Z][A-Z0-9_]*$")
+
+
+def _payload_keys(value):
+    if isinstance(value, dict):
+        for key, inner in value.items():
+            yield key
+            yield from _payload_keys(inner)
+    elif isinstance(value, list):
+        for inner in value:
+            yield from _payload_keys(inner)
+
+
+def test_payload_keys_are_served_camel_case(client, match_run, pair_id):
+    """JSON is camelCase on the wire; stored rows keep the keys their writer chose (snake_case here).
+    Map keys that are enum values (band_counts: AUTO_LINK, KEEP_SEPARATE) stay UPPER_SNAKE, exactly as
+    the contract's own MatchRunResponse.bandCounts serves them; every other key has no underscore."""
+    review(client, pair_id, approve_body())
+    items = client.get(f"{API}/events", params={"limit": 200}).json()["items"]
+    keys = {k for e in items for k in _payload_keys(e["payload"])}
+    assert {"rawScore", "newVersion", "bandCounts", "candidatePairs", "supersededStatus"} & keys, keys
+    offending = sorted(k for k in keys if "_" in k and not UPPER_SNAKE_ENUM_KEY.match(k))
+    assert offending == [], offending
+    run = next(e for e in items if e["eventType"] == "MATCH_RUN_COMPLETED")
+    assert set(run["payload"]["bandCounts"]) == {"AUTO_LINK", "REVIEW", "KEEP_SEPARATE"}
+
+
+def test_stored_payload_keys_are_unchanged(client, match_run, db_conn):
+    stored = db_conn.execute(
+        text("SELECT payload FROM event_log WHERE event_type = 'MATCH_RUN_COMPLETED' ORDER BY ts DESC LIMIT 1")
+    ).scalar_one()
+    assert "band_counts" in stored, "conversion happens at read time only"
