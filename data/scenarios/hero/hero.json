@@ -260,6 +260,12 @@
       "zip_match": 1.0
     }
   },
+  "exportedWhatIfKeys": {
+    "REMOVE_ADDRESS": "REMOVE_ADDRESS",
+    "CHANGE_BIRTH_YEAR": "CHANGE_BIRTH_YEAR:-1",
+    "SWAP_DOB_DAY_MONTH": "SWAP_DOB_DAY_MONTH",
+    "ACCENT_HYPHEN_SURNAME": "ACCENT_HYPHEN_SURNAME"
+  },
   "criteria": {
     "baseline_review": true,
     "remove_address_keep_separate": true,
