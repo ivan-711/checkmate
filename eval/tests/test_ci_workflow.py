@@ -61,3 +61,18 @@ def test_database_image_is_pinned_by_digest():
     for job in _jobs().values():
         for service in job.get("services", {}).values():
             assert "@sha256:" in service["image"], service["image"]
+
+
+def test_designed_422_exclusion_is_exactly_the_cursor_since_and_idempotency_operations():
+    """The schemathesis exclusion covers exactly the operations whose correct 422s it would flag, no more."""
+    import json
+
+    step = next(s for s in _jobs()["contract-test"]["steps"] if "DESIGNED_422_OPERATIONS" in (s.get("env") or {}))
+    listed = set(step["env"]["DESIGNED_422_OPERATIONS"].split("|"))
+    spec = json.loads((WORKFLOW.parents[2] / "contracts" / "openapi.json").read_text())
+    expected = {f"{method.upper()} {path}" for path, ops in spec["paths"].items() for method, op in ops.items()
+                if {p["name"] for p in op.get("parameters", [])} & {"cursor", "since", "Idempotency-Key"}}
+    assert listed == expected, listed ^ expected
+    run = step["run"]
+    assert "--exclude-checks not_a_server_error,positive_data_acceptance" in run and '"${include[@]}"' in run
+    assert "--checks all --exclude-checks not_a_server_error \"${exclude[@]}\"" in run
