@@ -1,5 +1,6 @@
 """W3b's parser against the payloads W1's loaders really store (W1's own fixtures), so the rule,
 the timeline and the golden record read exactly what ingest writes."""
+
 from __future__ import annotations
 
 import json
@@ -21,9 +22,15 @@ T0 = datetime(2026, 10, 17, 18, 0, tzinfo=UTC)
 
 def member(draft):
     # through JSON, as the payload comes back from the jsonb column
-    return parse_member(source_record_id=draft.id, source_system=draft.source_system, source_local_id=draft.source_local_id,
-                        kind=draft.kind, is_constructed=draft.is_constructed, ingested_at=T0,
-                        raw_payload=json.loads(json.dumps(draft.raw_payload)))
+    return parse_member(
+        source_record_id=draft.id,
+        source_system=draft.source_system,
+        source_local_id=draft.source_local_id,
+        kind=draft.kind,
+        is_constructed=draft.is_constructed,
+        ingested_at=T0,
+        raw_payload=json.loads(json.dumps(draft.raw_payload)),
+    )
 
 
 @pytest.fixture(scope="module")
@@ -39,11 +46,17 @@ def test_every_clinical_list_w1_stores_is_parsed_one_to_one(drafts):
         if d.kind.value == "FHIR_PATIENT":
             sizes = {k: len(d.raw_payload.get(k) or []) for k in FHIR_CLINICAL_LISTS}
             assert (len(m.allergies), len(m.orders), len(m.encounters)) == (
-                sizes["allergyIntolerances"], sizes["medicationRequests"], sizes["encounters"]), d.source_local_id
+                sizes["allergyIntolerances"],
+                sizes["medicationRequests"],
+                sizes["encounters"],
+            ), d.source_local_id
         else:
             sizes = {k: len(d.raw_payload.get(k) or []) for k in CSV_CLINICAL_LISTS}
             assert (len(m.allergies), len(m.orders), len(m.encounters)) == (
-                sizes["allergies"], sizes["medications"], sizes["encounters"]), d.source_local_id
+                sizes["allergies"],
+                sizes["medications"],
+                sizes["encounters"],
+            ), d.source_local_id
 
 
 def test_w1_codes_systems_and_statuses_come_through(drafts):
@@ -57,8 +70,13 @@ def test_w1_codes_systems_and_statuses_come_through(drafts):
 
 
 def test_rule_over_w1_records(drafts):
-    members = {(d.source_system, len(d.raw_payload.get("allergyIntolerances") or d.raw_payload.get("allergies") or [])): member(d)
-               for d in drafts}
+    members = {
+        (
+            d.source_system,
+            len(d.raw_payload.get("allergyIntolerances") or d.raw_payload.get("allergies") or []),
+        ): member(d)
+        for d in drafts
+    }
     with_allergy = [m for (_, n), m in members.items() if n]
     without = [m for (_, n), m in members.items() if not n]
     for m in with_allergy:  # allergy and active amoxicillin in one record: same-source Tier A

@@ -1,4 +1,5 @@
 """Connected components over LINKED edges (ADR-002). Pure; rebuilt from scratch per change."""
+
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable
@@ -27,4 +28,3 @@ def components[N: Hashable](edges: Iterable[tuple[N, N]], nodes: Iterable[N] = (
     for n in parent:
         groups.setdefault(find(n), set()).add(n)
     return {n: frozenset(members) for members in groups.values() for n in members}
-

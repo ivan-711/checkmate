@@ -15,10 +15,19 @@ T0 = datetime(2026, 10, 17, 18, 0, tzinfo=UTC)
 
 
 def m(i: int, minutes: int, **kw) -> MemberDemographics:
-    base = {"given_name": "Ana", "family_name": "Acuna", "birth_date": date(1985, 7, 3), "sex": "FEMALE", "phone_e164": "+15555550100",
-                "address_line": "100 Placeholder St", "zip5": "54311"}
+    base = {
+        "given_name": "Ana",
+        "family_name": "Acuna",
+        "birth_date": date(1985, 7, 3),
+        "sex": "FEMALE",
+        "phone_e164": "+15555550100",
+        "address_line": "100 Placeholder St",
+        "zip5": "54311",
+    }
     base.update(kw)
-    return MemberDemographics(source_system=f"S{i}", source_local_id=f"L{i}", ingested_at=T0 + timedelta(minutes=minutes), **base)
+    return MemberDemographics(
+        source_system=f"S{i}", source_local_id=f"L{i}", ingested_at=T0 + timedelta(minutes=minutes), **base
+    )
 
 
 def by_field(fields):
@@ -26,7 +35,9 @@ def by_field(fields):
 
 
 def test_names_most_frequent_then_most_recent():
-    g = by_field(golden_demographics([m(1, 0, given_name="Ana"), m(2, 1, given_name="Anna"), m(3, 2, given_name="ana")]))
+    g = by_field(
+        golden_demographics([m(1, 0, given_name="Ana"), m(2, 1, given_name="Anna"), m(3, 2, given_name="ana")])
+    )
     assert g["givenName"].value == "ana" and g["givenName"].rule == RULE_MOST_FREQUENT
     assert [a.value for a in g["givenName"].alternates] == ["Anna", "Ana"]
     assert g["givenName"].alternates[0].crosswalk.source_record_id == "L2"
@@ -46,8 +57,16 @@ def test_dob_and_sex_majority_else_conflict_unresolved():
 
 
 def test_phone_address_zip_most_recent():
-    g = by_field(golden_demographics([m(1, 5, phone_e164="+15555550001", address_line="old"), m(2, 1, phone_e164="+15555550002")]))
-    assert g["phone"].value == "+15555550001" and g["phone"].rule == RULE_MOST_RECENT and g["phone"].crosswalk.source_record_id == "L1"
+    g = by_field(
+        golden_demographics(
+            [m(1, 5, phone_e164="+15555550001", address_line="old"), m(2, 1, phone_e164="+15555550002")]
+        )
+    )
+    assert (
+        g["phone"].value == "+15555550001"
+        and g["phone"].rule == RULE_MOST_RECENT
+        and g["phone"].crosswalk.source_record_id == "L1"
+    )
     assert g["address"].value == "old" and g["zip5"].rule == RULE_MOST_RECENT
 
 
@@ -69,12 +88,14 @@ def test_clinical_union_prefers_the_active_allergy_and_keeps_distinct_orders():
         er_member,
         fhir_order,
     )
+
     member = clinic_member(allergies=[csv_allergy_row(stop="2020-01-01"), csv_allergy_row()])
     (allergy,) = [f for f in clinical_union([member]) if f.field == "allergy"]
     assert allergy.value["status"] == "active" and allergy.value["resourceId"] == "allergies.csv:1"
     reversed_member = clinic_member(allergies=[csv_allergy_row(), csv_allergy_row(stop="2020-01-01")])
     (allergy,) = [f for f in clinical_union([reversed_member]) if f.field == "allergy"]
     assert allergy.value["status"] == "active" and allergy.value["resourceId"] == "allergies.csv:0"
-    second = fhir_order(); second["id"] = "mr-2"
+    second = fhir_order()
+    second["id"] = "mr-2"
     orders = [f for f in clinical_union([er_member(fhir_order(), second)]) if f.field == "activeMedicationOrder"]
     assert sorted(f.value["resourceId"] for f in orders) == ["MedicationRequest/mr-1", "MedicationRequest/mr-2"]

@@ -1,4 +1,5 @@
 """Timeline events from member resources (architecture S10). Each keeps its source. Pure."""
+
 from __future__ import annotations
 
 import base64
@@ -24,7 +25,13 @@ TYPE_MEDICATION_ORDER = "MEDICATION_ORDER"
 def _codes(coding) -> list[str]:
     if coding is None:
         return []
-    system = "RxNorm" if coding.system and "rxnorm" in coding.system.lower() else "SNOMED" if coding.system and "snomed" in coding.system.lower() else (coding.system or "code")
+    system = (
+        "RxNorm"
+        if coding.system and "rxnorm" in coding.system.lower()
+        else "SNOMED"
+        if coding.system and "snomed" in coding.system.lower()
+        else (coding.system or "code")
+    )
     return [f"{system}:{coding.code}"]
 
 
@@ -38,9 +45,16 @@ def _allergy_event(entity_id: UUID, a: AllergyRecord) -> TimelineEvent | None:
         parts = [p for p in (strip_snomed_tag(worst.manifestation_display), worst.severity) if p]
         reaction = f" (reaction: {', '.join(parts)})" if parts else ""
     return TimelineEvent(
-        entity_id=entity_id, occurred_at=a.recorded_at, type=TYPE_ALLERGY, codes=_codes(a.code),
-        display=f"Allergy to {name}{reaction}", source_record_id=a.ref.source_record_id, source_system=a.ref.source_system,
-        resource_id=a.ref.resource_id, verification=a.ref.verification, is_constructed=a.ref.is_constructed,
+        entity_id=entity_id,
+        occurred_at=a.recorded_at,
+        type=TYPE_ALLERGY,
+        codes=_codes(a.code),
+        display=f"Allergy to {name}{reaction}",
+        source_record_id=a.ref.source_record_id,
+        source_system=a.ref.source_system,
+        resource_id=a.ref.resource_id,
+        verification=a.ref.verification,
+        is_constructed=a.ref.is_constructed,
     )
 
 
@@ -50,9 +64,16 @@ def _order_event(entity_id: UUID, o: OrderRecord) -> TimelineEvent | None:
     name = (o.code.display or o.code.code) if o.code else "unknown medication"
     status = f" ({o.status} order)" if o.status else ""
     return TimelineEvent(
-        entity_id=entity_id, occurred_at=o.authored_at, type=TYPE_MEDICATION_ORDER, codes=_codes(o.code),
-        display=f"{name}{status}", source_record_id=o.ref.source_record_id, source_system=o.ref.source_system,
-        resource_id=o.ref.resource_id, verification=o.ref.verification, is_constructed=o.ref.is_constructed,
+        entity_id=entity_id,
+        occurred_at=o.authored_at,
+        type=TYPE_MEDICATION_ORDER,
+        codes=_codes(o.code),
+        display=f"{name}{status}",
+        source_record_id=o.ref.source_record_id,
+        source_system=o.ref.source_system,
+        resource_id=o.ref.resource_id,
+        verification=o.ref.verification,
+        is_constructed=o.ref.is_constructed,
     )
 
 
@@ -62,9 +83,15 @@ def _encounter_event(entity_id: UUID, e: EncounterRecord) -> TimelineEvent | Non
     name = (strip_snomed_tag(e.type.display) if e.type else None) or "encounter"
     where = f" at {e.service_provider}" if e.service_provider else ""
     return TimelineEvent(
-        entity_id=entity_id, occurred_at=e.start, type=TYPE_ENCOUNTER, codes=_codes(e.type),
-        display=f"{name[:1].upper()}{name[1:]}{where}", source_record_id=e.ref.source_record_id,
-        source_system=e.ref.source_system, resource_id=e.ref.resource_id, verification=e.ref.verification,
+        entity_id=entity_id,
+        occurred_at=e.start,
+        type=TYPE_ENCOUNTER,
+        codes=_codes(e.type),
+        display=f"{name[:1].upper()}{name[1:]}{where}",
+        source_record_id=e.ref.source_record_id,
+        source_system=e.ref.source_system,
+        resource_id=e.ref.resource_id,
+        verification=e.ref.verification,
         is_constructed=e.ref.is_constructed,
     )
 

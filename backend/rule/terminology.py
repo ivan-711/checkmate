@@ -3,6 +3,7 @@
 Everything is read once from the JSON files committed under ``cache/``; the runtime
 never calls RxNav or DailyMed (ADR-011).
 """
+
 from __future__ import annotations
 
 import json
@@ -78,8 +79,14 @@ class Terminology:
 def _load_label(path: Path) -> Label:
     raw = json.loads(path.read_text())
     return Label(
-        drug_name=raw["drug_name"], label_name=raw["label_name"], set_id=raw["set_id"], revised=raw["revised"],
-        section=raw["section"], url=raw["url"], quote=raw["quote"], ingredients=frozenset(raw["ingredients"]),
+        drug_name=raw["drug_name"],
+        label_name=raw["label_name"],
+        set_id=raw["set_id"],
+        revised=raw["revised"],
+        section=raw["section"],
+        url=raw["url"],
+        quote=raw["quote"],
+        ingredients=frozenset(raw["ingredients"]),
     )
 
 

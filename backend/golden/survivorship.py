@@ -3,6 +3,7 @@
 names: most frequent, then most recent. dob and sex: majority, else CONFLICT_UNRESOLVED.
 phone, address, zip: most recent. Clinical lists: union (one golden value per item).
 """
+
 from __future__ import annotations
 
 from collections import Counter
@@ -57,8 +58,13 @@ def _alternates(candidates: list[Candidate], winner: MemberDemographics) -> list
 
 def _field(name: str, winner: Candidate, rule: str, candidates: list[Candidate]) -> GoldenField:
     value, member = winner
-    return GoldenField(field=name, value=_json(value), crosswalk=member.crosswalk, rule=rule,
-                       alternates=_alternates(candidates, member))
+    return GoldenField(
+        field=name,
+        value=_json(value),
+        crosswalk=member.crosswalk,
+        rule=rule,
+        alternates=_alternates(candidates, member),
+    )
 
 
 def _normalize(value: Value) -> str:
@@ -86,8 +92,13 @@ def majority_else_conflict(name: str, candidates: list[Candidate]) -> GoldenFiel
         winner = next(c for c in candidates if _normalize(c[0]) == key)
         return _field(name, winner, RULE_MAJORITY, candidates)
     newest = candidates[0][1]
-    return GoldenField(field=name, value=None, crosswalk=newest.crosswalk, rule=RULE_CONFLICT,
-                       alternates=[GoldenAlternate(value=_json(v), crosswalk=m.crosswalk) for v, m in candidates])
+    return GoldenField(
+        field=name,
+        value=None,
+        crosswalk=newest.crosswalk,
+        rule=RULE_CONFLICT,
+        alternates=[GoldenAlternate(value=_json(v), crosswalk=m.crosswalk) for v, m in candidates],
+    )
 
 
 def most_recent(name: str, candidates: list[Candidate]) -> GoldenField | None:
@@ -131,5 +142,7 @@ def golden_union(name: str, items: Sequence[tuple[dict, Crosswalk]], *, per_reso
         rank = 0 if value.get("status") == "active" else 1
         if key not in best or rank < best[key][0]:
             best[key] = (rank, position, value, crosswalk)
-    return [GoldenField(field=name, value=value, crosswalk=crosswalk, rule=RULE_UNION)
-            for _, _, value, crosswalk in sorted(best.values(), key=lambda b: b[1])]
+    return [
+        GoldenField(field=name, value=value, crosswalk=crosswalk, rule=RULE_UNION)
+        for _, _, value, crosswalk in sorted(best.values(), key=lambda b: b[1])
+    ]

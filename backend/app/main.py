@@ -172,19 +172,29 @@ Limit = Annotated[int, Query(ge=1, le=LIST_LIMIT_MAX)]
 _ENTITY_ERRORS = error_responses(ErrorCode.NOT_FOUND, ErrorCode.UPSTREAM_UNAVAILABLE) | common_error_responses()
 
 
-@app.get(API_PREFIX + "/entities/{entity_id}", response_model=Entity, tags=["core"], responses=_ENTITY_ERRORS,
-         description="Lane W3b. Read-time golden record with crosswalks.")
+@app.get(
+    API_PREFIX + "/entities/{entity_id}",
+    response_model=Entity,
+    tags=["core"],
+    responses=_ENTITY_ERRORS,
+    description="Lane W3b. Read-time golden record with crosswalks.",
+)
 def get_entity(entity_id: uuid.UUID, engine: EngineDep):
     with engine.connect() as conn:
         entity = read_entity(conn, entity_id)
     return entity if entity is not None else error_envelope(ErrorCode.NOT_FOUND, "entity not found")
 
 
-@app.get(API_PREFIX + "/entities/{entity_id}/timeline", response_model=Page[TimelineEvent], tags=["core"],
-         responses=_ENTITY_ERRORS,
-         description="Lane W3b. Timeline across the entity's sources; bounded keyset list.")
-def get_entity_timeline(entity_id: uuid.UUID, engine: EngineDep, limit: Limit = LIST_LIMIT_DEFAULT,
-                        cursor: str | None = None):
+@app.get(
+    API_PREFIX + "/entities/{entity_id}/timeline",
+    response_model=Page[TimelineEvent],
+    tags=["core"],
+    responses=_ENTITY_ERRORS,
+    description="Lane W3b. Timeline across the entity's sources; bounded keyset list.",
+)
+def get_entity_timeline(
+    entity_id: uuid.UUID, engine: EngineDep, limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None
+):
     try:
         with engine.connect() as conn:
             page = read_timeline(conn, entity_id, limit, cursor)
@@ -193,10 +203,20 @@ def get_entity_timeline(entity_id: uuid.UUID, engine: EngineDep, limit: Limit = 
     return page if page is not None else error_envelope(ErrorCode.NOT_FOUND, "entity not found")
 
 
-@app.get(API_PREFIX + "/alerts", response_model=Page[SafetyAlert], tags=["core"], responses=_ENTITY_ERRORS,
-         description="Lane W3b. DetectedIssue-shaped alerts, optionally for one entity; bounded keyset list.")
-def list_alerts(engine: EngineDep, entity_id: Annotated[uuid.UUID | None, Query(alias="entityId")] = None,
-                status: AlertStatus | None = None, limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None):
+@app.get(
+    API_PREFIX + "/alerts",
+    response_model=Page[SafetyAlert],
+    tags=["core"],
+    responses=_ENTITY_ERRORS,
+    description="Lane W3b. DetectedIssue-shaped alerts, optionally for one entity; bounded keyset list.",
+)
+def list_alerts(
+    engine: EngineDep,
+    entity_id: Annotated[uuid.UUID | None, Query(alias="entityId")] = None,
+    status: AlertStatus | None = None,
+    limit: Limit = LIST_LIMIT_DEFAULT,
+    cursor: str | None = None,
+):
     with engine.connect() as conn:
         if entity_id is not None and not entity_exists(conn, entity_id):
             return error_envelope(ErrorCode.NOT_FOUND, "entity not found")

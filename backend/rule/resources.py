@@ -11,6 +11,7 @@ Two payload families (architecture S1):
 
 Only the fields the spec names are read; everything else stays in the raw payload.
 """
+
 from __future__ import annotations
 
 import re
@@ -50,8 +51,8 @@ def is_rxnorm(system: str | None) -> bool:
 
 @dataclass(frozen=True)
 class Reaction:
-    severity: str | None                      # mild / moderate / severe, lower-case; None when not recorded
-    manifestations: tuple[Coding, ...]        # every coding of every manifestation, system kept
+    severity: str | None  # mild / moderate / severe, lower-case; None when not recorded
+    manifestations: tuple[Coding, ...]  # every coding of every manifestation, system kept
     manifestation_display: str | None
 
 
@@ -72,7 +73,7 @@ class SourceRef:
     source_record_id: UUID
     source_system: str
     source_local_id: str
-    resource_id: str                          # "AllergyIntolerance/<id>" or "allergies.csv:<row>"
+    resource_id: str  # "AllergyIntolerance/<id>" or "allergies.csv:<row>"
     is_constructed: bool
     verification: TimelineVerification
 
@@ -80,12 +81,12 @@ class SourceRef:
 @dataclass(frozen=True)
 class AllergyRecord:
     ref: SourceRef
-    code: Coding | None                       # preferred coding: the first RxNorm one, else the first
-    codings: tuple[Coding, ...]               # every coding; eligibility scans all of them
-    type: str | None                          # allergy / intolerance; None when absent (never eligible)
-    clinical_status: str | None               # active / inactive / resolved
-    verification_status: str | None           # confirmed / unconfirmed / refuted / entered-in-error; None = not stated
-    criticality: str | None                   # low / high / unable-to-assess; None for CSV
+    code: Coding | None  # preferred coding: the first RxNorm one, else the first
+    codings: tuple[Coding, ...]  # every coding; eligibility scans all of them
+    type: str | None  # allergy / intolerance; None when absent (never eligible)
+    clinical_status: str | None  # active / inactive / resolved
+    verification_status: str | None  # confirmed / unconfirmed / refuted / entered-in-error; None = not stated
+    criticality: str | None  # low / high / unable-to-assess; None for CSV
     reactions: tuple[Reaction, ...]
     recorded_at: datetime | None
 
@@ -95,7 +96,7 @@ class OrderRecord:
     ref: SourceRef
     code: Coding | None
     codings: tuple[Coding, ...]
-    status: str | None                        # FHIR MedicationRequest.status
+    status: str | None  # FHIR MedicationRequest.status
     intent: str | None
     authored_at: datetime | None
     requester_display: str | None
@@ -136,7 +137,7 @@ def parse_timestamp(value: Any) -> datetime | None:
 
 
 def strip_snomed_tag(display: str | None) -> str | None:
-    """"Anaphylaxis (disorder)" reads as "anaphylaxis" on the card."""
+    """ "Anaphylaxis (disorder)" reads as "anaphylaxis" on the card."""
     if not display:
         return None
     text = _SNOMED_TAG.sub("", display).strip()
@@ -144,6 +145,7 @@ def strip_snomed_tag(display: str | None) -> str | None:
 
 
 # FHIR -----------------------------------------------------------------------------------
+
 
 def _walk_resources(node: Any) -> Iterator[dict]:
     if isinstance(node, dict):
@@ -159,8 +161,11 @@ def _walk_resources(node: Any) -> Iterator[dict]:
 def _codings(concept: Mapping | None) -> tuple[Coding, ...]:
     if not concept:
         return ()
-    return tuple(Coding(system=c.get("system"), code=str(c["code"]), display=c.get("display") or concept.get("text"))
-                 for c in concept.get("coding") or [] if c.get("code"))
+    return tuple(
+        Coding(system=c.get("system"), code=str(c["code"]), display=c.get("display") or concept.get("text"))
+        for c in concept.get("coding") or []
+        if c.get("code")
+    )
 
 
 def preferred_coding(codings: tuple[Coding, ...]) -> Coding | None:
@@ -186,8 +191,14 @@ def _fhir_ref(base: MemberResources, resource: Mapping, index: int) -> SourceRef
     """``Type/id``; a resource without an id gets its position in the payload so two such
     resources never share a reference."""
     rid = f"{resource['resourceType']}/{resource.get('id') or f'_{index}'}"
-    return SourceRef(base.source_record_id, base.source_system, base.source_local_id, rid,
-                     base.is_constructed or _is_constructed_resource(resource), TimelineVerification.CODED)
+    return SourceRef(
+        base.source_record_id,
+        base.source_system,
+        base.source_local_id,
+        rid,
+        base.is_constructed or _is_constructed_resource(resource),
+        TimelineVerification.CODED,
+    )
 
 
 def _fhir_allergy(base: MemberResources, r: Mapping, index: int) -> AllergyRecord:
@@ -199,9 +210,15 @@ def _fhir_allergy(base: MemberResources, r: Mapping, index: int) -> AllergyRecor
         reactions.append(Reaction((reaction.get("severity") or None), codings, display))
     codings = _codings(r.get("code"))
     return AllergyRecord(
-        ref=_fhir_ref(base, r, index), code=preferred_coding(codings), codings=codings, type=r.get("type"),
-        clinical_status=_first_code(r.get("clinicalStatus")), verification_status=_first_code(r.get("verificationStatus")),
-        criticality=r.get("criticality"), reactions=tuple(reactions), recorded_at=parse_timestamp(r.get("recordedDate")),
+        ref=_fhir_ref(base, r, index),
+        code=preferred_coding(codings),
+        codings=codings,
+        type=r.get("type"),
+        clinical_status=_first_code(r.get("clinicalStatus")),
+        verification_status=_first_code(r.get("verificationStatus")),
+        criticality=r.get("criticality"),
+        reactions=tuple(reactions),
+        recorded_at=parse_timestamp(r.get("recordedDate")),
     )
 
 
@@ -213,8 +230,13 @@ def _fhir_order(base: MemberResources, r: Mapping, index: int, medications: Mapp
         concept = (medications.get(med_id) or {}).get("code")
     codings = _codings(concept)
     return OrderRecord(
-        ref=_fhir_ref(base, r, index), code=preferred_coding(codings), codings=codings, status=r.get("status"), intent=r.get("intent"),
-        authored_at=parse_timestamp(r.get("authoredOn")), requester_display=(r.get("requester") or {}).get("display"),
+        ref=_fhir_ref(base, r, index),
+        code=preferred_coding(codings),
+        codings=codings,
+        status=r.get("status"),
+        intent=r.get("intent"),
+        authored_at=parse_timestamp(r.get("authoredOn")),
+        requester_display=(r.get("requester") or {}).get("display"),
     )
 
 
@@ -222,22 +244,32 @@ def _fhir_encounter(base: MemberResources, r: Mapping, index: int) -> EncounterR
     period = r.get("period") or {}
     types = r.get("type") or []
     return EncounterRecord(
-        ref=_fhir_ref(base, r, index), class_code=(r.get("class") or {}).get("code"),
-        type=_first_coding(types[0]) if types else None, start=parse_timestamp(period.get("start")),
-        end=parse_timestamp(period.get("end")), service_provider=(r.get("serviceProvider") or {}).get("display"),
+        ref=_fhir_ref(base, r, index),
+        class_code=(r.get("class") or {}).get("code"),
+        type=_first_coding(types[0]) if types else None,
+        start=parse_timestamp(period.get("start")),
+        end=parse_timestamp(period.get("end")),
+        service_provider=(r.get("serviceProvider") or {}).get("display"),
     )
 
 
 def _parse_fhir(base: MemberResources, payload: Any) -> MemberResources:
     resources = list(_walk_resources(payload))
     medications = {r.get("id"): r for r in resources if r["resourceType"] == "Medication"}
-    allergies = tuple(_fhir_allergy(base, r, i) for i, r in enumerate(resources) if r["resourceType"] == "AllergyIntolerance")
-    orders = tuple(_fhir_order(base, r, i, medications) for i, r in enumerate(resources) if r["resourceType"] == "MedicationRequest")
+    allergies = tuple(
+        _fhir_allergy(base, r, i) for i, r in enumerate(resources) if r["resourceType"] == "AllergyIntolerance"
+    )
+    orders = tuple(
+        _fhir_order(base, r, i, medications)
+        for i, r in enumerate(resources)
+        if r["resourceType"] == "MedicationRequest"
+    )
     encounters = tuple(_fhir_encounter(base, r, i) for i, r in enumerate(resources) if r["resourceType"] == "Encounter")
     return MemberResources(**{**base.__dict__, "allergies": allergies, "orders": orders, "encounters": encounters})
 
 
 # CSV ------------------------------------------------------------------------------------
+
 
 def _upper(row: Mapping) -> dict[str, Any]:
     return {str(k).upper(): v for k, v in row.items()}
@@ -278,8 +310,14 @@ def _truthy(value: Any) -> bool:
 
 def _csv_ref(base: MemberResources, file: str, row: Mapping, index: int) -> SourceRef:
     key = row.get("ROW_ID") or row.get("ID") or row.get("ROW") or str(index)
-    return SourceRef(base.source_record_id, base.source_system, base.source_local_id, f"{file}:{key}",
-                     base.is_constructed or _truthy(row.get("CONSTRUCTED", "")), TimelineVerification.CSV_DERIVED)
+    return SourceRef(
+        base.source_record_id,
+        base.source_system,
+        base.source_local_id,
+        f"{file}:{key}",
+        base.is_constructed or _truthy(row.get("CONSTRUCTED", "")),
+        TimelineVerification.CSV_DERIVED,
+    )
 
 
 def _csv_code(row: Mapping, *, always_rxnorm: bool = False) -> Coding | None:
@@ -305,16 +343,20 @@ def _csv_allergy(base: MemberResources, row: Mapping, index: int) -> AllergyReco
             description = row.get(f"DESCRIPTION{n}") or None
             # Synthea reaction codes are SNOMED CT (CSV data dictionary); the adapter says so explicitly
             manifestations = (Coding(SNOMED_SYSTEM, str(code), description),) if code else ()
-            reactions.append(Reaction((str(severity).lower() or None) if severity else None, manifestations, description))
+            reactions.append(
+                Reaction((str(severity).lower() or None) if severity else None, manifestations, description)
+            )
     code = _csv_code(row)
     return AllergyRecord(
         ref=_csv_ref(base, ALLERGY_FILE, row, index),
-        code=code, codings=(code,) if code else (),
+        code=code,
+        codings=(code,) if code else (),
         type=(str(row.get("TYPE")).lower() or None) if row.get("TYPE") else None,
         clinical_status="active" if not row.get("STOP") else "inactive",
         verification_status=None,  # allergies.csv carries no verificationStatus: "not stated in source"
-        criticality=None,          # nor criticality
-        reactions=tuple(reactions), recorded_at=parse_timestamp(row.get("START")),
+        criticality=None,  # nor criticality
+        reactions=tuple(reactions),
+        recorded_at=parse_timestamp(row.get("START")),
     )
 
 
@@ -322,19 +364,23 @@ def _csv_order(base: MemberResources, row: Mapping, index: int) -> OrderRecord:
     code = _csv_code(row, always_rxnorm=True)
     return OrderRecord(
         ref=_csv_ref(base, MEDICATION_FILE, row, index),
-        code=code, codings=(code,) if code else (),
+        code=code,
+        codings=(code,) if code else (),
         status=str(row["STATUS"]).lower() if row.get("STATUS") else ("active" if not row.get("STOP") else "completed"),
         intent=str(row["INTENT"]).lower() if row.get("INTENT") else "order",
-        authored_at=parse_timestamp(row.get("START")), requester_display=row.get("PROVIDER") or None,
+        authored_at=parse_timestamp(row.get("START")),
+        requester_display=row.get("PROVIDER") or None,
     )
 
 
 def _csv_encounter(base: MemberResources, row: Mapping, index: int) -> EncounterRecord:
     code = str(row.get("CODE") or "").strip()
     return EncounterRecord(
-        ref=_csv_ref(base, ENCOUNTER_FILE, row, index), class_code=row.get("ENCOUNTERCLASS") or None,
+        ref=_csv_ref(base, ENCOUNTER_FILE, row, index),
+        class_code=row.get("ENCOUNTERCLASS") or None,
         type=Coding("http://snomed.info/sct", code, row.get("DESCRIPTION") or None) if code else None,
-        start=parse_timestamp(row.get("START")), end=parse_timestamp(row.get("STOP")),
+        start=parse_timestamp(row.get("START")),
+        end=parse_timestamp(row.get("STOP")),
         service_provider=row.get("ORGANIZATION") or None,
     )
 
@@ -351,14 +397,24 @@ def _parse_csv(base: MemberResources, payload: Any) -> MemberResources:
             orders.append(_csv_order(base, row, index))
         else:
             encounters.append(_csv_encounter(base, row, index))
-    return MemberResources(**{**base.__dict__, "allergies": tuple(allergies), "orders": tuple(orders),
-                              "encounters": tuple(encounters)})
+    return MemberResources(
+        **{**base.__dict__, "allergies": tuple(allergies), "orders": tuple(orders), "encounters": tuple(encounters)}
+    )
 
 
 # Entry point ----------------------------------------------------------------------------
 
-def parse_member(*, source_record_id: UUID, source_system: str, source_local_id: str, kind: SourceKind | str,
-                 is_constructed: bool, ingested_at: datetime, raw_payload: Any) -> MemberResources:
+
+def parse_member(
+    *,
+    source_record_id: UUID,
+    source_system: str,
+    source_local_id: str,
+    kind: SourceKind | str,
+    is_constructed: bool,
+    ingested_at: datetime,
+    raw_payload: Any,
+) -> MemberResources:
     """One source_record row to its parsed clinical resources."""
     kind = SourceKind(kind)
     base = MemberResources(source_record_id, source_system, source_local_id, kind, bool(is_constructed), ingested_at)

@@ -1,4 +1,5 @@
 """Database fixtures for the backend tests: a throwaway database, one rolled-back transaction per test."""
+
 from __future__ import annotations
 
 import os
@@ -9,7 +10,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from backend.app.db import make_engine
 
-TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://checkmate:checkmate@127.0.0.1:5432/checkmate_test_w3b")
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL", "postgresql://checkmate:checkmate@127.0.0.1:5432/checkmate_test_w3b"
+)
 SKIP_DB_TESTS = os.environ.get("CHECKMATE_SKIP_DB_TESTS") == "1"  # explicit opt-out only; never a silent skip
 
 
@@ -46,13 +49,26 @@ def purge(engine, record_ids) -> None:
     if not ids:
         return
     with engine.begin() as c:
-        pairs = [r[0] for r in c.execute(text(
-            "SELECT id FROM candidate_pair WHERE record_a_id = ANY(:ids) OR record_b_id = ANY(:ids)"), {"ids": ids})]
-        entities = [r[0] for r in c.execute(text(
-            "SELECT DISTINCT entity_id FROM entity_member WHERE source_record_id = ANY(:ids)"), {"ids": ids})]
-        c.execute(text("DELETE FROM event_log WHERE entity_id = ANY(:e) OR pair_id = ANY(:p)"), {"e": entities, "p": pairs})
+        pairs = [
+            r[0]
+            for r in c.execute(
+                text("SELECT id FROM candidate_pair WHERE record_a_id = ANY(:ids) OR record_b_id = ANY(:ids)"),
+                {"ids": ids},
+            )
+        ]
+        entities = [
+            r[0]
+            for r in c.execute(
+                text("SELECT DISTINCT entity_id FROM entity_member WHERE source_record_id = ANY(:ids)"), {"ids": ids}
+            )
+        ]
+        c.execute(
+            text("DELETE FROM event_log WHERE entity_id = ANY(:e) OR pair_id = ANY(:p)"), {"e": entities, "p": pairs}
+        )
         c.execute(text("DELETE FROM entity WHERE id = ANY(:e)"), {"e": entities})  # cascades members and alerts
-        c.execute(text("DELETE FROM not_a_match WHERE record_a_id = ANY(:ids) OR record_b_id = ANY(:ids)"), {"ids": ids})
+        c.execute(
+            text("DELETE FROM not_a_match WHERE record_a_id = ANY(:ids) OR record_b_id = ANY(:ids)"), {"ids": ids}
+        )
         c.execute(text("DELETE FROM match_decision WHERE pair_id = ANY(:p)"), {"p": pairs})
         c.execute(text("DELETE FROM candidate_pair WHERE id = ANY(:p)"), {"p": pairs})
         c.execute(text("DELETE FROM source_record WHERE id = ANY(:ids)"), {"ids": ids})

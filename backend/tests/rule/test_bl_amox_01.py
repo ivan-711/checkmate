@@ -3,6 +3,7 @@
 Rows about link state (2, 3, 4, 13) run the pure union-find over approved edges and
 evaluate each component, which is exactly what the service does inside the transaction.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -34,53 +35,122 @@ RXNORM = "http://www.nlm.nih.gov/research/umls/rxnorm"
 SNOMED = "http://snomed.info/sct"
 
 
-def fhir_allergy(code="7984", display="Penicillin V", *, type_="allergy", clinical="active", verification="confirmed",
-                 criticality="low", reactions=(("39579001", "Anaphylaxis (disorder)", "severe"),), system=RXNORM) -> dict:
-    r = {"resourceType": "AllergyIntolerance", "id": "al-1",
-         "clinicalStatus": {"coding": [{"code": clinical}]},
-         "verificationStatus": {"coding": [{"code": verification}]},
-         "category": ["medication"], "criticality": criticality,
-         "code": {"coding": [{"system": system, "code": code, "display": display}]},
-         "recordedDate": "2024-03-02T10:00:00Z",
-         "reaction": [{"manifestation": [{"coding": [{"system": SNOMED, "code": mc, "display": md}]}], "severity": sev}
-                      for mc, md, sev in reactions]}
+def fhir_allergy(
+    code="7984",
+    display="Penicillin V",
+    *,
+    type_="allergy",
+    clinical="active",
+    verification="confirmed",
+    criticality="low",
+    reactions=(("39579001", "Anaphylaxis (disorder)", "severe"),),
+    system=RXNORM,
+) -> dict:
+    r = {
+        "resourceType": "AllergyIntolerance",
+        "id": "al-1",
+        "clinicalStatus": {"coding": [{"code": clinical}]},
+        "verificationStatus": {"coding": [{"code": verification}]},
+        "category": ["medication"],
+        "criticality": criticality,
+        "code": {"coding": [{"system": system, "code": code, "display": display}]},
+        "recordedDate": "2024-03-02T10:00:00Z",
+        "reaction": [
+            {"manifestation": [{"coding": [{"system": SNOMED, "code": mc, "display": md}]}], "severity": sev}
+            for mc, md, sev in reactions
+        ],
+    }
     if type_ is not None:
         r["type"] = type_
     return r
 
 
-def fhir_order(code="308192", display="Amoxicillin 500 MG Oral Tablet", *, status="active", intent="order",
-               constructed=False) -> dict:
-    r = {"resourceType": "MedicationRequest", "id": "mr-1", "status": status, "intent": intent,
-         "medicationCodeableConcept": {"coding": [{"system": RXNORM, "code": code, "display": display}]},
-         "authoredOn": "2026-10-17T15:00:00Z", "requester": {"display": "Dr. Example"}}
+def fhir_order(
+    code="308192", display="Amoxicillin 500 MG Oral Tablet", *, status="active", intent="order", constructed=False
+) -> dict:
+    r = {
+        "resourceType": "MedicationRequest",
+        "id": "mr-1",
+        "status": status,
+        "intent": intent,
+        "medicationCodeableConcept": {"coding": [{"system": RXNORM, "code": code, "display": display}]},
+        "authoredOn": "2026-10-17T15:00:00Z",
+        "requester": {"display": "Dr. Example"},
+    }
     if constructed:
         r["meta"] = {"tag": [{"system": "urn:chartguard:provenance", "code": "constructed-scenario"}]}
     return r
 
 
 def bundle(*resources: dict) -> dict:
-    return {"resourceType": "Bundle", "type": "transaction",
-            "entry": [{"fullUrl": "urn:uuid:p", "resource": {"resourceType": "Patient", "id": "p"}},
-                      *({"fullUrl": f"urn:uuid:{r['id']}", "resource": r} for r in resources)]}
+    return {
+        "resourceType": "Bundle",
+        "type": "transaction",
+        "entry": [
+            {"fullUrl": "urn:uuid:p", "resource": {"resourceType": "Patient", "id": "p"}},
+            *({"fullUrl": f"urn:uuid:{r['id']}", "resource": r} for r in resources),
+        ],
+    }
 
 
 def er_member(*resources: dict, record_id: UUID = ER, constructed=False) -> MemberResources:
-    return parse_member(source_record_id=record_id, source_system="ER_FHIR", source_local_id="ER-MRN-1",
-                        kind=SourceKind.FHIR_PATIENT, is_constructed=constructed, ingested_at=T0, raw_payload=bundle(*resources))
+    return parse_member(
+        source_record_id=record_id,
+        source_system="ER_FHIR",
+        source_local_id="ER-MRN-1",
+        kind=SourceKind.FHIR_PATIENT,
+        is_constructed=constructed,
+        ingested_at=T0,
+        raw_payload=bundle(*resources),
+    )
 
 
-def csv_allergy_row(code="7984", description="Penicillin V", *, stop="", type_="allergy", severity1="SEVERE",
-                    reaction1="39579001", description1="Anaphylaxis") -> dict:
-    return {"START": "2024-03-02", "STOP": stop, "PATIENT": "p", "ENCOUNTER": "e", "CODE": code, "SYSTEM": "Unknown",
-            "DESCRIPTION": description, "TYPE": type_, "CATEGORY": "medication", "REACTION1": reaction1,
-            "DESCRIPTION1": description1, "SEVERITY1": severity1, "REACTION2": "", "DESCRIPTION2": "", "SEVERITY2": ""}
+def csv_allergy_row(
+    code="7984",
+    description="Penicillin V",
+    *,
+    stop="",
+    type_="allergy",
+    severity1="SEVERE",
+    reaction1="39579001",
+    description1="Anaphylaxis",
+) -> dict:
+    return {
+        "START": "2024-03-02",
+        "STOP": stop,
+        "PATIENT": "p",
+        "ENCOUNTER": "e",
+        "CODE": code,
+        "SYSTEM": "Unknown",
+        "DESCRIPTION": description,
+        "TYPE": type_,
+        "CATEGORY": "medication",
+        "REACTION1": reaction1,
+        "DESCRIPTION1": description1,
+        "SEVERITY1": severity1,
+        "REACTION2": "",
+        "DESCRIPTION2": "",
+        "SEVERITY2": "",
+    }
 
 
 def clinic_member(allergies=(), medications=(), record_id: UUID = CLINIC) -> MemberResources:
-    payload = {"Id": "p", "First": "Ana", "Last": "Placeholder", "allergies": list(allergies), "medications": list(medications)}
-    return parse_member(source_record_id=record_id, source_system="CLINIC_CSV", source_local_id="CLINIC-7",
-                        kind=SourceKind.CSV_ROW, is_constructed=False, ingested_at=T0, raw_payload=payload)
+    payload = {
+        "Id": "p",
+        "First": "Ana",
+        "Last": "Placeholder",
+        "allergies": list(allergies),
+        "medications": list(medications),
+    }
+    return parse_member(
+        source_record_id=record_id,
+        source_system="CLINIC_CSV",
+        source_local_id="CLINIC-7",
+        kind=SourceKind.CSV_ROW,
+        is_constructed=False,
+        ingested_at=T0,
+        raw_payload=payload,
+    )
 
 
 def flags_for(members: list[MemberResources], approved_edges: list[tuple[UUID, UUID]]):
@@ -103,21 +173,62 @@ ROWS = {
     "3a": ([HERO_ALLERGY], [], None),
     "3b": ([HERO_ORDER], [], None),
     5: ([clinic_member(allergies=[csv_allergy_row(stop="2025-01-01")]), HERO_ORDER], LINK, None),
-    6: ([er_member(fhir_allergy(verification="refuted")), clinic_member(medications=[
-        {"START": "2026-10-01", "STOP": "", "CODE": "308192", "DESCRIPTION": "Amoxicillin 500 MG Oral Tablet", "DISPENSES": "1"}])],
-        LINK, None),
+    6: (
+        [
+            er_member(fhir_allergy(verification="refuted")),
+            clinic_member(
+                medications=[
+                    {
+                        "START": "2026-10-01",
+                        "STOP": "",
+                        "CODE": "308192",
+                        "DESCRIPTION": "Amoxicillin 500 MG Oral Tablet",
+                        "DISPENSES": "1",
+                    }
+                ]
+            ),
+        ],
+        LINK,
+        None,
+    ),
     7: ([clinic_member(allergies=[csv_allergy_row(type_="intolerance")]), HERO_ORDER], LINK, None),
     8: ([HERO_ALLERGY, er_member(fhir_order(status="completed"))], LINK, None),
-    9: ([HERO_ALLERGY, er_member(fhir_order(code="1649988", display="doxycycline hyclate 100 MG Oral Tablet"))], LINK, None),
+    9: (
+        [HERO_ALLERGY, er_member(fhir_order(code="1649988", display="doxycycline hyclate 100 MG Oral Tablet"))],
+        LINK,
+        None,
+    ),
     10: ([clinic_member(allergies=[csv_allergy_row(code="2231", description="Cephalexin")]), HERO_ORDER], LINK, None),
-    11: ([clinic_member(allergies=[csv_allergy_row(severity1="MILD", reaction1="271807003", description1="Eruption of skin (disorder)")]),
-          HERO_ORDER], LINK, "B"),
+    11: (
+        [
+            clinic_member(
+                allergies=[
+                    csv_allergy_row(severity1="MILD", reaction1="271807003", description1="Eruption of skin (disorder)")
+                ]
+            ),
+            HERO_ORDER,
+        ],
+        LINK,
+        "B",
+    ),
     12: ([er_member(fhir_allergy(), fhir_order())], [], "A"),
-    13: ([HERO_ALLERGY, HERO_ORDER], [], None),  # the only edge is an unapproved auto-link proposal: not in the approved set
-    14: ([HERO_ALLERGY, er_member(fhir_order(code="834061", display="Penicillin V Potassium 250 MG Oral Tablet"))], LINK, "A"),
+    13: (
+        [HERO_ALLERGY, HERO_ORDER],
+        [],
+        None,
+    ),  # the only edge is an unapproved auto-link proposal: not in the approved set
+    14: (
+        [HERO_ALLERGY, er_member(fhir_order(code="834061", display="Penicillin V Potassium 250 MG Oral Tablet"))],
+        LINK,
+        "A",
+    ),
     "15a": ([HERO_ALLERGY, er_member(fhir_order(code="1297882", display="amoxicillin anhydrous"))], LINK, "A"),
     "15b": ([HERO_ALLERGY, er_member(fhir_order(code="308182", display="Amoxicillin 250 MG Oral Capsule"))], LINK, "A"),
-    16: ([HERO_ALLERGY, er_member(fhir_order(code="789980", display="Ampicillin 100 MG/ML Injectable Solution"))], LINK, "A"),
+    16: (
+        [HERO_ALLERGY, er_member(fhir_order(code="789980", display="Ampicillin 100 MG/ML Injectable Solution"))],
+        LINK,
+        "A",
+    ),
     17: ([HERO_ALLERGY, HERO_ORDER], LINK, "A"),
     18: ([HERO_ALLERGY, er_member(fhir_order(status="draft"))], LINK, None),
 }
@@ -152,10 +263,19 @@ def test_row_1_tier_a_card_is_the_exact_reveal_text():
 
 
 def test_amoxicillin_clavulanate_order_cites_the_chartwell_label():
-    (flag,) = flags_for([HERO_ALLERGY, er_member(fhir_order(code="562251", display="Amoxicillin 250 MG / Clavulanate 125 MG Oral Tablet"))], LINK)
+    (flag,) = flags_for(
+        [
+            HERO_ALLERGY,
+            er_member(fhir_order(code="562251", display="Amoxicillin 250 MG / Clavulanate 125 MG Oral Tablet")),
+        ],
+        LINK,
+    )
     assert flag.citation.set_id == "f10634cb-6505-43f1-9b70-314c58673016"
     assert flag.citation.revised == "10/2026"
-    assert "The amoxicillin/clavulanate label (DailyMed, set f10634cb-6505-43f1-9b70-314c58673016, revised 10/2026) states:" in flag.card_text
+    assert (
+        "The amoxicillin/clavulanate label (DailyMed, set f10634cb-6505-43f1-9b70-314c58673016, revised 10/2026) states:"
+        in flag.card_text
+    )
 
 
 def test_row_4_split_retracts_when_the_edge_is_gone():
@@ -207,12 +327,18 @@ def test_allergy_without_type_is_not_eligible():
 def test_safety_alert_and_detected_issue_shape():
     (flag,) = flags_for([HERO_ALLERGY, HERO_ORDER], LINK)
     entity = UUID("00000000-0000-4000-8000-000000000900")
-    alert = to_safety_alert(flag, alert_id=UUID("00000000-0000-4000-8000-000000000950"), entity_id=entity, identified_at=T0)
+    alert = to_safety_alert(
+        flag, alert_id=UUID("00000000-0000-4000-8000-000000000950"), entity_id=entity, identified_at=T0
+    )
     assert alert.severity == "moderate" and alert.status.value == "PRELIMINARY" and alert.card_footer == CARD_FOOTER
     assert alert.allergy_ref.source_system == "CLINIC_CSV" and alert.order_ref.resource_id == "MedicationRequest/mr-1"
     assert alert.constructed_scenario is True
     issue = detected_issue(alert)
-    assert issue["resourceType"] == "DetectedIssue" and issue["status"] == "preliminary" and issue["severity"] == "moderate"
+    assert (
+        issue["resourceType"] == "DetectedIssue"
+        and issue["status"] == "preliminary"
+        and issue["severity"] == "moderate"
+    )
     assert issue["detail"] == alert.card_text and issue["reference"] == alert.citation.url
     assert [i["reference"] for i in issue["implicated"]] == ["MedicationRequest/mr-1", "allergies.csv:0"]
     tier_b = to_safety_alert(flags_for(*ROWS[11][:2])[0], alert_id=alert.id, entity_id=entity, identified_at=T0)
@@ -220,8 +346,19 @@ def test_safety_alert_and_detected_issue_shape():
 
 
 def test_never_say_words_are_absent_from_every_card():
-    banned = ("alert stopped", "prevented", "the AI caught", "diagnosed", "would have died", "fatal", "held",
-              "automatically canceled", "blocked", "AI decided", "contraindicated for this patient")
+    banned = (
+        "alert stopped",
+        "prevented",
+        "the AI caught",
+        "diagnosed",
+        "would have died",
+        "fatal",
+        "held",
+        "automatically canceled",
+        "blocked",
+        "AI decided",
+        "contraindicated for this patient",
+    )
     for members, edges, _ in ROWS.values():
         for flag in flags_for(members, edges):
             low = flag.card_text.lower()
@@ -231,30 +368,71 @@ def test_never_say_words_are_absent_from_every_card():
 
 def test_csv_encounter_rows_with_reasoncode_are_encounters_not_orders():
     member = clinic_member()
-    payload = {"Id": "p", "encounters": [{"Id": "e1", "START": "2024-03-02T10:00:00Z", "STOP": "2024-03-02T10:30:00Z",
-                                           "PATIENT": "p", "ENCOUNTERCLASS": "ambulatory", "CODE": "185349003",
-                                           "DESCRIPTION": "Encounter for check up (procedure)", "REASONCODE": "", "REASONDESCRIPTION": ""}],
-               "medications": [{"START": "2026-10-01", "STOP": "", "PATIENT": "p", "CODE": "308192",
-                                "DESCRIPTION": "Amoxicillin 500 MG Oral Tablet", "DISPENSES": "1", "REASONCODE": "43878008"}]}
-    parsed = parse_member(source_record_id=member.source_record_id, source_system="CLINIC_CSV", source_local_id="CLINIC-7",
-                          kind=SourceKind.CSV_ROW, is_constructed=False, ingested_at=T0, raw_payload=payload)
+    payload = {
+        "Id": "p",
+        "encounters": [
+            {
+                "Id": "e1",
+                "START": "2024-03-02T10:00:00Z",
+                "STOP": "2024-03-02T10:30:00Z",
+                "PATIENT": "p",
+                "ENCOUNTERCLASS": "ambulatory",
+                "CODE": "185349003",
+                "DESCRIPTION": "Encounter for check up (procedure)",
+                "REASONCODE": "",
+                "REASONDESCRIPTION": "",
+            }
+        ],
+        "medications": [
+            {
+                "START": "2026-10-01",
+                "STOP": "",
+                "PATIENT": "p",
+                "CODE": "308192",
+                "DESCRIPTION": "Amoxicillin 500 MG Oral Tablet",
+                "DISPENSES": "1",
+                "REASONCODE": "43878008",
+            }
+        ],
+    }
+    parsed = parse_member(
+        source_record_id=member.source_record_id,
+        source_system="CLINIC_CSV",
+        source_local_id="CLINIC-7",
+        kind=SourceKind.CSV_ROW,
+        is_constructed=False,
+        ingested_at=T0,
+        raw_payload=payload,
+    )
     assert len(parsed.encounters) == 1 and parsed.encounters[0].class_code == "ambulatory"
     assert [o.code.code for o in parsed.orders] == ["308192"] and parsed.orders[0].code.system == RXNORM
 
 
 def test_csv_unknown_system_is_rxnorm_only_for_cached_codes():
-    member = clinic_member(allergies=[csv_allergy_row(code="91930004", description="Animal dander (substance)"), csv_allergy_row()])
+    member = clinic_member(
+        allergies=[csv_allergy_row(code="91930004", description="Animal dander (substance)"), csv_allergy_row()]
+    )
     systems = {a.code.code: a.code.system for a in member.allergies}
     assert systems["7984"] == RXNORM and systems["91930004"] is None
     assert evaluate([member, HERO_ORDER]) and all(f.allergy.code.code == "7984" for f in evaluate([member, HERO_ORDER]))
 
 
 def test_idless_fhir_resources_get_distinct_references():
-    a1 = fhir_allergy(); a2 = fhir_allergy(code="733", display="Ampicillin")
+    a1 = fhir_allergy()
+    a2 = fhir_allergy(code="733", display="Ampicillin")
     del a1["id"], a2["id"]
-    member = parse_member(source_record_id=ER, source_system="ER_FHIR", source_local_id="ER-MRN-1", kind=SourceKind.FHIR_PATIENT,
-                          is_constructed=False, ingested_at=T0,
-                          raw_payload={"resourceType": "Bundle", "entry": [{"resource": a1}, {"resource": a2}, {"resource": fhir_order()}]})
+    member = parse_member(
+        source_record_id=ER,
+        source_system="ER_FHIR",
+        source_local_id="ER-MRN-1",
+        kind=SourceKind.FHIR_PATIENT,
+        is_constructed=False,
+        ingested_at=T0,
+        raw_payload={
+            "resourceType": "Bundle",
+            "entry": [{"resource": a1}, {"resource": a2}, {"resource": fhir_order()}],
+        },
+    )
     refs = {a.ref.resource_id for a in member.allergies}
     assert len(refs) == 2 and all(r.startswith("AllergyIntolerance/_") for r in refs)
     assert len({f.key for f in evaluate([member])}) == 2
@@ -262,11 +440,16 @@ def test_idless_fhir_resources_get_distinct_references():
 
 # Codex review (PR #3) regressions -------------------------------------------------------
 
+
 def test_eligibility_scans_every_coding_not_only_the_first():
     allergy = fhir_allergy()
-    allergy["code"]["coding"].insert(0, {"system": "urn:local:allergens", "code": "PEN-V", "display": "Penicillin (local)"})
+    allergy["code"]["coding"].insert(
+        0, {"system": "urn:local:allergens", "code": "PEN-V", "display": "Penicillin (local)"}
+    )
     order = fhir_order()
-    order["medicationCodeableConcept"]["coding"].insert(0, {"system": "urn:local:formulary", "code": "AMX500", "display": "Amox 500"})
+    order["medicationCodeableConcept"]["coding"].insert(
+        0, {"system": "urn:local:formulary", "code": "AMX500", "display": "Amox 500"}
+    )
     (flag,) = evaluate([er_member(allergy, order)])
     assert flag.tier == AlertTier.A
     assert "coded penicillin V (RxNorm 7984;" in flag.card_text and "RxNorm 308192." in flag.card_text
@@ -274,8 +457,14 @@ def test_eligibility_scans_every_coding_not_only_the_first():
 
 def test_anaphylaxis_requires_the_snomed_system():
     local = fhir_allergy(reactions=())
-    local["reaction"] = [{"manifestation": [{"coding": [{"system": "urn:local:reactions", "code": "39579001", "display": "Anaphylaxis"}]}],
-                         "severity": "mild"}]
+    local["reaction"] = [
+        {
+            "manifestation": [
+                {"coding": [{"system": "urn:local:reactions", "code": "39579001", "display": "Anaphylaxis"}]}
+            ],
+            "severity": "mild",
+        }
+    ]
     (flag,) = evaluate([er_member(local, fhir_order())])
     assert flag.tier == AlertTier.B, "a local system reusing the digits is not SNOMED anaphylaxis"
     snomed = fhir_allergy(reactions=(("39579001", "Anaphylaxis (disorder)", "mild"),))
@@ -293,12 +482,15 @@ def test_contained_medication_reference_resolves():
     bundle_ref = fhir_order()
     bundle_ref.pop("medicationCodeableConcept")
     bundle_ref["medicationReference"] = {"reference": "urn:uuid:med-9"}
-    (flag,) = evaluate([er_member(fhir_allergy(), bundle_ref, {"resourceType": "Medication", "id": "med-9", "code": concept})])
+    (flag,) = evaluate(
+        [er_member(fhir_allergy(), bundle_ref, {"resourceType": "Medication", "id": "med-9", "code": concept})]
+    )
     assert flag.tier == AlertTier.A
 
 
 def test_detected_issue_states_the_csv_order_rule():
     from backend.rule.bl_amox_01 import CSV_ORDER_NOTE
+
     (flag,) = flags_for([HERO_ALLERGY, HERO_ORDER], LINK)
     issue = detected_issue(to_safety_alert(flag, alert_id=ER, entity_id=CLINIC, identified_at=T0))
     assert CSV_ORDER_NOTE in issue["note"] and "derived from STOP" in CSV_ORDER_NOTE

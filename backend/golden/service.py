@@ -3,6 +3,7 @@
 Every query matches how the screen reads the data: one entity, its members, their
 normalized rows and raw payloads. Nothing is cached (ADR-014).
 """
+
 from __future__ import annotations
 
 import base64
@@ -44,9 +45,18 @@ def _member_rows(conn: Connection, entity_id: UUID):
 
 
 def _parse_rows(rows) -> list[MemberResources]:
-    return [parse_member(source_record_id=r["id"], source_system=r["source_system"], source_local_id=r["source_local_id"],
-                         kind=r["kind"], is_constructed=r["is_constructed"], ingested_at=r["ingested_at"],
-                         raw_payload=r["raw_payload"]) for r in rows]
+    return [
+        parse_member(
+            source_record_id=r["id"],
+            source_system=r["source_system"],
+            source_local_id=r["source_local_id"],
+            kind=r["kind"],
+            is_constructed=r["is_constructed"],
+            ingested_at=r["ingested_at"],
+            raw_payload=r["raw_payload"],
+        )
+        for r in rows
+    ]
 
 
 def load_members(conn: Connection, entity_id: UUID) -> list[MemberResources]:
@@ -58,10 +68,21 @@ def entity_exists(conn: Connection, entity_id: UUID) -> bool:
 
 
 def _demographics(rows) -> list[MemberDemographics]:
-    return [MemberDemographics(source_system=r["source_system"], source_local_id=r["source_local_id"],
-                               ingested_at=r["ingested_at"], given_name=r["given_name"], family_name=r["family_name"],
-                               birth_date=r["birth_date"], sex=r["sex"], phone_e164=r["phone_e164"],
-                               address_line=r["address_line"], zip5=r["zip5"]) for r in rows]
+    return [
+        MemberDemographics(
+            source_system=r["source_system"],
+            source_local_id=r["source_local_id"],
+            ingested_at=r["ingested_at"],
+            given_name=r["given_name"],
+            family_name=r["family_name"],
+            birth_date=r["birth_date"],
+            sex=r["sex"],
+            phone_e164=r["phone_e164"],
+            address_line=r["address_line"],
+            zip5=r["zip5"],
+        )
+        for r in rows
+    ]
 
 
 def clinical_union(members: Sequence[MemberResources]) -> list[GoldenField]:
@@ -71,14 +92,33 @@ def clinical_union(members: Sequence[MemberResources]) -> list[GoldenField]:
         xw = Crosswalk(source_system=m.source_system, source_record_id=m.source_local_id)
         for a in m.allergies:
             if a.code:
-                allergies.append(({"code": a.code.code, "display": a.code.display, "status": a.clinical_status,
-                                   "resourceId": a.ref.resource_id}, xw))
+                allergies.append(
+                    (
+                        {
+                            "code": a.code.code,
+                            "display": a.code.display,
+                            "status": a.clinical_status,
+                            "resourceId": a.ref.resource_id,
+                        },
+                        xw,
+                    )
+                )
         for o in m.orders:
             if o.code and o.status == "active":
-                orders.append(({"code": o.code.code, "display": o.code.display, "status": o.status,
-                                "resourceId": o.ref.resource_id}, xw))
-    return (golden_union("allergy", allergies, per_resource=False)
-            + golden_union("activeMedicationOrder", orders, per_resource=True))
+                orders.append(
+                    (
+                        {
+                            "code": o.code.code,
+                            "display": o.code.display,
+                            "status": o.status,
+                            "resourceId": o.ref.resource_id,
+                        },
+                        xw,
+                    )
+                )
+    return golden_union("allergy", allergies, per_resource=False) + golden_union(
+        "activeMedicationOrder", orders, per_resource=True
+    )
 
 
 def read_entity(conn: Connection, entity_id: UUID) -> Entity | None:
@@ -88,9 +128,12 @@ def read_entity(conn: Connection, entity_id: UUID) -> Entity | None:
     rows = _member_rows(conn, entity_id)
     members = _parse_rows(rows)
     return Entity(
-        id=head["id"], version=head["version"],
-        members=[EntityMember(source_record_id=r["id"], source_system=r["source_system"], is_constructed=r["is_constructed"])
-                 for r in rows],
+        id=head["id"],
+        version=head["version"],
+        members=[
+            EntityMember(source_record_id=r["id"], source_system=r["source_system"], is_constructed=r["is_constructed"])
+            for r in rows
+        ],
         golden=golden_demographics(_demographics(rows)) + clinical_union(members),
         all_links_reviewer_approved=True,
     )
@@ -106,14 +149,26 @@ def read_timeline(conn: Connection, entity_id: UUID, limit: int, cursor: str | N
 
 def _alert(r) -> SafetyAlert:
     return SafetyAlert(
-        id=r["id"], entity_id=r["entity_id"], rule_id=r["rule_id"], rule_version=r["rule_version"], tier=AlertTier(r["tier"]),
-        allergy_ref=ResourceRef(source_record_id=r["allergy_record_id"], source_system=r["allergy_system"],
-                                resource_id=r["allergy_resource_id"]),
-        order_ref=ResourceRef(source_record_id=r["order_record_id"], source_system=r["order_system"],
-                              resource_id=r["order_resource_id"]),
-        revealed_by_merge=r["revealed_by_merge"], severity=r["severity"], status=AlertStatus(r["status"]),
-        card_text=r["card_text"], citation=Citation(**r["citation"]) if r["citation"] else None,
-        constructed_scenario=r["constructed_scenario"], identified_at=r["identified_at"],
+        id=r["id"],
+        entity_id=r["entity_id"],
+        rule_id=r["rule_id"],
+        rule_version=r["rule_version"],
+        tier=AlertTier(r["tier"]),
+        allergy_ref=ResourceRef(
+            source_record_id=r["allergy_record_id"],
+            source_system=r["allergy_system"],
+            resource_id=r["allergy_resource_id"],
+        ),
+        order_ref=ResourceRef(
+            source_record_id=r["order_record_id"], source_system=r["order_system"], resource_id=r["order_resource_id"]
+        ),
+        revealed_by_merge=r["revealed_by_merge"],
+        severity=r["severity"],
+        status=AlertStatus(r["status"]),
+        card_text=r["card_text"],
+        citation=Citation(**r["citation"]) if r["citation"] else None,
+        constructed_scenario=r["constructed_scenario"],
+        identified_at=r["identified_at"],
     )
 
 
@@ -151,4 +206,3 @@ def alert_page(alerts: Sequence[SafetyAlert], limit: int, cursor: str | None) ->
     items = remaining[:limit]
     next_cursor = _encode_alert_cursor(items[-1]) if len(remaining) > limit and items else None
     return Page[SafetyAlert](items=items, next_cursor=next_cursor)
-

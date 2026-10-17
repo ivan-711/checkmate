@@ -1,4 +1,5 @@
 """read_entity, read_timeline and the routes, over the test database."""
+
 from __future__ import annotations
 
 from uuid import uuid4
@@ -18,11 +19,16 @@ def test_read_entity_golden_record_has_crosswalks_and_clinical_union(conn):
     g = {f.field: f for f in entity.golden if f.rule != "UNION"}
     assert g["givenName"].value == "Ana" and g["givenName"].rule == "MOST_FREQUENT"
     assert g["familyName"].value == "Placeholder-Family" and g["familyName"].rule == "MOST_RECENT"
-    assert g["familyName"].crosswalk.source_record_id == "ER-MRN-1" and g["familyName"].alternates[0].value == "Placeholder Family"
+    assert (
+        g["familyName"].crosswalk.source_record_id == "ER-MRN-1"
+        and g["familyName"].alternates[0].value == "Placeholder Family"
+    )
     assert g["birthDate"].rule == "MAJORITY" and g["phone"].rule == "MOST_RECENT"
     union = [f for f in entity.golden if f.rule == "UNION"]
     assert {(f.field, f.value["code"], f.crosswalk.source_system) for f in union} == {
-        ("allergy", "7984", "CLINIC_CSV"), ("activeMedicationOrder", "308192", "ER_FHIR")}
+        ("allergy", "7984", "CLINIC_CSV"),
+        ("activeMedicationOrder", "308192", "ER_FHIR"),
+    }
     assert read_entity(conn, uuid4()) is None
 
 
@@ -38,7 +44,10 @@ def test_timeline_keeps_source_verification_and_constructed_flag_and_pages(conn)
         ("MEDICATION_ORDER", "ER_FHIR", TimelineVerification.CODED, True),
     ]
     assert page.items[0].codes == ["RxNorm:7984"] and "anaphylaxis, severe" in page.items[0].display
-    assert page.items[-1].display == "Amoxicillin 500 MG Oral Tablet (active order)" and page.items[-1].resource_id == "MedicationRequest/mr-1"
+    assert (
+        page.items[-1].display == "Amoxicillin 500 MG Oral Tablet (active order)"
+        and page.items[-1].resource_id == "MedicationRequest/mr-1"
+    )
     first = read_timeline(conn, entity.id, limit=3, cursor=None)
     assert len(first.items) == 3 and first.next_cursor
     rest = read_timeline(conn, entity.id, limit=3, cursor=first.next_cursor)
@@ -75,6 +84,7 @@ def client(engine, monkeypatch):
     from fastapi.testclient import TestClient
 
     from backend.app import main
+
     monkeypatch.setattr(main.app.state, "engine", engine)
     return TestClient(main.app)
 
@@ -95,14 +105,20 @@ def test_routes_entity_timeline_alerts(client, committed_entity):
     assert a.status_code == 200
     (card,) = a.json()["items"]
     assert card["tier"] == "A" and card["severity"] == "moderate" and card["status"] == "PRELIMINARY"
-    assert card["cardText"].startswith("Flagged for clinician review.") and card["cardFooter"].startswith("Rule BL-AMOX-01 v1.")
+    assert card["cardText"].startswith("Flagged for clinician review.") and card["cardFooter"].startswith(
+        "Rule BL-AMOX-01 v1."
+    )
     assert card["citation"]["setId"] and card["constructedScenario"] is True
-    assert client.get("/api/v1/alerts", params={"entityId": str(entity.id), "status": "RETRACTED"}).json()["items"] == []
+    assert (
+        client.get("/api/v1/alerts", params={"entityId": str(entity.id), "status": "RETRACTED"}).json()["items"] == []
+    )
 
 
 def test_routes_404_use_the_error_envelope(client):
     r = client.get(f"/api/v1/entities/{uuid4()}")
-    assert r.status_code == 404 and r.json() == {"error": {"code": "NOT_FOUND", "message": "entity not found", "details": None}}
+    assert r.status_code == 404 and r.json() == {
+        "error": {"code": "NOT_FOUND", "message": "entity not found", "details": None}
+    }
     t = client.get(f"/api/v1/entities/{uuid4()}/timeline")
     assert t.status_code == 404 and t.json()["error"]["code"] == "NOT_FOUND"
     assert client.get("/api/v1/entities/not-a-uuid").status_code == 422
@@ -128,6 +144,7 @@ def test_alert_cursor_survives_a_retraction_and_naive_timeline_cursor_is_422(cli
     import base64
 
     from backend.golden.service import alert_page, read_alerts
+
     entity, alerts, _ = committed_entity
     page = alert_page(alerts, 1, None)
     assert page.items == alerts[:1] and page.next_cursor is None
@@ -160,4 +177,6 @@ def test_route_serializes_the_unresolved_dob_as_null_with_both_alternates(client
     (dob,) = [g for g in body["golden"] if g["field"] == "birthDate"]
     assert "value" in dob and dob["value"] is None, "the null is sent, not dropped, so the UI can say why"
     assert dob["rule"] == "CONFLICT_UNRESOLVED"
-    assert {(a["value"], a["crosswalk"]["sourceSystem"], a["crosswalk"]["sourceRecordId"]) for a in dob["alternates"]} == SWAPPED
+    assert {
+        (a["value"], a["crosswalk"]["sourceSystem"], a["crosswalk"]["sourceRecordId"]) for a in dob["alternates"]
+    } == SWAPPED
