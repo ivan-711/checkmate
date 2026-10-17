@@ -3173,6 +3173,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "List Alerts",
@@ -3303,6 +3313,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "List Candidate Pairs",
@@ -3377,6 +3397,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Candidate Pair",
@@ -3509,6 +3539,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create Review",
@@ -3593,6 +3633,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create What If",
@@ -3667,6 +3717,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Entity",
@@ -3769,6 +3829,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Entity History",
@@ -3871,6 +3941,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Entity Timeline",
@@ -3970,6 +4050,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "List Events",
@@ -4022,6 +4112,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Health",
@@ -4094,6 +4194,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create Intake Session",
@@ -4168,6 +4278,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Intake Session",
@@ -4275,6 +4395,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create Intake Turn",
@@ -4327,6 +4457,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create Match Run",
@@ -4393,6 +4533,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Tiles",
@@ -4465,6 +4615,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create Session",
@@ -4517,6 +4677,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Current Thresholds",
