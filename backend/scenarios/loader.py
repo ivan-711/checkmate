@@ -34,7 +34,7 @@ import logging
 import os
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
-from functools import cache
+from functools import cache, lru_cache
 from pathlib import Path
 from uuid import UUID
 
@@ -48,6 +48,7 @@ HERO_OVERLAY_DIR = REPO_ROOT / "data" / "scenarios" / "hero"
 RAW_DIR = REPO_ROOT / "data" / "raw"
 ER_SOURCE_SYSTEM = "ER_FHIR"
 CLINIC_SOURCE_SYSTEM = "CLINIC_CSV"
+CORPUS_CACHE_SIZE = 1  # one full corpus in memory: a new hero export replaces it, never adds a second
 HERO_PAIR = frozenset({ER_SOURCE_SYSTEM, CLINIC_SOURCE_SYSTEM})  # the hero is always one ER and one Clinic record
 DISPLAY_LABEL = {"ER_FHIR": "ER FHIR", "CLINIC_CSV": "Clinic CSV"}
 HERO_SOURCE_FIXTURE = "fixture"
@@ -178,10 +179,30 @@ def _is_constructed_resource(resource: dict) -> bool:
     )
 
 
+def _bundle_paths(hero_dir: Path) -> list[Path]:
+    """The overlay bundles the loader reads; hidden files (an editor's or Finder's) are never bundles."""
+    return sorted(p for p in (hero_dir / "fhir").glob("*.json") if not p.name.startswith("."))
+
+
+def hero_files(hero_dir: Path) -> list[Path]:
+    """Exactly the files the loader reads, in reading order: the reader and the cache key share this list,
+    so a file it never reads (a .DS_Store, a swap file, patients.csv) cannot force a cold rebuild."""
+    return [hero_dir / HERO_EXPORT_FILE, *_bundle_paths(hero_dir), hero_dir / "csv" / "allergies.csv"]
+
+
+def _read_text(path: Path, label: str) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        raise HeroExportInvalid(f"{label} is not UTF-8") from None
+    except OSError as exc:  # a directory where a file belongs, permissions, a vanished file
+        raise HeroExportInvalid(f"{label} cannot be read ({exc.strerror or type(exc).__name__})") from None
+
+
 def _hero_record_ids(hero_json: Path) -> dict[str, UUID]:
     try:
-        data = json.loads(hero_json.read_text())
-    except ValueError as exc:  # json.JSONDecodeError and UnicodeDecodeError are ValueErrors
+        data = json.loads(_read_text(hero_json, HERO_EXPORT_FILE))
+    except ValueError as exc:  # json.JSONDecodeError
         raise HeroExportInvalid(f"{HERO_EXPORT_FILE} is not valid JSON ({exc})") from None
     records = data.get("records") if isinstance(data, dict) else None
     if not isinstance(records, dict):
@@ -201,39 +222,56 @@ def _read_hero_dir(hero_dir: Path) -> HeroExport:
     ``urn:chartguard:provenance#constructed-scenario`` and allergy rows with a true ``CONSTRUCTED``.
     Anything unreadable is a ``HeroExportInvalid`` naming the problem."""
     export = HeroExport(record_ids=_hero_record_ids(hero_dir / HERO_EXPORT_FILE))
-    for bundle_path in sorted((hero_dir / "fhir").glob("*.json")):
+    for bundle_path in _bundle_paths(hero_dir):
+        label = f"overlay bundle fhir/{bundle_path.name}"
         try:
-            bundle = json.loads(bundle_path.read_text())
+            bundle = json.loads(_read_text(bundle_path, label))
         except ValueError as exc:
-            raise HeroExportInvalid(f"overlay bundle fhir/{bundle_path.name} is not valid JSON ({exc})") from None
-        for entry in bundle.get("entry", []) if isinstance(bundle, dict) else []:
-            resource = (entry or {}).get("resource") or {}
+            raise HeroExportInvalid(f"{label} is not valid JSON ({exc})") from None
+        entries = bundle.get("entry", []) if isinstance(bundle, dict) else None
+        if not isinstance(entries, list):
+            raise HeroExportInvalid(f"{label} is not an object with an entry list")
+        for index, entry in enumerate(entries):
+            resource = entry.get("resource") if isinstance(entry, dict) else None
+            if not isinstance(resource, dict):
+                raise HeroExportInvalid(f"{label} entry {index} is not an object with a resource object")
             if not _is_constructed_resource(resource):
                 continue
             if resource.get("resourceType") == "Patient":  # identity stays exactly as selected
-                export.fhir_patient_ids.add(resource["id"])
+                if not resource.get("id"):
+                    raise HeroExportInvalid(f"{label}: a constructed Patient has no id")
+                export.fhir_patient_ids.add(str(resource["id"]))
             else:
                 export.fhir_resources.append(resource)
     allergies_csv = hero_dir / "csv" / "allergies.csv"
     if allergies_csv.exists():
-        with allergies_csv.open(newline="", encoding="utf-8") as fh:
-            for row in csv.DictReader(fh):
-                if (row.get(CONSTRUCTED_COLUMN) or "").strip().lower() in TRUTHY:
-                    if not row.get("PATIENT"):
-                        raise HeroExportInvalid("a constructed allergies.csv row has no PATIENT")
-                    export.allergy_rows.append(row)
-                    export.csv_patient_ids.add(row["PATIENT"])
+        try:
+            rows = list(csv.DictReader(_read_text(allergies_csv, "csv/allergies.csv").splitlines()))
+        except csv.Error as exc:
+            raise HeroExportInvalid(f"csv/allergies.csv is not valid CSV ({exc})") from None
+        for row in rows:
+            if (row.get(CONSTRUCTED_COLUMN) or "").strip().lower() in TRUTHY:
+                if not row.get("PATIENT"):
+                    raise HeroExportInvalid("a constructed allergies.csv row has no PATIENT")
+                export.allergy_rows.append(row)
+                export.csv_patient_ids.add(row["PATIENT"])
     return export
 
 
 def hero_fingerprint(hero_dir: Path) -> str:
-    """The hero directory's contents, so a re-export into the same directory (the 20:00 selection) is never
-    served from a cached copy of the old one. The files are small; this runs on every corpus-mode reset."""
+    """The contents of the files the loader reads, so a re-export into the same directory (the 20:00
+    selection) is never served from a cached copy of the old one. The files are small; this runs on every
+    corpus-mode reset."""
     digest = hashlib.sha256()
-    if hero_dir.is_dir():
-        for path in sorted(p for p in hero_dir.rglob("*") if p.is_file()):
-            digest.update(str(path.relative_to(hero_dir)).encode())
-            digest.update(path.read_bytes())
+    for path in hero_files(hero_dir):
+        digest.update(str(path.relative_to(hero_dir)).encode())
+        if path.is_file():
+            try:
+                digest.update(path.read_bytes())
+            except OSError:  # unreadable: the reader refuses it; the key only has to differ
+                digest.update(b"\0unreadable")
+        elif path.exists():
+            digest.update(b"\0not a file")
     return digest.hexdigest()
 
 
@@ -288,7 +326,7 @@ def _refuse(hero_dir: Path, problem: str, message: str):
     raise HeroNotFound(f"hero scenario not found: {message}")
 
 
-@cache
+@lru_cache(maxsize=CORPUS_CACHE_SIZE)
 def _corpus_cards(seed: int, raw_dir: Path, overlay_dir: Path, fingerprint: str) -> Corpus:
     """Built once per (seed, raw dir, hero dir and its contents): read-only input, the same ids on every
     reset. ``fingerprint`` is only a cache key (``hero_fingerprint``). Every way the hero export can be
