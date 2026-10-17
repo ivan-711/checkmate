@@ -135,28 +135,30 @@ export function ReviewPanel({ detail, onDecided }: Props) {
               </span>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              data-testid="approve-button"
-              onClick={() => open("APPROVE")}
-              aria-expanded={approving}
-              disabled={decide.isPending}
-              className="h-14 rounded-md bg-accent px-6 font-semibold text-on-accent hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-3"
-            >
-              Approve link
-            </button>
-            <button
-              type="button"
-              data-testid="reject-button"
-              onClick={() => open("REJECT")}
-              aria-expanded={intent?.action === "REJECT"}
-              disabled={decide.isPending}
-              className="h-14 rounded-md border border-border-strong bg-surface px-6 font-semibold text-ink-1 hover:bg-sunken disabled:text-ink-3"
-            >
-              Reject link
-            </button>
-          </div>
+          {!intent && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                data-testid="approve-button"
+                onClick={() => open("APPROVE")}
+                aria-expanded={false}
+                disabled={decide.isPending}
+                className="h-14 rounded-md bg-accent px-6 font-semibold text-on-accent hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-3"
+              >
+                Approve link
+              </button>
+              <button
+                type="button"
+                data-testid="reject-button"
+                onClick={() => open("REJECT")}
+                aria-expanded={false}
+                disabled={decide.isPending}
+                className="h-14 rounded-md border border-border-strong bg-surface px-6 font-semibold text-ink-1 hover:bg-sunken disabled:text-ink-3"
+              >
+                Reject link
+              </button>
+            </div>
+          )}
           {intent && (
             <form
               aria-labelledby={`${ids}-dialog-h`}
