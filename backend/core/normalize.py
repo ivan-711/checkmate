@@ -92,6 +92,9 @@ _WHITESPACE = re.compile(r"\s+")
 _PUNCTUATION_TO_SPACE = re.compile(r"[\-‐-―'`’.,/_]+")
 _NON_WORD = re.compile(r"[^\w\s]+")
 _DIGITS = re.compile(r"\d")
+# Inline ordinal suffixes ("Smith 3rd") are read before Synthea digit stripping would eat them.
+_ORDINAL_SUFFIX = re.compile(r"(?i)(?<!\w)(2nd|3rd|4th)(?!\w)")
+_ORDINAL_WORDS = {"2nd": "ii", "3rd": "iii", "4th": "iv"}
 _ISO_DATE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?$")
 _US_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 _COMPACT_DATE = re.compile(r"^(\d{4})(\d{2})(\d{2})$")
@@ -208,61 +211,39 @@ def strip_synthea_digits(text: str | None) -> str | None:
     return _DIGITS.sub("", str(text)) or None
 
 
-_SEPARATORS = re.compile(r"([\-\u2010-\u2015'`\u2019.,/_]+)")
+def _name_tokens(text: str) -> list[tuple[str, str]]:
+    """(accented token, folded token) pairs from one split, so both forms always align."""
+    accented = casefold_text(text) or ""
+    pairs = []
+    for word in _PUNCTUATION_TO_SPACE.sub(" ", accented).split():
+        folded = fold_text(word)
+        if folded:
+            pairs.append((word.strip(",. "), folded.replace(" ", "")))
+    return [(a, f) for a, f in pairs if a and f]
 
 
-def _drop_subword(word: str, token: str) -> str | None:
-    """Remove the part of a punctuation-glued word (``smith-jr``, ``dr.robert``) whose fold is ``token``."""
-    parts = _SEPARATORS.split(word)
-    kept: list[str] = []
-    for i in range(0, len(parts), 2):
-        part = parts[i]
-        separator = parts[i - 1] if i else ""
-        if fold_text(part) == token:
-            continue
-        kept.append((separator if kept else "") + part)
-    return "".join(kept) or None
+def _strip_titles_and_suffix(
+    pairs: list[tuple[str, str]], suffix_allowed: bool
+) -> tuple[list[tuple[str, str]], str | None]:
+    """Strip trailing titles and the generation suffix until stable, then titles anywhere.
 
-
-def _remove_tokens_from_accented(accented: str | None, titles: list[str], suffix_token: str | None) -> str | None:
-    """Drop the same title and suffix words from the accented form, matching each word by its fold.
-
-    Titles are removed from the front and the suffix from the end, mirroring where
-    ``_split_name_tokens`` found them, so both forms keep the same tokens.
+    Working from the tail makes the stored row (``family_name = "smith jr"``) normalize back to
+    the same tokens and suffix, which ``coerce_normalized`` relies on.
     """
-    if not accented or not (titles or suffix_token):
-        return accented
-    words = accented.split(" ")
-    if suffix_token:
-        for i in range(len(words) - 1, -1, -1):
-            if suffix_token in (fold_text(words[i]) or "").split():
-                words[i] = _drop_subword(words[i], suffix_token) or ""
-                break
-    pending = list(titles)
-    for i, word in enumerate(words):
-        for tok in list(pending):
-            if tok in (fold_text(word) or "").split():
-                words[i] = _drop_subword(word, tok) or ""
-                pending.remove(tok)
-                break
-    out = " ".join(w for w in words if w).strip(" ,")
-    return out or None
-
-
-def _split_name_tokens(tokens: list[str], suffix_allowed: bool) -> tuple[list[str], str | None, list[str]]:
-    """(kept tokens, suffix, removed title tokens). A suffix is only the last family token."""
     suffix = None
-    if suffix_allowed and len(tokens) > 1 and tokens[-1] in GENERATION_SUFFIXES:
-        suffix = tokens[-1]
-        tokens = tokens[:-1]
-    titles: list[str] = []
-    kept = []
-    for tok in tokens:
-        if tok in _TITLES and len(tokens) > 1:
-            titles.append(tok)
+    pairs = list(pairs)
+    while len(pairs) > 1:
+        tail = pairs[-1][1]
+        if suffix_allowed and suffix is None and tail in GENERATION_SUFFIXES:
+            suffix = GENERATION_SUFFIXES[tail]
+            pairs.pop()
+        elif tail in _TITLES:
+            pairs.pop()
         else:
-            kept.append(tok)
-    return kept, suffix, titles
+            break
+    if len(pairs) > 1:
+        pairs = [pf for pf in pairs if pf[1] not in _TITLES]
+    return pairs, suffix
 
 
 def surname_codes(tokens: tuple[str, ...]) -> tuple[str, ...]:
@@ -367,16 +348,23 @@ def normalize_address(value: Any) -> tuple[str | None, tuple[str, ...]]:
 def normalize_name_part(
     value: Any, *, suffix_allowed: bool
 ) -> tuple[str | None, str | None, tuple[str, ...], str | None]:
-    """(accented, folded, tokens, suffix) for one name field, titles and suffix removed from both forms."""
-    text = strip_synthea_digits(None if value is None else str(value))
-    accented = casefold_text(text)
-    folded = fold_text(text)
-    if not folded:
-        return accented, None, (), None
-    tokens, suffix_token, titles = _split_name_tokens(folded.split(), suffix_allowed)
-    accented = _remove_tokens_from_accented(accented, titles, suffix_token)
-    folded_clean = " ".join(tokens) or None
-    return accented, folded_clean, tuple(tokens), GENERATION_SUFFIXES.get(suffix_token or "")
+    """(accented, folded, tokens, suffix) for one name field.
+
+    Both forms are built from the same token split, so ``fold_text(accented) == folded`` always
+    holds and the features never compare text the folded form dropped.
+    """
+    if value is None:
+        return None, None, (), None
+    text = _ORDINAL_SUFFIX.sub(lambda m: _ORDINAL_WORDS[m.group(1).lower()], str(value))
+    text = strip_synthea_digits(text)
+    if not text:
+        return None, None, (), None
+    pairs, suffix = _strip_titles_and_suffix(_name_tokens(text), suffix_allowed)
+    if not pairs:
+        return None, None, (), suffix
+    accented = " ".join(a for a, _ in pairs)
+    tokens = tuple(f for _, f in pairs)
+    return accented, " ".join(tokens), tokens, suffix
 
 
 # --- record ------------------------------------------------------------------------------

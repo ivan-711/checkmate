@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from backend.core.features import FeatureVector, compute_features
+from backend.core.nicknames import same_nickname_family
 from backend.core.normalize import Normalized, coerce_normalized
 from backend.core.placeholders import is_placeholder_dob
 from backend.core.score import Weights, display_probability, score_pair
@@ -57,12 +58,16 @@ def negative_rules_for(a: Normalized, b: Normalized, fv: FeatureVector) -> list[
         fired.append(NegativeRule.BIRTH_YEAR_GAP_GT_2)
     same_family = values.get("family_jw_folded") == 1.0
     given_jw = values.get("given_jw_folded")
+    # Twins share DOB and surname but have different given names: some token of the shorter given
+    # name has no equal or nickname partner in the other ("Maria Jose" / "Maria Fernanda" fires;
+    # "Maria Jose" / "Maria", a dropped compound name, and "Robert" / "Bob" do not).
+    first_names_differ = given_names_differ(a.given_tokens, b.given_tokens)
     if (
         values.get("dob_exact") == 1.0
         and same_family
         and given_jw is not None
         and given_jw < TWIN_GIVEN_JW_MAX
-        and values.get("given_nickname") == 0.0
+        and first_names_differ
     ):
         fired.append(NegativeRule.TWIN)
     same_full_name = (
@@ -81,6 +86,13 @@ def negative_rules_for(a: Normalized, b: Normalized, fv: FeatureVector) -> list[
     ):
         fired.append(NegativeRule.PLACEHOLDER_DOB)
     return fired
+
+
+def given_names_differ(tokens_a: tuple[str, ...], tokens_b: tuple[str, ...]) -> bool:
+    if not tokens_a or not tokens_b:
+        return False
+    shorter, longer = sorted((tokens_a, tokens_b), key=len)
+    return any(not any(same_nickname_family(x, y) for y in longer) for x in shorter)
 
 
 def apply_negative_rules(band: Band, fired: list[NegativeRule]) -> Band:

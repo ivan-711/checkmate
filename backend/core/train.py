@@ -81,20 +81,48 @@ def load_truth_csv(path: Path, partition: str | None = None) -> dict[str, TruthR
     return truth
 
 
+def _fold_groups(component_pairs: Sequence[tuple[str, str]], components: Sequence[str]) -> dict[str, str]:
+    """Union-find over components joined by a blocked pair: each root is one CV group."""
+    parent = {c: c for c in components}
+
+    def find(c: str) -> str:
+        while parent[c] != c:
+            parent[c] = parent[parent[c]]
+            c = parent[c]
+        return c
+
+    for a, b in component_pairs:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[max(ra, rb)] = min(ra, rb)  # smaller id as root keeps the grouping deterministic
+    return {c: find(c) for c in components}
+
+
 def build_labeled_pairs(
-    records: Mapping[str, Normalized], truth: Mapping[str, TruthRow], max_block_records: int | None = BLOCK_MAX_RECORDS
+    records: Mapping[str, Normalized],
+    truth: Mapping[str, TruthRow],
+    max_block_records: int | None = BLOCK_MAX_RECORDS,
 ) -> list[LabeledPair]:
-    """Blocked pairs among labeled records; label 1 when both share an entity."""
+    """Blocked pairs among labeled records; label 1 when both share an entity.
+
+    Every blocked pair is kept. Its CV group is the connected component of the dependency
+    components it touches, so every component sits on one side of every fold and a pair is never
+    validated by a model that trained on either of its records' components (evaluation plan
+    section 3, steps 4-5).
+    """
     labeled = {rid: rec for rid, rec in records.items() if rid in truth}
     blocked = candidate_pairs(labeled, max_block_records=max_block_records)
-    out = []
-    for pair in blocked.pairs:
-        ta, tb = truth[pair.record_a_id], truth[pair.record_b_id]
-        # A cross-component negative is assigned to the smaller component id so the split is
-        # deterministic; it is an approximation the evaluation harness tightens with weights.
-        group = min(ta.component_id, tb.component_id)
-        out.append(LabeledPair(pair.record_a_id, pair.record_b_id, int(ta.entity_id == tb.entity_id), group))
-    return out
+    component_pairs = [(truth[p.record_a_id].component_id, truth[p.record_b_id].component_id) for p in blocked.pairs]
+    group_of = _fold_groups(component_pairs, sorted({t.component_id for t in truth.values()}))
+    return [
+        LabeledPair(
+            p.record_a_id,
+            p.record_b_id,
+            int(truth[p.record_a_id].entity_id == truth[p.record_b_id].entity_id),
+            group_of[ca],
+        )
+        for p, (ca, _) in zip(blocked.pairs, component_pairs, strict=True)
+    ]
 
 
 def design_row(a: Normalized, b: Normalized) -> list[float]:
@@ -164,7 +192,8 @@ def fit_weights(
             **dict(provenance or {}),  # provenance first: the computed keys below always win
             "n_pairs": len(pairs),
             "n_positive": int(y.sum()),
-            "n_components": n_groups,
+            "n_components": len({t.component_id for t in truth.values()}),
+            "n_cv_groups": n_groups,
             "n_folds": folds,
             "C": c,
         },
@@ -175,7 +204,8 @@ def fit_weights(
         "scorer_version": version,
         "n_pairs": len(pairs),
         "n_positive": int(y.sum()),
-        "n_components": n_groups,
+        "n_components": len({t.component_id for t in truth.values()}),
+        "n_cv_groups": n_groups,
         "n_folds": folds,
         "oof_auc": float(roc_auc_score(y, oof)),
         "oof_average_precision": float(average_precision_score(y, oof)),
@@ -183,8 +213,7 @@ def fit_weights(
         "oof_recall_at_raw_0": tp / max(int(y.sum()), 1),
         "note": (
             "development, out-of-fold, descriptive; thresholds and Platt are chosen elsewhere on these raw scores. "
-            "A cross-component negative pair is grouped under the smaller component id, so the other component's "
-            "records can appear on both sides of a fold through it; the harness resamples by component to tighten this."
+            "Components joined by a blocked pair share a CV group, so every component sits on one side of every fold."
         ),
     }
     oof_rows = [

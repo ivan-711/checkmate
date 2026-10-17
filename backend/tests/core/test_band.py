@@ -75,6 +75,8 @@ def test_rules_do_not_fire_on_benign_variants():
     dropped_suffix = match({**BASE, "suffix": "Jr"}, BASE, HANDSET_WEIGHTS, T)
     assert NegativeRule.GENERATION_SUFFIX_MISMATCH not in dropped_suffix.negative_rules_fired
     assert match(BASE, BASE, HANDSET_WEIGHTS, T).negative_rules_fired == ()
+    compound = match({**BASE, "given_name": "Maria Jose"}, {**BASE, "given_name": "Maria Fernanda"}, HANDSET_WEIGHTS, T)
+    assert NegativeRule.TWIN in compound.negative_rules_fired
 
 
 def test_match_returns_the_full_shape_and_accepts_contract_dicts():

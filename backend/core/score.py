@@ -42,6 +42,10 @@ class Weights:
             raise ValueError(f"weights for {self.scorer_version}: missing {missing}, unknown {unknown}")
         if (self.platt_a is None) != (self.platt_b is None):
             raise ValueError("platt_a and platt_b must be set together")
+        if self.platt_a is not None and self.platt_a >= 0:
+            # sklearn's sigmoid calibrator gives p = expit(-(a*s + b)); p increases in s only for a < 0
+            # (evaluation plan section 5, contract item 3: asserted, not assumed).
+            raise ValueError(f"platt_a must be negative so p increases in the raw score, got {self.platt_a}")
         object.__setattr__(self, "weights", dict(self.weights))
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -128,9 +132,11 @@ def score_pair(fv: FeatureVector, weights: Weights) -> ScoreResult:
 # band-changer; siblings sharing surname, address and phone never reach AUTO_LINK. The trained
 # scorer replaces these and they are never called calibrated. backend/core/weights/handset-0.json
 # is this object on disk; a test keeps the two equal.
+# The intercept moved from -11.0 to -12.5 when equal given names began earning the nickname credit
+# (+1.5), so every score above is unchanged.
 HANDSET_WEIGHTS = Weights(
     scorer_version=HANDSET_SCORER_VERSION,
-    intercept=-11.0,
+    intercept=-12.5,
     weights={
         # The folded forms carry more weight than the accented ones so an accent or hyphen
         # variant loses little; the nickname table is the only way "Paco" reaches "Francisco".

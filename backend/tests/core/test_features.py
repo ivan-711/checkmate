@@ -110,10 +110,10 @@ def test_placeholder_name_yields_missing_name_features():
     assert fv.missing["given_name"] and fv.missing["family_name"]
 
 
-def test_shared_given_token_is_overlap_not_nickname():
+def test_equal_tokens_earn_the_nickname_credit_so_a_nickname_never_outscores_the_name():
+    assert feats(BASE, BASE).values["given_nickname"] == 1.0
     fv = feats({**BASE, "given_name": "Maria Jose"}, {**BASE, "given_name": "Maria Fernanda"})
-    assert fv.values["given_nickname"] == 0.0 and fv.values["given_token_overlap"] == 0.5
-    assert feats(BASE, BASE).values["given_nickname"] == 0.0
+    assert fv.values["given_nickname"] == 1.0 and fv.values["given_token_overlap"] == 0.5
 
 
 def test_one_digit_edit_and_one_component_off_are_exclusive():

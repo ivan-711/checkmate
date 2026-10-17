@@ -93,11 +93,24 @@ def is_placeholder_name(given_folded: str | None, family_folded: str | None) -> 
     return False
 
 
+PHONE_KEY_DIGITS = 7  # the blocking key is the last 7 digits, so they must be clean on their own
+
+
 def is_placeholder_phone(digits: str | None) -> bool:
-    """``digits`` is the national number without country code (10 digits in the US)."""
+    """``digits`` is the national number without country code (10 digits in the US).
+
+    Checked on the whole number and on the last seven digits, because a desk that types a real
+    area code before ``000-0000`` would otherwise block every such number together.
+    """
     if not digits:
         return False
-    return bool(_REPEATED_DIGIT.match(digits)) or bool(_FICTIONAL_555.search(digits)) or digits in _SEQUENTIAL_PHONES
+    tail = digits[-PHONE_KEY_DIGITS:]
+    return (
+        bool(_REPEATED_DIGIT.match(digits))
+        or bool(_REPEATED_DIGIT.match(tail))
+        or bool(_FICTIONAL_555.search(digits))
+        or digits in _SEQUENTIAL_PHONES
+    )
 
 
 def is_placeholder_zip(zip5: str | None) -> bool:

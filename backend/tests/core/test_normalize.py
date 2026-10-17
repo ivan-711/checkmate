@@ -14,7 +14,8 @@ from backend.core.normalize import (
 def test_casefold_happens_before_features_and_accents_are_kept_in_accented_form():
     n = normalize_record({"given_name": "JOSÉ", "family_name": "García-López"})
     assert n.given_name == "josé"
-    assert n.family_name == "garcía-lópez"
+    # Both forms come from one token split (so fold(accented) == folded); punctuation becomes a space.
+    assert n.family_name == "garcía lópez"
     assert n.given_name_folded == "jose"
     assert n.family_name_folded == "garcia lopez"
     assert n.family_tokens == ("garcia", "lopez")
@@ -194,3 +195,19 @@ def test_derived_fields_cannot_be_passed_in():
 
     with pytest.raises(TypeError):
         Normalized(name_is_placeholder=True)
+
+
+def test_inline_ordinal_suffix_and_stored_row_idempotence():
+    n = normalize_record({"given_name": "John", "family_name": "Smith 3rd"})
+    assert n.suffix == "III" and n.family_tokens == ("smith",)
+    odd = normalize_record({"given_name": "Ann", "family_name": "Smith, III Don"})
+    assert normalize_record(odd.to_row_dict()) == odd
+    for given, family in (("Jr.", "Sr.-Sr."), ("López", "Mr-Dr.-Jr."), ("Sr", "Sra.-Sr-de la")):
+        m = normalize_record({"given_name": given, "family_name": family})
+        assert fold_text(m.family_name) == m.family_name_folded and fold_text(m.given_name) == m.given_name_folded
+
+
+def test_phone_with_real_area_code_and_placeholder_line_is_a_placeholder():
+    from backend.core.placeholders import is_placeholder_phone
+
+    assert is_placeholder_phone("6170000000") and not is_placeholder_phone("6175552368")

@@ -100,6 +100,8 @@ def test_weights_reject_unknown_or_missing_names():
         )
     with pytest.raises(ValueError):
         Weights(scorer_version="bad", intercept=0.0, weights=HANDSET_WEIGHTS.weights, platt_a=-1.0)
+    with pytest.raises(ValueError):
+        Weights(scorer_version="bad", intercept=0.0, weights=HANDSET_WEIGHTS.weights, platt_a=0.5, platt_b=0.0)
 
 
 def test_weights_json_round_trip(tmp_path):
