@@ -26,6 +26,7 @@ os.environ["DATABASE_URL"] = TEST_URL
 os.environ.setdefault("FRONTDESK_AGENT_MODE", "REPLAY")
 
 from backend.app.main import app, engine  # after the environment is set
+from backend.tests.api.hero_corpus import hero_corpus  # noqa: F401  (fixture for every API test module)
 
 API = "/api/v1"
 
