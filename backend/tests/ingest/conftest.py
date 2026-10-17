@@ -37,17 +37,25 @@ def csv_patients(bundles):
 
 @pytest.fixture
 def db():
+    """One REPEATABLE READ transaction per test, always rolled back.
+
+    Every worktree on main runs these tests against the same default database, so nothing a test
+    does may be committed: its DELETE and inserts stay invisible to other sessions, two concurrent
+    runs wait on each other's row locks instead of wiping each other's rows, and a corpus a CLI
+    load committed to the same database survives. ``clear_records`` and ``ingest`` open nested
+    ``transaction()`` blocks, which become savepoints inside this one.
+    """
+    if "checkmate_test" not in TEST_DATABASE_URL:
+        pytest.skip("refusing to run destructive fixtures against a non-test database")
     try:
-        # autocommit: otherwise a test's last SELECT leaves an implicit transaction open, the
-        # teardown's transaction() becomes a savepoint inside it and close() rolls the cleanup back.
         conn = psycopg.connect(TEST_DATABASE_URL, connect_timeout=3, autocommit=True)
     except psycopg.OperationalError as exc:  # pragma: no cover - environment dependent
         pytest.skip(f"test database unreachable: {exc}")
-    if "checkmate_test" not in TEST_DATABASE_URL:
-        pytest.skip("refusing to run destructive fixtures against a non-test database")
-    clear_records(conn)
+    # A stable snapshot, so a CLI load committing to the same database cannot move a test's counts.
+    conn.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
     try:
-        yield conn
+        with conn.transaction(force_rollback=True):
+            clear_records(conn)  # only this transaction's view of the tables is emptied
+            yield conn
     finally:
-        clear_records(conn)
         conn.close()
