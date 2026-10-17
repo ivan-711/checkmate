@@ -125,7 +125,7 @@ def propose(
             "logit": result.logit,
             "p": result.p,
             "raw_score": result.evidence.raw_score,
-            "band": result.band.value,
+            "band": Band(result.band).value,
             "rules": list(result.evidence.negative_rules_fired),
             "snapshot": json.dumps(result.evidence.model_dump(mode="json")),
             "status": DecisionStatus.PROPOSED.value,
@@ -178,7 +178,7 @@ def create_match_run(engine: EngineDep) -> MatchRunResponse:
                 status = DecisionStatus.PROPOSED
             else:
                 decision_id, status = current.id, DecisionStatus(current.status)
-            band_counts[result.band] += 1
+            band_counts[Band(result.band)] += 1
             if status == DecisionStatus.PROPOSED:
                 queue.append((abs(result.p - 0.5), pair_id))
             write_event(
@@ -189,7 +189,7 @@ def create_match_run(engine: EngineDep) -> MatchRunResponse:
                 run_id=run_id,
                 pair_id=pair_id,
                 decision_id=decision_id,
-                band=result.band,
+                band=Band(result.band),
                 versions=versions,
                 payload={
                     "raw_score": result.evidence.raw_score,

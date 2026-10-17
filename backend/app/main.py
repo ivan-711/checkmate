@@ -17,7 +17,7 @@ from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
 from starlette.responses import Response
 
-from backend.api import match_runs, pairs, reviews, sessions, thresholds, tiles
+from backend.api import events, match_runs, pairs, reviews, sessions, thresholds, tiles
 from backend.app import request_context
 from backend.app.config import load_settings
 from backend.app.db import db_is_up, make_engine
@@ -56,6 +56,7 @@ IMPLEMENTED = frozenset(
         ("POST", API_PREFIX + "/candidate-pairs/{pair_id}/reviews"),  # W3a (link seam: W3b)
         ("GET", API_PREFIX + "/metrics/tiles"),  # W3a
         ("GET", API_PREFIX + "/threshold-sets/current"),  # W3a (stub added to the contract at 256ca4a)
+        ("GET", API_PREFIX + "/events"),  # W3a (additive contract route e591005, G16 step 7)
         ("GET", API_PREFIX + "/entities/{entity_id}"),  # W3b
         ("GET", API_PREFIX + "/entities/{entity_id}/timeline"),  # W3b
         ("GET", API_PREFIX + "/alerts"),  # W3b
@@ -64,7 +65,15 @@ IMPLEMENTED = frozenset(
 app = build_app(implemented=IMPLEMENTED)
 app.state.engine = engine
 app.state.settings = settings
-for router in (sessions.router, match_runs.router, pairs.router, reviews.router, tiles.router, thresholds.router):
+for router in (
+    sessions.router,
+    match_runs.router,
+    pairs.router,
+    reviews.router,
+    tiles.router,
+    thresholds.router,
+    events.router,
+):
     app.include_router(router)
 
 app.add_middleware(
@@ -167,9 +176,7 @@ def health() -> Health:  # sync: db_is_up blocks, so it runs in the threadpool, 
 # same documented errors as the frozen stubs; ``limit`` above LIST_LIMIT_MAX is a 422, as the
 # frozen schema says.
 Limit = Annotated[int, Query(ge=1, le=LIST_LIMIT_MAX)]
-# 503 listed here because the contract documents it on every route (2d6ff68) and the shared
-# common_error_responses() helper does not include it yet.
-_ENTITY_ERRORS = error_responses(ErrorCode.NOT_FOUND, ErrorCode.UPSTREAM_UNAVAILABLE) | common_error_responses()
+_ENTITY_ERRORS = error_responses(ErrorCode.NOT_FOUND) | common_error_responses()
 
 
 @app.get(

@@ -549,6 +549,12 @@ def preview_approve(conn: Connection, pair_id: UUID) -> MergePreview:
     )
 
 
+def alerts_for_entity(conn: Connection, entity_id: UUID) -> list[SafetyAlert]:
+    """The entity's current (PRELIMINARY) alerts, read only. W3a's same-state Approve branch returns
+    them with the entity, so a second Approve click shows the same flag card instead of none."""
+    return read_alerts(conn, entity_id, status=AlertStatus.PRELIMINARY)
+
+
 def entity_for_pair(conn: Connection, pair_id: UUID) -> Entity | None:
     """The entity a LINKED pair belongs to (entity_member lookup); None while its records are unlinked."""
     a, _ = _pair_records(conn, pair_id)

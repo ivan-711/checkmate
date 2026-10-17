@@ -11,6 +11,7 @@ dependencies = [
   "sqlalchemy>=2.0,<3",
   "python-dotenv>=1.0,<2",
   "metaphone==0.6",
+  "jellyfish>=1.0,<2",
 ]
 
 [dependency-groups]
@@ -19,13 +20,17 @@ dev = [
   "httpx>=0.27",
   "jsonschema>=4.23",
   "ruff>=0.6",
+  { include-group = "train" },
+]
+train = [
+    "scikit-learn>=1.6,<2",
 ]
 
 [tool.uv]
 package = true
 
 [tool.setuptools.packages.find]
-include = ["contracts*", "backend*", "eval*", "data*"]
+include = ["contracts*", "backend*"]
 
 [tool.setuptools.package-data]
 "backend.core" = ["weights/*.json"]

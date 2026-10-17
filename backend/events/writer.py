@@ -88,7 +88,7 @@ def write_event(
             "decision_id": decision_id,
             "actor": actor,
             "actor_type": actor_type.value,
-            "band": band.value if band else None,
+            "band": Band(band).value if band else None,
             "outcome": outcome,
             "latency_ms": ctx.elapsed_ms(),
             "mode": ctx.mode.value,

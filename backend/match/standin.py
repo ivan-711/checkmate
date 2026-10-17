@@ -22,7 +22,8 @@ from contracts.models.records import NormalizedRecord
 SCORER_VERSION = "standin-scorer-w3a-0"
 
 # Hand-set logistic weights on features in [0,1]; the hero fixture lands in REVIEW under
-# the provisional thresholds (c_low 0, c_high 2). A missing feature contributes 0.
+# the current threshold row (raw score about 1.2; provisional-1 is c_low 0.0, c_high 4.0). A missing
+# feature contributes 0.
 WEIGHTS: dict[str, float] = {
     "given_name_jw": 1.0,
     "family_name_jw": 1.0,

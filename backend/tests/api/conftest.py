@@ -38,8 +38,11 @@ def client() -> Iterator[TestClient]:
 
 @pytest.fixture
 def db_conn():
-    """Read-only inspection of tables the tests assert on (event_log, not_a_match, ...)."""
-    with engine.connect() as conn:
+    """Read-only inspection of tables the tests assert on (event_log, not_a_match, ...).
+
+    Autocommit, so a read holds no lock past its own statement: an open read transaction would make
+    a later reset's TRUNCATE wait out the 5 s statement_timeout and answer 503."""
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         yield conn
 
 

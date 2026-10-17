@@ -223,7 +223,10 @@ def _review(conn: Connection, scope: str, key: str, sha: str, pair_id: UUID, bod
         )
     if step == Transition.SAME_STATE:
         entity = link.entity_for_pair(conn, pair_id) if current.status == DecisionStatus.LINKED else None
-        status_code, response = 200, ReviewResponse(decision=decision_from_row(current), entity=entity)
+        # A double-click's second Approve lands here; the flag card renders from this response too (R3b).
+        alerts = link.alerts_for_entity(conn, entity.id) if entity is not None else []
+        status_code = 200
+        response = ReviewResponse(decision=decision_from_row(current), entity=entity, alerts=alerts)
     else:
         status_code, response = 201, apply_effect(conn, pair, current, body, action)
     content = response.model_dump(by_alias=True, mode="json")
