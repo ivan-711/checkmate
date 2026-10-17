@@ -104,19 +104,21 @@ def test_corpus_mode_loads_corpus_plus_overlay_and_keeps_is_constructed(client, 
     r = client.post(f"{API}/sessions", json={"scenarioId": "hero"})
     assert r.status_code == 201, r.text
     assert corpus_mode.overlay_seen == [corpus_mode.overlay_dir], "the overlay dir comes from the env var"
-    by_local_id = {s["record"]["sourceLocalId"]: s for s in r.json()["sources"]}
-    assert set(by_local_id) == {"corpus-er-1", "corpus-clinic-1", "overlay-er-hero"}
-    assert by_local_id["overlay-er-hero"]["record"]["isConstructed"] is True
-    assert by_local_id["corpus-er-1"]["record"]["isConstructed"] is False
-    assert by_local_id["corpus-clinic-1"]["displayLabel"] == "Clinic CSV"
+    # The response is the showcase (the constructed overlay); every record is loaded for matching.
+    showcase = r.json()["sources"]
+    assert [c["record"]["sourceLocalId"] for c in showcase] == ["overlay-er-hero"]
+    assert showcase[0]["record"]["isConstructed"] is True
+    assert showcase[0]["displayLabel"] == "ER FHIR"
     stored = dict(db_conn.execute(text("SELECT source_local_id, is_constructed FROM source_record")).all())
     assert stored == {"corpus-er-1": False, "corpus-clinic-1": False, "overlay-er-hero": True}
 
 
-def test_corpus_mode_frontdesk_hero_leaves_out_the_er_records(client, corpus_mode):
+def test_corpus_mode_frontdesk_hero_leaves_out_the_er_records(client, corpus_mode, db_conn):
     r = client.post(f"{API}/sessions", json={"scenarioId": "frontdesk-hero"})
     assert r.status_code == 201, r.text
-    assert [s["record"]["sourceLocalId"] for s in r.json()["sources"]] == ["corpus-clinic-1"]
+    assert r.json()["sources"] == [], "the only showcase card here is an ER record"
+    stored = db_conn.execute(text("SELECT source_local_id FROM source_record")).scalars().all()
+    assert stored == ["corpus-clinic-1"]
 
 
 def test_corpus_mode_overlay_dir_defaults_to_data_scenarios_hero(corpus_mode, monkeypatch):
@@ -171,17 +173,15 @@ def test_corpus_mode_end_to_end_on_real_w1(client, w1_raw_and_overlay, db_conn):
     """Real W1 loaders, corruptor and normalizer; only the input files are small."""
     first = client.post(f"{API}/sessions", json={"scenarioId": "hero"})
     assert first.status_code == 201, first.text
-    cards = first.json()["sources"]
-    constructed = [c for c in cards if c["record"]["isConstructed"]]
-    assert len(constructed) == 1, "exactly the one overlay bundle is constructed"
-    assert constructed[0]["record"]["sourceSystem"] == "ER_FHIR"
-    assert len(cards) > 1, "the corpus records load beside the overlay"
-    stored = dict(db_conn.execute(text("SELECT id::text, is_constructed FROM source_record")).all())
-    assert stored == {c["record"]["id"]: c["record"]["isConstructed"] for c in cards}
-    assert {c["displayLabel"] for c in cards} <= {"ER FHIR", "Clinic CSV"}
-    loader._corpus_cards.cache_clear()
-    second = client.post(f"{API}/sessions", json={"scenarioId": "hero"}).json()
-    assert sorted(c["record"]["id"] for c in second["sources"]) == sorted(c["record"]["id"] for c in cards), (
-        "loading twice gives the same records"
+    showcase = first.json()["sources"]
+    assert [(c["record"]["sourceSystem"], c["record"]["isConstructed"]) for c in showcase] == [("ER_FHIR", True)], (
+        "the showcase is the one constructed overlay bundle"
     )
+    stored = dict(db_conn.execute(text("SELECT id::text, is_constructed FROM source_record")).all())
+    assert len(stored) > 1, "the corpus records load beside the overlay"
+    assert [rid for rid, constructed in stored.items() if constructed] == [showcase[0]["record"]["id"]]
+    loader._corpus_cards.cache_clear()
+    client.post(f"{API}/sessions", json={"scenarioId": "hero"})
+    again = dict(db_conn.execute(text("SELECT id::text, is_constructed FROM source_record")).all())
+    assert again == stored, "loading twice gives the same records"
     assert client.post(f"{API}/match-runs").status_code == 201

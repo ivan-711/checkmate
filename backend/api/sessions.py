@@ -7,12 +7,13 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
+from uuid import UUID
 
 from fastapi import APIRouter
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-from backend.api.common import current_thresholds
+from backend.api.common import current_thresholds, source_card
 from backend.app.deps import EngineDep
 from backend.app.errors import ApiError
 from backend.app.openapi_meta import common_error_responses, error_responses
@@ -47,10 +48,21 @@ STATE_TABLES = (
     "intake_history_item",
 )
 _CLEAR_STATE = text("TRUNCATE TABLE " + ", ".join(STATE_TABLES))
-_LAST_SESSION = text("SELECT id FROM demo_session ORDER BY created_at DESC LIMIT 1")
+_SESSION_COLUMNS = "id, scenario_id, scorer_version, threshold_set_id, snapshot, previous_session_id, created_at"
+_LAST_SESSION = text(f"SELECT {_SESSION_COLUMNS} FROM demo_session ORDER BY created_at DESC, id DESC LIMIT 1")
+_SESSION_BY_ID = text(f"SELECT {_SESSION_COLUMNS} FROM demo_session WHERE id = :id")
 _INSERT_SESSION = text(
-    "INSERT INTO demo_session (id, scenario_id, scorer_version, threshold_set_id, previous_session_id, created_at) "
-    "VALUES (:id, :scenario_id, :scorer_version, :threshold_set_id, :previous_session_id, :created_at)"
+    "INSERT INTO demo_session (id, scenario_id, scorer_version, threshold_set_id, snapshot, previous_session_id, "
+    "created_at) VALUES (:id, :scenario_id, :scorer_version, :threshold_set_id, CAST(:snapshot AS jsonb), "
+    ":previous_session_id, :created_at)"
+)
+_EXISTING_RECORDS = text("SELECT id FROM source_record WHERE id = ANY(:ids)")
+
+# demo_session.snapshot keys this lane writes; a restore lane may add its own beside them.
+SHOWCASE_IDS_KEY, HERO_PROVISIONAL_KEY, HERO_CONSTRUCTED_FLOOR_KEY = (
+    "showcaseRecordIds",
+    "heroProvisional",
+    "heroConstructedFloor",
 )
 _INSERT_SOURCE = text(
     "INSERT INTO source_record (id, source_system, source_local_id, kind, raw_payload, payload_sha256, is_constructed, "
@@ -125,7 +137,8 @@ def create_session(body: CreateSessionRequest, engine: EngineDep) -> SessionResp
     created_at = datetime.now(UTC)
     with engine.begin() as conn:
         conn.execute(_CLEAR_STATE)
-        previous_id = conn.execute(_LAST_SESSION).scalar_one_or_none()
+        previous = conn.execute(_LAST_SESSION).one_or_none()
+        previous_id = previous.id if previous else None
         thresholds = current_thresholds(conn)
         for card in scenario.sources:
             insert_source_card(conn, card, core)
@@ -136,6 +149,13 @@ def create_session(body: CreateSessionRequest, engine: EngineDep) -> SessionResp
                 "scenario_id": scenario.scenario_id,
                 "scorer_version": core.scorer_version,
                 "threshold_set_id": thresholds.threshold_set_id,
+                "snapshot": json.dumps(
+                    {
+                        SHOWCASE_IDS_KEY: [str(c.record.id) for c in scenario.showcase],
+                        HERO_PROVISIONAL_KEY: scenario.hero_provisional,
+                        HERO_CONSTRUCTED_FLOOR_KEY: scenario.hero_constructed_floor,
+                    }
+                ),
                 "previous_session_id": previous_id,
                 "created_at": created_at,
             },
@@ -153,17 +173,39 @@ def create_session(body: CreateSessionRequest, engine: EngineDep) -> SessionResp
                 "previous_session_id": str(previous_id) if previous_id else None,
             },
         )
-    sources = [
-        c.model_copy(update={"record": c.record.model_copy(update={"raw_payload": None})}) for c in scenario.sources
-    ]
+        # Built from what was just stored, the same way GET /sessions/current builds it.
+        return session_response(conn, conn.execute(_SESSION_BY_ID, {"id": session_id}).one())
+
+
+def session_response(conn: Connection, row) -> SessionResponse:
+    """A demo_session row as the contract's SessionResponse: the showcase cards read back from
+    source_record (raw payload left out), in the order the reset stored them."""
+    snapshot = row.snapshot or {}
+    wanted = [UUID(i) for i in snapshot.get(SHOWCASE_IDS_KEY, [])]
+    present = {r.id for r in conn.execute(_EXISTING_RECORDS, {"ids": wanted})} if wanted else set()
     return SessionResponse(
-        id=session_id,
-        scenario_id=scenario.scenario_id,
-        scorer_version=core.scorer_version,
-        threshold_set_id=thresholds.threshold_set_id,
-        created_at=created_at,
-        sources=sources,
-        hero_provisional=scenario.hero_provisional,
-        hero_constructed_floor=scenario.hero_constructed_floor,
-        previous_session_id=previous_id,
+        id=row.id,
+        scenario_id=row.scenario_id,
+        scorer_version=row.scorer_version,
+        threshold_set_id=row.threshold_set_id,
+        created_at=row.created_at,
+        sources=[source_card(conn, i) for i in wanted if i in present],
+        hero_provisional=bool(snapshot.get(HERO_PROVISIONAL_KEY, True)),
+        hero_constructed_floor=bool(snapshot.get(HERO_CONSTRUCTED_FLOOR_KEY, False)),
+        previous_session_id=row.previous_session_id,
     )
+
+
+@router.get(
+    "/sessions/current",
+    response_model=SessionResponse,
+    responses=error_responses(ErrorCode.NOT_FOUND) | common_error_responses(),
+    description="Lane W3a (additive). The current demo session, so a reloaded page rebinds the hero "
+    "without a reset; 404 before the first reset.",
+)
+def get_current_session(engine: EngineDep) -> SessionResponse:
+    with engine.connect() as conn:
+        row = conn.execute(_LAST_SESSION).one_or_none()
+        if row is None:
+            raise ApiError(ErrorCode.NOT_FOUND, "no demo session yet: reset first")
+        return session_response(conn, row)

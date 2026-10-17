@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import cache
 from pathlib import Path
+from uuid import UUID
 
 from contracts.models.records import NormalizedRecord, SourceCard, SourceRecord
 
@@ -42,6 +43,8 @@ HERO_SOURCE_FIXTURE = "fixture"
 HERO_SOURCE_CORPUS = "corpus"
 DEFAULT_CORPUS_SEED = 20261017
 SCENARIO_IDS = ("hero", "frontdesk-hero")
+HERO_EXPORT_FILE = "hero.json"  # W5's export, beside the overlay
+SHOWCASE_ORDER = {"ER_FHIR": 0, "CLINIC_CSV": 1}  # the order the UI lays the cards out
 
 
 class ScenarioNotFound(LookupError):
@@ -51,9 +54,16 @@ class ScenarioNotFound(LookupError):
 @dataclass(frozen=True)
 class Scenario:
     scenario_id: str
-    sources: list[SourceCard]
+    sources: list[SourceCard]  # every record the reset loads; match runs score all of them
+    showcase: list[SourceCard]  # SessionResponse.sources: the hero pair's cards, never the whole corpus
     hero_provisional: bool
     hero_constructed_floor: bool
+
+
+@dataclass(frozen=True)
+class Corpus:
+    cards: tuple[SourceCard, ...]
+    showcase_ids: tuple[UUID, ...]
 
 
 @cache
@@ -136,13 +146,34 @@ def _card_from_draft(draft, ingested_at: datetime) -> SourceCard:
 
 
 @cache
-def _corpus_cards(seed: int, raw_dir: Path, overlay_dir: Path) -> tuple[SourceCard, ...]:
+def _corpus_cards(seed: int, raw_dir: Path, overlay_dir: Path) -> Corpus:
     """Built once per (seed, raw dir, overlay dir): read-only input, the same ids on every reset.
     The overlay dir is part of the key so pointing the env var elsewhere is never silently ignored."""
     ingested_at = datetime.now(UTC)
-    drafts = _w1_corpus_drafts(seed, raw_dir) + _w1_overlay_drafts(overlay_dir)
+    overlay = _w1_overlay_drafts(overlay_dir)
+    drafts = _w1_corpus_drafts(seed, raw_dir) + overlay
     _refuse_duplicate_ids(drafts)
-    return tuple(_card_from_draft(d, ingested_at) for d in drafts)
+    cards = tuple(_card_from_draft(d, ingested_at) for d in drafts)
+    return Corpus(cards=cards, showcase_ids=_showcase_ids(cards, {d.id for d in overlay}, overlay_dir))
+
+
+def _showcase_ids(cards: tuple[SourceCard, ...], overlay_ids: set, overlay_dir: Path) -> tuple[UUID, ...]:
+    """The hero pair's records, ER first. The constructed overlay when there is one: W5 writes the hero's
+    ER registration and Clinic row there with the identity exactly as selected plus the clinical content
+    BL-AMOX-01 needs, so they are the pair the demo approves. Otherwise hero.json's records, if loaded."""
+    wanted = overlay_ids or _hero_json_record_ids(overlay_dir)
+    chosen = [c for c in cards if c.record.id in wanted]
+    chosen.sort(key=lambda c: (SHOWCASE_ORDER.get(c.record.source_system, len(SHOWCASE_ORDER)), str(c.record.id)))
+    return tuple(c.record.id for c in chosen)
+
+
+def _hero_json_record_ids(hero_dir: Path) -> set[UUID]:
+    """W5's hero export names the hero pair by record id: ``records.<SOURCE_SYSTEM>.record_id``."""
+    path = hero_dir / HERO_EXPORT_FILE
+    if not path.exists():
+        return set()
+    records = json.loads(path.read_text()).get("records", {})
+    return {UUID(r["record_id"]) for r in records.values() if r.get("record_id")}
 
 
 def _refuse_duplicate_ids(drafts: list) -> None:
@@ -158,31 +189,35 @@ def _refuse_duplicate_ids(drafts: list) -> None:
         raise ValueError(f"scenario records share an id: {', '.join(sorted(duplicates))}")
 
 
-def _all_cards() -> list[SourceCard]:
+def _all_cards() -> tuple[list[SourceCard], list[SourceCard]]:
+    """(every card to load, the showcase). The fixture is the showcase itself."""
     source = os.environ.get("CHECKMATE_HERO_SOURCE", HERO_SOURCE_FIXTURE)
     if source == HERO_SOURCE_CORPUS:
-        return list(
-            _corpus_cards(
-                int(os.environ.get("CHECKMATE_CORPUS_SEED", DEFAULT_CORPUS_SEED)),
-                Path(os.environ.get("CHECKMATE_RAW_DIR", str(RAW_DIR))),
-                Path(os.environ.get("CHECKMATE_HERO_OVERLAY_DIR", str(HERO_OVERLAY_DIR))),
-            )
+        corpus = _corpus_cards(
+            int(os.environ.get("CHECKMATE_CORPUS_SEED", DEFAULT_CORPUS_SEED)),
+            Path(os.environ.get("CHECKMATE_RAW_DIR", str(RAW_DIR))),
+            Path(os.environ.get("CHECKMATE_HERO_OVERLAY_DIR", str(HERO_OVERLAY_DIR))),
         )
+        by_id = {c.record.id: c for c in corpus.cards}
+        return list(corpus.cards), [by_id[i] for i in corpus.showcase_ids]
     if source != HERO_SOURCE_FIXTURE:
         raise ValueError(f"CHECKMATE_HERO_SOURCE must be {HERO_SOURCE_FIXTURE} or {HERO_SOURCE_CORPUS}, not {source!r}")
-    return _fixture_cards()
+    cards = _fixture_cards()
+    return cards, list(cards)
 
 
 def load_scenario(scenario_id: str) -> Scenario:
     if scenario_id not in SCENARIO_IDS:
         raise ScenarioNotFound(scenario_id)
-    cards = _all_cards()
+    cards, showcase = _all_cards()
     if scenario_id == "frontdesk-hero":
         cards = [c for c in cards if c.record.source_system != ER_SOURCE_SYSTEM]
+        showcase = [c for c in showcase if c.record.source_system != ER_SOURCE_SYSTEM]
     hero = _fixture().get("hero", {})
     return Scenario(
         scenario_id=scenario_id,
         sources=cards,
+        showcase=showcase,
         hero_provisional=bool(hero.get("provisional", True)),
         hero_constructed_floor=bool(hero.get("constructedFloor", False)),
     )
