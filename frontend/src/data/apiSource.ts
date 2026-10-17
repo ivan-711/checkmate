@@ -31,10 +31,15 @@ function fail(error: unknown): never {
 export class ApiSource implements DataSource {
   readonly mode = "LOCAL" as const;
   readonly canRestore = false; // the contract has no restore route
-  private readonly client = createClient<paths>({ baseUrl: "" });
+  private readonly client: ReturnType<typeof createClient<paths>>;
   private sessionRecordIds: Set<string> | null = null;
   private session: SessionResponse | null = null;
   private resolved = false;
+
+  /** `baseUrl` stays "" in the browser (same origin); tests pass an absolute origin. */
+  constructor(baseUrl = "") {
+    this.client = createClient<paths>({ baseUrl });
+  }
 
   async getSession(): Promise<SessionResponse | null> {
     return this.session;
