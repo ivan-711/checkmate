@@ -3194,7 +3194,7 @@
     },
     "/api/v1/candidate-pairs": {
       "get": {
-        "description": "Lane W3a. Review queue ordered by |p-0.5|. Bounded list.",
+        "description": "Lane W3a. Review queue ordered by |p-0.5|. Bounded list. `recordId` (additive) keeps only pairs that include that source record, so the UI binds the hero pair in one request.",
         "operationId": "list_candidate_pairs_api_v1_candidate_pairs_get",
         "parameters": [
           {
@@ -3243,6 +3243,23 @@
                 }
               ],
               "title": "Origin"
+            }
+          },
+          {
+            "in": "query",
+            "name": "recordId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Recordid"
             }
           },
           {
