@@ -84,7 +84,7 @@ describe("ApiSource", () => {
     const s = new ApiSource(ORIGIN);
     await s.reset();
     const { detail, outcome, resolved } = await s.getCase();
-    expect(detail.pair.id).toBe(hero.pair.id);
+    expect(detail!.pair.id).toBe(hero.pair.id);
     expect(outcome).toBeNull();
     expect(resolved).toBe(true);
     expect(calls.find((c) => c.path === "/api/v1/sessions")?.body).toEqual({ scenarioId: "hero" });
@@ -191,5 +191,22 @@ describe("ApiSource", () => {
     const s = new ApiSource(ORIGIN);
     expect(await s.getTimeline(scenario.entityIfApproved.id)).toBeNull();
     expect(await s.getAlerts(scenario.entityIfApproved.id)).toBeNull();
+  });
+});
+
+describe("ApiSource after a reset", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows the session's source cards while the queue is empty, and resolved is false", async () => {
+    stubFetch({
+      "POST /api/v1/sessions": () => ({ status: 201, body: scenario.session }),
+      "GET /api/v1/candidate-pairs": () => ({ body: { items: [], nextCursor: null } }),
+    });
+    const s = new ApiSource(ORIGIN);
+    await s.reset();
+    const { sources, detail, resolved } = await s.getCase();
+    expect(sources.map((c) => c.record.sourceSystem)).toEqual(["ER_FHIR", "CLINIC_CSV"]);
+    expect(detail).toBeNull();
+    expect(resolved).toBe(false);
   });
 });
