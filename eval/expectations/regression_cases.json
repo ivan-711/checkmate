@@ -31,7 +31,8 @@
           "AUTO_LINK",
           "REVIEW"
         ]
-      }
+      },
+      "nickname": true
     },
     {
       "id": "same-person-spanish-surname-moved",
@@ -86,6 +87,70 @@
           "phone": "+19205550111",
           "address_line": null,
           "zip5": null
+        }
+      },
+      "expected": {
+        "band_in": [
+          "AUTO_LINK",
+          "REVIEW"
+        ]
+      }
+    },
+    {
+      "id": "same-person-english-nickname-only",
+      "kind": "same_person",
+      "nickname": true,
+      "why": "one person, records identical except the given name: Robert and its nickname Bob",
+      "inputs": {
+        "a": {
+          "given_name": "Robert",
+          "family_name": "Lindgren",
+          "birth_date": "1976-09-21",
+          "sex": "MALE",
+          "phone": "+19205550134",
+          "address_line": "18 Maple Ave",
+          "zip5": "54301"
+        },
+        "b": {
+          "given_name": "Bob",
+          "family_name": "Lindgren",
+          "birth_date": "1976-09-21",
+          "sex": "MALE",
+          "phone": "+19205550134",
+          "address_line": "18 Maple Ave",
+          "zip5": "54301"
+        }
+      },
+      "expected": {
+        "band_in": [
+          "AUTO_LINK",
+          "REVIEW"
+        ]
+      }
+    },
+    {
+      "id": "same-person-spanish-nickname-only",
+      "kind": "same_person",
+      "nickname": true,
+      "why": "one person, records identical except the given name: Francisco and its nickname Paco",
+      "inputs": {
+        "a": {
+          "given_name": "Francisco",
+          "family_name": "Medina Castillo",
+          "birth_date": "1982-01-27",
+          "sex": "MALE",
+          "phone": "+19205550161",
+          "address_line": "402 Walnut St",
+          "zip5": "54302"
+        },
+        "b": {
+          "given_name": "Paco",
+          "family_name": "Medina Castillo",
+          "birth_date": "1982-01-27",
+          "sex": "MALE",
+          "phone": "+19205550161",
+          "address_line": "402 Walnut St",
+          "zip5": "54302"
         }
       },
       "expected": {

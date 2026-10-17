@@ -127,3 +127,14 @@ def test_category_recall_counts_blocking_misses():
     out = category_numbers([found], [missed], 0.0, 4.0, ["T1"], seed=1, resamples=20)
     assert out["category.T1.recall.strict"]["value"] == 0.5
     assert out["category.T1.blocking_recall"]["value"] == 0.5
+
+
+def test_regression_outcomes_are_published_through_the_named_engine(tmp_path: Path):
+    from eval.harness import standin
+
+    result = run(RunConfig(name="fast", seed=3, fast=True, out_dir=tmp_path, regression_match=standin.match,
+                           fixture=FixtureConfig(seed=3, entities=120, hard_negative_pairs=12)))
+    cells = {k: v for k, v in result.numbers.items() if k.startswith("regression.")}
+    assert len(cells) == 10 and sum(v["nickname"] for v in cells.values()) >= 3
+    assert all({"value", "raw_score", "pass", "expected"} <= set(v) for v in cells.values())
+    assert "Nickname cases" in render(result.numbers, result.manifest)

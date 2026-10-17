@@ -1,6 +1,6 @@
 {
   "placeholder": false,
-  "watermark": "engine export by data/hero_select.py: PROVISIONAL hero d2f739cb-ae51-5065-bee9-1784d4b1e817 (best partial; see hero.unmetCriteria); scorer handset-0; thresholds provisional-1; seed 20261017",
+  "watermark": "engine export by data/hero_select.py: PROVISIONAL hero d2f739cb-ae51-5065-bee9-1784d4b1e817 (best partial; see hero.unmetCriteria); scorer handset-1; thresholds provisional-1; seed 20261017",
   "hero": {
     "provisional": true,
     "constructedFloor": false,
@@ -43,7 +43,7 @@
     "drawnFromTest": false,
     "seed": 20261017,
     "entityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
-    "scorerVersion": "handset-0",
+    "scorerVersion": "handset-1",
     "thresholdsId": "provisional-1",
     "poolSize": 21,
     "wording": "a selected showcase satisfying published criteria; aggregate metrics cover the full frozen test set"
@@ -56,7 +56,7 @@
   "session": {
     "id": "00000000-0000-4000-8000-000000000100",
     "scenarioId": "hero",
-    "scorerVersion": "handset-0",
+    "scorerVersion": "handset-1",
     "thresholdSetId": "provisional-1",
     "createdAt": "2026-10-17T18:00:00Z",
     "sources": [
@@ -140,7 +140,7 @@
         "reasonCode": null,
         "note": null,
         "decidedAt": "2026-10-17T18:00:00Z",
-        "scorerVersion": "handset-0",
+        "scorerVersion": "handset-1",
         "thresholdSetId": "provisional-1",
         "evidenceSnapshot": {
           "features": {
@@ -148,7 +148,7 @@
             "given_jw_folded": 1.0,
             "given_dl": 1.0,
             "given_dmeta": 1.0,
-            "given_nickname": 1.0,
+            "given_nickname": 0.0,
             "given_initial": 1.0,
             "given_token_overlap": 1.0,
             "family_jw": 0.98,
@@ -233,7 +233,7 @@
             "missing_address": -0.3,
             "missing_zip": -0.2
           },
-          "intercept": -12.5,
+          "intercept": -11.0,
           "contributions": [
             {
               "feature": "given_jw",
@@ -257,8 +257,8 @@
             },
             {
               "feature": "given_nickname",
-              "logit": 1.5,
-              "value": 1.0
+              "logit": 0.0,
+              "value": 0.0
             },
             {
               "feature": "given_initial",
@@ -384,7 +384,7 @@
           "tLowDisplay": null,
           "tHighDisplay": null,
           "negativeRulesFired": [],
-          "scorerVersion": "handset-0",
+          "scorerVersion": "handset-1",
           "thresholdSetId": "provisional-1",
           "policyVersion": null
         }
@@ -464,8 +464,8 @@
       },
       {
         "feature": "given_nickname",
-        "logit": 1.5,
-        "value": 1.0
+        "logit": 0.0,
+        "value": 0.0
       },
       {
         "feature": "given_initial",
@@ -598,7 +598,7 @@
         "reasonCode": null,
         "note": null,
         "decidedAt": "2026-10-17T18:00:00Z",
-        "scorerVersion": "handset-0",
+        "scorerVersion": "handset-1",
         "thresholdSetId": "provisional-1",
         "evidenceSnapshot": {
           "features": {
@@ -606,7 +606,7 @@
             "given_jw_folded": 1.0,
             "given_dl": 1.0,
             "given_dmeta": 1.0,
-            "given_nickname": 1.0,
+            "given_nickname": 0.0,
             "given_initial": 1.0,
             "given_token_overlap": 1.0,
             "family_jw": 0.98,
@@ -691,7 +691,7 @@
             "missing_address": -0.3,
             "missing_zip": -0.2
           },
-          "intercept": -12.5,
+          "intercept": -11.0,
           "contributions": [
             {
               "feature": "given_jw",
@@ -715,8 +715,8 @@
             },
             {
               "feature": "given_nickname",
-              "logit": 1.5,
-              "value": 1.0
+              "logit": 0.0,
+              "value": 0.0
             },
             {
               "feature": "given_initial",
@@ -842,7 +842,7 @@
           "tLowDisplay": null,
           "tHighDisplay": null,
           "negativeRulesFired": [],
-          "scorerVersion": "handset-0",
+          "scorerVersion": "handset-1",
           "thresholdSetId": "provisional-1",
           "policyVersion": null
         }
@@ -1104,8 +1104,8 @@
           },
           {
             "feature": "given_nickname",
-            "logit": 1.5,
-            "value": 1.0
+            "logit": 0.0,
+            "value": 0.0
           },
           {
             "feature": "given_initial",
@@ -1252,8 +1252,8 @@
           },
           {
             "feature": "given_nickname",
-            "logit": 1.5,
-            "value": 1.0
+            "logit": 0.0,
+            "value": 0.0
           },
           {
             "feature": "given_initial",
@@ -1468,8 +1468,8 @@
           },
           {
             "feature": "given_nickname",
-            "logit": 1.5,
-            "value": 1.0
+            "logit": 0.0,
+            "value": 0.0
           },
           {
             "feature": "given_initial",
@@ -1616,8 +1616,8 @@
           },
           {
             "feature": "given_nickname",
-            "logit": 1.5,
-            "value": 1.0
+            "logit": 0.0,
+            "value": 0.0
           },
           {
             "feature": "given_initial",
@@ -1827,8 +1827,8 @@
           },
           {
             "feature": "given_nickname",
-            "logit": 1.5,
-            "value": 1.0
+            "logit": 0.0,
+            "value": 0.0
           },
           {
             "feature": "given_initial",
@@ -1975,8 +1975,8 @@
           },
           {
             "feature": "given_nickname",
-            "logit": 1.5,
-            "value": 1.0
+            "logit": 0.0,
+            "value": 0.0
           },
           {
             "feature": "given_initial",
@@ -2170,8 +2170,8 @@
           },
           {
             "feature": "given_nickname",
-            "logit": 1.5,
-            "value": 1.0
+            "logit": 0.0,
+            "value": 0.0
           },
           {
             "feature": "given_initial",
@@ -2318,8 +2318,8 @@
           },
           {
             "feature": "given_nickname",
-            "logit": 1.5,
-            "value": 1.0
+            "logit": 0.0,
+            "value": 0.0
           },
           {
             "feature": "given_initial",

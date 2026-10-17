@@ -66,6 +66,20 @@ def render(numbers: dict, manifest: dict | None = None) -> str:
                  f"c_high = {_fmt(numbers.get('thresholds.proposed.c_high', {}).get('value'))}; "
                  f"alpha target reachable: {th.get('value')} (fallback used: {th.get('fallback_used')}). "
                  "Configuration, not clinical thresholds.")
+    nick = [(k, v) for k, v in sorted(numbers.items()) if k.startswith("regression.") and v.get("nickname")]
+    t3 = numbers.get("category.T3.recall.lenient")
+    if nick or t3:
+        lines.append("")
+        lines.append("Nickname cases (reported explicitly):")
+        if t3:
+            lines.append(f"- T3 English nickname, LENIENT end-to-end recall {_fmt(t3.get('value'))} "
+                         f"(n {t3.get('n_pairs')} pairs / {t3.get('n_entities')} entities / {t3.get('n_components')} components)")
+        for key, cell in nick:
+            lines.append(f"- {key[len('regression.'):]}: {cell.get('value')} at raw {_fmt(cell.get('raw_score'))}; "
+                         f"{'as expected' if cell.get('pass') else 'NOT as expected'} ({cell.get('expected')})")
+    failed = [k for k, v in numbers.items() if k.startswith("regression.") and v.get("pass") is False]
+    if failed:
+        lines.append(f"Regression cases not as expected: {', '.join(sorted(failed))}")
     lat = numbers.get("latency.match.p95_ms")
     if lat:
         lines.append(f"match() p95 {_fmt(lat.get('value'))} ms, warm, n = {lat.get('n')}, in-process.")

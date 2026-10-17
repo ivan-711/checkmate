@@ -94,6 +94,11 @@ class RunConfig:
     latency_calls: tuple[int, int] | None = None
     extra_manifest: dict = field(default_factory=dict)
     provenance: dict = field(default_factory=dict)  # engine and corpus versions and hashes, into run.json
+    shipped_weights: Mapping[str, float] | None = None
+    """The weights the app ships; regression cases are scored with them (never a harness refit)."""
+    regression_match: MatchFn | None = None
+    """The app's engine for the invented regression cases (eval/expectations/regression_cases.json). Kept apart
+    from ``match``, which only ever sees development records; None (unit tests): no regression numbers."""
     operating_point: CurrentThresholds | None = None
     """The app's current threshold row (fork #12). When set, every band number is published at it and the
     harness's own out-of-fold selection is reported beside it as a proposal; None (unit tests): the selection."""
@@ -286,6 +291,24 @@ def category_numbers(pairs: Sequence[ScoredPair], missed_true: Sequence[ScoredPa
     return out
 
 
+def regression_numbers(cases_path: Path, match: MatchFn, weights: Mapping[str, float], c_low: float,
+                       c_high: float) -> dict[str, dict]:
+    """Each regression case's outcome at the operating point: band, raw score, expected, pass (R2: nickname
+    cases reported explicitly). Scorer inputs only reach ``match``; the expectation stays here."""
+    if not cases_path.exists():
+        return {}
+    out: dict[str, dict] = {}
+    for case in json.loads(cases_path.read_text())["cases"]:
+        result = match(case["inputs"]["a"], case["inputs"]["b"], weights, {"c_low": c_low, "c_high": c_high})
+        expected = case["expected"]
+        ok = (result.band in expected.get("band_in", [result.band])
+              and result.band not in expected.get("band_not", []))
+        out[f"regression.{case['id']}"] = {"value": result.band, "raw_score": result.raw_score, "pass": ok,
+                                           "expected": expected, "kind": case["kind"],
+                                           "nickname": bool(case.get("nickname"))}
+    return out
+
+
 def _round(obj):
     if isinstance(obj, float):
         return None if math.isnan(obj) else round(obj, EXPORT_DECIMALS)
@@ -397,6 +420,9 @@ def run(cfg: RunConfig) -> RunResult:
         "fit_partition_assertions": True,
     }
     t_low, t_high = g(c_low), g(c_high)
+    if cfg.regression_match is not None:
+        numbers.update(regression_numbers(cfg.expectations_dir / "regression_cases.json", cfg.regression_match,
+                                          cfg.shipped_weights or weights, c_low, c_high))
 
     by_id = corpus.record_by_id()
     lat_pairs = [(by_id[p.record_a], by_id[p.record_b]) for p in scored[: max(timed, 1)]]
@@ -502,6 +528,7 @@ def product_config(args: argparse.Namespace) -> RunConfig:
                      include_test_pass=args.test_pass, out_dir=args.out, corpus_loader=loader,
                      match=engine.match, fit=engine.fit, block=engine.block, scorer_version=engine.scorer_version,
                      provenance={"engine": engine.provenance, "corpus": corpus_provenance},
+                     shipped_weights=engine.shipped_weights, regression_match=engine.match,
                      operating_point=from_database(args.database_url) if args.database_url else from_migrations())
 
 

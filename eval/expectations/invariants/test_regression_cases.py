@@ -49,6 +49,7 @@ def test_cases_hold_scorer_inputs_only_and_no_showcase_identity():
     hero_names = {(r["given_name"], r["family_name"]) for r in hero["records"].values()}
     kinds = {c["kind"] for c in CASES}
     assert {"same_person", "different_people", "thin_record"} <= kinds
+    assert sum(1 for c in CASES if c.get("nickname")) >= 3, "nickname outcomes are reported explicitly (R2)"
     for case in CASES:
         for side in ("a", "b"):
             record = case["inputs"][side]
