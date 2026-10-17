@@ -1,13 +1,13 @@
 # CheckMate build brief (read this, then your own spec section; not the whole PRD)
 
-Author: Gojo (lead session) · 2026-10-17 · `CLAUDE.md` is canonical; `AGENTS.md` is a byte-for-byte mirror for Codex.
+Author: Christian Flores (lead session) · 2026-10-17 · `CLAUDE.md` is canonical; `AGENTS.md` is a byte-for-byte mirror for Codex.
 
 CheckMate = **FrontDesk** (a Gemini intake agent behind a deterministic policy gate) + **ChartGuard** (an identity-resolution engine with human-approved links and one cited safety rule). Product name on screen, README, Devpost: CheckMate. Internal names stay in code. Synthetic data only. Not for clinical use. API bound to 127.0.0.1.
 
 ## Standing rules for every lane agent
 1. Every task comes with how to check it. Run that check before you say you are done: the acceptance script or a Playwright run against the running app for UI and API lanes; the named unit or harness tests for core lanes.
 2. Review each of your own commits (code-review skill, or Codex read-only) and fix until clean **before** opening a PR. Then the PR goes to the paired reviewer, Codex and Copilot.
-3. Build only in your own worktree (`.worktrees/<lane>` on branch `lane/<lane>`). Push only your own `lane/*` branch. Never push to `main`. Never merge. The lead session merges a PR once every gate below is green (Ivan's standing authorization, 2026-10-17 17:15); Ivan or the cousin may also click merge.
+3. Build only in your own worktree (`.worktrees/<lane>` on branch `lane/<lane>`). Push only your own `lane/*` branch. Never push to `main`. Never merge. The lead session merges a PR once every gate below is green (Ivan's standing authorization, 2026-10-17 17:15); Ivan or Alejandro Barojas may also click merge.
 4. Reuse the running dev server and database. Do not start new ones. The database is synthetic and rebuilt from the seed with one command (`docker compose down -v && docker compose up`).
 5. Never edit `eval/acceptance/` or `eval/expectations/` once W5 has written them. From 20:00, never edit `data/scenarios/hero/`. A change there is a fork for Ivan.
 6. The Gemini key lives only in the gitignored `.env`. Never print it, log it or copy it into a tracked file. CI and agents use only the Replay adapter; no key exists in CI.
@@ -15,7 +15,7 @@ CheckMate = **FrontDesk** (a Gemini intake agent behind a deterministic policy g
 8. Never write a camera frame to the repo, `event_log`, Postgres or a log line. Card images go only to `CHARTGUARD_CAPTURE_DIR` outside the work tree, after the local QR check passes.
 9. `contracts/` is frozen at 13:15 (tag `contracts-v1`). An additive change (new optional field, new endpoint) is a reversible fork: proceed and flag it in the PR. A change that alters or removes a field waits for Ivan.
 10. A fork is any choice that changes what a judge sees or what the contracts say. Post it as a GitHub issue labeled `fork`: question, option A, option B, your recommendation, cost of each. Do not decide it yourself.
-11. Author convention on documents: "Gojo (role)". No AI model or vendor name appears as an author anywhere. Every commit message ends with `[AI-assisted]`, e.g. `feat(policy): deny new chart at REVIEW or higher [AI-assisted]`.
+11. Author convention on documents: "Christian Flores (role)". No AI model or vendor name appears as an author anywhere. Every commit message ends with `[AI-assisted]`, e.g. `feat(policy): deny new chart at REVIEW or higher [AI-assisted]`.
 12. If you die, the lead session restarts you in the same worktree from this brief, your PR description and your last commit. Keep the PR description current.
 
 ## Canonical names (architecture §0; the glossary wins over every other document)
@@ -43,7 +43,7 @@ CheckMate = **FrontDesk** (a Gemini intake agent behind a deterministic policy g
 | `docs/` | D1 D2 D3 |
 | `.github/` | W5 |
 
-The frontend never imports from the backend. The backend never renders HTML. The typed frontend client is generated from the frozen OpenAPI; nobody hand-writes API types. `core/` never imports `frontdesk/`. Only `backend/frontdesk/gemini.py` imports the Gemini SDK. Only `backend/frontdesk/executor.py` imports `chart_store.writes`. No intake step module is imported by the gate, scorer, bands, review, cluster, rule or agent. The cousin's lanes never edit `backend/`, `data/`, `eval/`, `tools/` or `contracts/`.
+The frontend never imports from the backend. The backend never renders HTML. The typed frontend client is generated from the frozen OpenAPI; nobody hand-writes API types. `core/` never imports `frontdesk/`. Only `backend/frontdesk/gemini.py` imports the Gemini SDK. Only `backend/frontdesk/executor.py` imports `chart_store.writes`. No intake step module is imported by the gate, scorer, bands, review, cluster, rule or agent. Alejandro Barojas's lanes never edit `backend/`, `data/`, `eval/`, `tools/` or `contracts/`.
 
 ## Wave 1 (13:15–15:30) — done when
 | Lane | Builds | Done when |
@@ -53,11 +53,11 @@ The frontend never imports from the backend. The backend never renders HTML. The
 | W3a bands + review + hypertable | three bands with negative rules, thresholds from the target false-merge rate on held-out seeded data, review endpoint with reason code, note and frozen evidence snapshot, `Idempotency-Key` required, `SELECT … FOR UPDATE` on the pair, `event_log` writer, continuous aggregates, request middleware writing one structured log line per request (never whole records) | review and event tests pass; aggregate tiles return rows |
 | W3b link + rule | union-find over LINKED edges, read-time golden record with crosswalks, timeline, rule BL-AMOX-01 with its 18 tests, the reject case (rule silent) | rule tests pass, including the reject case |
 | W5 harness + hero + CI | harness core (per-band precision and recall with n, held-out); GitHub Actions: lint, tests, `schemathesis` against `/openapi.json`, fixture check, frontend build, harness on merge to `main`, secret scan, installs from lock files only; Playwright acceptance script for the G16 path under `eval/acceptance/` by 15:30; automated hero selector | harness posts numbers on each merge; selector returns a hero or a reasoned failure |
-| W4 frontend scaffold (cousin) | source cards, candidate pair with evidence rail, Approve and Reject with reason and note, collapse to one golden record with crosswalk chips (basic CSS transition), timeline, neutral flag card with the constructed-scenario chip, mode badge, reset; FrontDesk shell with empty chat pane and gate-tile slot | renders from `scenario.json`; build green |
+| W4 frontend scaffold (Alejandro Barojas) | source cards, candidate pair with evidence rail, Approve and Reject with reason and note, collapse to one golden record with crosswalk chips (basic CSS transition), timeline, neutral flag card with the constructed-scenario chip, mode badge, reset; FrontDesk shell with empty chat pane and gate-tile slot | renders from `scenario.json`; build green |
 | S0 Gemini spike | throwaway worktree, never merged: one function-calling round trip with the three tool schemas in EN and ES; notes to `docs/spikes/gemini.md` | notes written |
-| D1 docs (cousin) | README skeleton (AI disclosure first), architecture diagram from the contracts, license inventory, known-limits list | first draft committed |
+| D1 docs (Alejandro Barojas) | README skeleton (AI disclosure first), architecture diagram from the contracts, license inventory, known-limits list | first draft committed |
 
-Merge order for wave 1: W1, W2, W3a, W3b, W5, W4. 14:30 walking-skeleton check (two cards, Approve, flag card over the real API). 15:30 scorer checkpoint. 16:00 integration gate G16 on the cousin's fresh clone; wave 2 starts only when G16 passes. The G16 steps and the wave 2 ranked queue (Q1 FrontDesk gate/agent/UI/replay, Q2 evaluation tab + ONC, Q3 what-ifs + why, Q3a card capture, Q4 third source + split + why-not, Q4a reason, Q5 Platt + injection suite, Q5a consent, Q6 note extraction, Q6a lookup, Q6b board, Q8 gate latency tile, Q13 Modal, Q15 vitals, Q16 mirror) arrive in each lane's prompt. Check-in desk lanes merge with their flag (`FRONTDESK_STEPS`, `VITALS_ENABLED`) off; the lead session turns a flag on only when the lane is green. Feature merge cutoff 19:45; freeze 20:00 (tag `freeze-20`); `main` freezes Sunday 11:30.
+Merge order for wave 1: W1, W2, W3a, W3b, W5, W4. 14:30 walking-skeleton check (two cards, Approve, flag card over the real API). 15:30 scorer checkpoint. 16:00 integration gate G16 on Alejandro Barojas's fresh clone; wave 2 starts only when G16 passes. The G16 steps and the wave 2 ranked queue (Q1 FrontDesk gate/agent/UI/replay, Q2 evaluation tab + ONC, Q3 what-ifs + why, Q3a card capture, Q4 third source + split + why-not, Q4a reason, Q5 Platt + injection suite, Q5a consent, Q6 note extraction, Q6a lookup, Q6b board, Q8 gate latency tile, Q13 Modal, Q15 vitals, Q16 mirror) arrive in each lane's prompt. Check-in desk lanes merge with their flag (`FRONTDESK_STEPS`, `VITALS_ENABLED`) off; the lead session turns a flag on only when the lane is green. Feature merge cutoff 19:45; freeze 20:00 (tag `freeze-20`); `main` freezes Sunday 11:30.
 
 ## Review lane (every PR; Ivan is not a reviewer)
 1. Paired reviewer agent, started with the builder, given the spec section, the contracts and the tests, never the builder's reasoning. It runs the app in `.worktrees/review-<lane>` and the acceptance script, writes tests that should fail, checks every on-screen string against the say/never-say list, checks contract conformance, and posts PASS or BLOCK with numbered findings. It may add failing tests on `review/<lane>`; it never pushes to the builder's branch.
@@ -65,7 +65,7 @@ Merge order for wave 1: W1, W2, W3a, W3b, W5, W4. 14:30 walking-skeleton check (
 3. Copilot code review; each comment fixed or replied to.
 4. Harness on every merge to `main`; a drop beyond `eval/expectations/tolerance.json` opens a revert PR automatically.
 
-A PR merges only when: CI green (until W5's CI is on `main`, the lead's integration run stands in); reviewer PASS; Codex blocking findings closed; Copilot comments answered; the description names the lane, links test evidence, carries `[AI-assisted]`, names the owner (Ivan for his Mac's lanes, the cousin for his) and opens with one line of product impact. Over about 400 changed lines (generated and lock files excluded): split before review. Demo-path lanes also get a two-minute manual click-through on localhost before the merge.
+A PR merges only when: CI green (until W5's CI is on `main`, the lead's integration run stands in); reviewer PASS; Codex blocking findings closed; Copilot comments answered; the description names the lane, links test evidence, carries `[AI-assisted]`, names the owner (Ivan for his Mac's lanes, Alejandro Barojas for his) and opens with one line of product impact. Over about 400 changed lines (generated and lock files excluded): split before review. Demo-path lanes also get a two-minute manual click-through on localhost before the merge.
 
 ## Reviewer checklist (verbatim, in order)
 Size first: copy and CSS get a spot check plus a green build; a standard lane gets the full list plus the acceptance script; scorer, thresholds, gate, allergy rule and contracts get the full list plus the harness, and any threshold or contract change is a fork for Ivan.

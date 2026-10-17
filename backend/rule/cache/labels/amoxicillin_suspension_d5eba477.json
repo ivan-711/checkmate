@@ -1,0 +1,11 @@
+{
+  "drug_name": "amoxicillin",
+  "label_name": "Amoxicillin for oral suspension (Proficient Rx)",
+  "set_id": "d5eba477-e255-4d97-9e16-30543c298680",
+  "revised": "3/2023",
+  "section": "4 Contraindications",
+  "url": "https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=d5eba477-e255-4d97-9e16-30543c298680",
+  "quote": "contraindicated in patients with a history of serious hypersensitivity reactions (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin, clavulanate or to other beta-lactam antibacterial drugs (e.g., penicillins and cephalosporins)",
+  "ingredients": ["723"],
+  "fetched": "2026-10-17"
+}
