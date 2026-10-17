@@ -1,0 +1,31 @@
+{
+  "scenarioContextId": "hero-er-arrival",
+  "utteranceEs": "Me llamo Sofia Mesa-López, nací el 16 de mayo de 1964, mi teléfono es 555-757-3688, vivo en 899 Sawayn Trafficway.",
+  "utteranceEn": "My name is Sofia Mesa-López, born May 16, 1964, my phone is 555-757-3688, I live at 899 Sawayn Trafficway.",
+  "expectedProposeNewChartArgs": {
+    "givenName": "Sofia",
+    "familyName": "Mesa-López",
+    "birthDate": "1964-05-16",
+    "sex": "female",
+    "phone": "555-757-3688",
+    "addressLine": "899 Sawayn Trafficway",
+    "postalCode": "01915",
+    "preferredLanguage": "ES"
+  },
+  "expectedGate": {
+    "tool": "propose_new_chart",
+    "outcome": "DENY",
+    "reasonCode": "CANDIDATE_IN_REVIEW_OR_HIGHER",
+    "evidenceRecordId": "5923bfbe-a6db-55cf-b12d-bc5c66219432"
+  },
+  "loads": {
+    "clinicRecord": "bf940010-e5d3-56ef-9198-8e54333fccd2",
+    "erRecord": null,
+    "note": "the frontdesk-hero scenario loads the Clinic CSV record and decoys, not the ER record"
+  },
+  "constructedOrder": {
+    "resourceId": "MedicationRequest/c3a0fc4f-e1ab-55b9-b01c-a0723f55d945",
+    "attachedBy": "executor",
+    "isConstructed": true
+  }
+}

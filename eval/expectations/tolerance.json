@@ -1,0 +1,23 @@
+{
+  "comparedAgainst": "the last green main run with the same seed and data, so any difference comes from the merge",
+  "blockingRecallDropPp": 1,
+  "lenientOutOfFoldEndToEndRecallDropPp": 2,
+  "gateSuiteDuplicatesDeniedDropPp": 2,
+  "reviewBurdenRisePp": 3,
+  "alphaTargetMustStayReachable": true,
+  "keys": {
+    "blockingRecall": "blocking.recall",
+    "lenientOutOfFoldEndToEndRecall": "recall.lenient.end_to_end",
+    "gateSuiteDuplicatesDenied": "gate_suite.duplicates_denied",
+    "reviewBurden": "review_burden",
+    "alphaTargetReachable": "thresholds.alpha_target_reachable"
+  },
+  "beforeFirstTrainedScorer": {
+    "invariantsOnly": true,
+    "standInScorerVersions": [
+      "standin-logistic-0"
+    ],
+    "note": "before the first trained scorer only invariants apply"
+  },
+  "onBreach": "CI opens a revert PR labeled revert; improvements and changes inside tolerance are posted, not reverted"
+}
