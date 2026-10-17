@@ -1,0 +1,311 @@
+"""Link service: the entity and rule side of approve, reject, revoke and split (ADR-002, ADR-011).
+
+Every function runs on the caller's connection inside the caller's transaction. W3a's
+review endpoint writes the decision row first, then calls ``apply_approve`` or
+``apply_reject`` with the new decision id. Entities are union-find components of the
+current LINKED decisions, rebuilt from scratch on every change; the rule runs over each
+affected entity in the same transaction; all SQL values are bound parameters.
+"""
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from uuid import UUID, uuid4
+
+from sqlalchemy import text
+from sqlalchemy.engine import Connection
+
+from backend.golden.service import load_members, read_alerts, read_entity
+from backend.link.events import EventContext, write_event
+from backend.link.union_find import components
+from backend.rule.bl_amox_01 import RuleFlag, evaluate, to_safety_alert
+from contracts.models.alerts import AlertStatus, SafetyAlert
+from contracts.models.common import ActorType, DecisionStatus, EventType, Mode, ReasonCode
+from contracts.models.entities import Entity
+from contracts.version import RULE_ID, RULE_VERSION
+
+
+class LinkError(ValueError):
+    """The decision row does not say what the caller claims (wrong pair or status)."""
+
+
+class CannotLinkConflict(LinkError):
+    """A not_a_match row sits inside the would-be entity: the API answers 409 CANNOT_LINK_CONFLICT."""
+
+
+@dataclass(frozen=True)
+class SplitResult:
+    entities: list[Entity]
+    revoked_decision_ids: list[UUID] = field(default_factory=list)
+    retracted_alert_ids: list[UUID] = field(default_factory=list)
+
+
+_DECISION = text(
+    "SELECT md.id, md.pair_id, md.version, md.status, md.actor, md.actor_type, md.reason_code, "
+    "cp.record_a_id, cp.record_b_id FROM match_decision md JOIN candidate_pair cp ON cp.id = md.pair_id "
+    "WHERE md.id = :decision_id"
+)
+_LINKED_EDGES = text(
+    "SELECT cp.id AS pair_id, cp.record_a_id, cp.record_b_id FROM candidate_pair cp "
+    "JOIN LATERAL (SELECT status FROM match_decision WHERE pair_id = cp.id ORDER BY version DESC LIMIT 1) d ON true "
+    "WHERE d.status = 'LINKED'"
+)
+_INGEST_ORDER = text("SELECT id FROM source_record WHERE id = ANY(:ids) ORDER BY ingested_at, id")
+_MEMBERSHIP = text("SELECT entity_id, source_record_id FROM entity_member WHERE source_record_id = ANY(:ids)")
+_ENTITY_MEMBERS = text("SELECT source_record_id FROM entity_member WHERE entity_id = :entity_id")
+_NOT_A_MATCH_INSIDE = text(
+    "SELECT record_a_id, record_b_id FROM not_a_match WHERE record_a_id = ANY(:ids) AND record_b_id = ANY(:ids)"
+)
+_INSERT_ENTITY = text("INSERT INTO entity (id, version) VALUES (:id, 1)")
+_BUMP_ENTITY = text("UPDATE entity SET version = version + 1 WHERE id = :id")
+_DELETE_MEMBERS = text("DELETE FROM entity_member WHERE source_record_id = ANY(:ids)")
+_INSERT_MEMBER = text("INSERT INTO entity_member (entity_id, source_record_id) VALUES (:entity_id, :record_id)")
+_MOVE_ALERTS = text("UPDATE safety_alert SET entity_id = :keeper WHERE entity_id = ANY(:ids)")
+_DELETE_EMPTY_ENTITIES = text(
+    "DELETE FROM entity WHERE id = ANY(:ids) AND NOT EXISTS (SELECT 1 FROM entity_member em WHERE em.entity_id = entity.id)"
+)
+_INSERT_NOT_A_MATCH = text(
+    "INSERT INTO not_a_match (record_a_id, record_b_id, decision_id, actor) VALUES (:a, :b, :decision_id, :actor) "
+    "ON CONFLICT DO NOTHING"
+)
+_INSERT_ALERT = text(
+    "INSERT INTO safety_alert (id, entity_id, rule_id, rule_version, tier, allergy_record_id, allergy_resource_id, "
+    "order_record_id, order_resource_id, revealed_by_merge, severity, status, card_text, citation, "
+    "constructed_scenario, identified_at) VALUES (:id, :entity_id, :rule_id, :rule_version, :tier, :allergy_record_id, "
+    ":allergy_resource_id, :order_record_id, :order_resource_id, :revealed_by_merge, :severity, :status, :card_text, "
+    "CAST(:citation AS jsonb), :constructed_scenario, :identified_at)"
+)
+_RETRACT_ALERT = text("UPDATE safety_alert SET status = 'RETRACTED', retracted_at = :at WHERE id = :id")
+_INSERT_REVOKED_DECISION = text(
+    "INSERT INTO match_decision (id, pair_id, version, logit, p, raw_score, band, negative_rules_fired, "
+    "evidence_snapshot, status, actor, actor_type, reason_code, note, scorer_version, threshold_set_id) "
+    "SELECT :id, pair_id, version + 1, logit, p, raw_score, band, negative_rules_fired, evidence_snapshot, 'REVOKED', "
+    ":actor, :actor_type, :reason_code, :note, scorer_version, threshold_set_id "
+    "FROM match_decision WHERE pair_id = :pair_id ORDER BY version DESC LIMIT 1"
+)
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _decision(conn: Connection, pair_id: UUID, decision_id: UUID, expected: DecisionStatus):
+    row = conn.execute(_DECISION, {"decision_id": decision_id}).mappings().first()
+    if row is None or row["pair_id"] != pair_id:
+        raise LinkError(f"decision {decision_id} is not a decision on pair {pair_id}")
+    if row["status"] != expected.value:
+        raise LinkError(f"decision {decision_id} is {row['status']}, expected {expected.value}")
+    return row
+
+
+def _context(row, mode: Mode, request_id: str | None) -> EventContext:
+    return EventContext(actor=row["actor"], actor_type=ActorType(row["actor_type"]), mode=mode, request_id=request_id)
+
+
+def _linked_edges(conn: Connection) -> list[tuple[UUID, UUID, UUID]]:
+    return [(r["record_a_id"], r["record_b_id"], r["pair_id"]) for r in conn.execute(_LINKED_EDGES).mappings()]
+
+
+def _ingest_order(conn: Connection, ids: set[UUID]) -> list[UUID]:
+    return [r[0] for r in conn.execute(_INGEST_ORDER, {"ids": list(ids)})]
+
+
+def _membership(conn: Connection, ids: set[UUID]) -> dict[UUID, UUID]:
+    return {r["source_record_id"]: r["entity_id"] for r in conn.execute(_MEMBERSHIP, {"ids": list(ids)}).mappings()}
+
+
+# Entity membership ----------------------------------------------------------------------
+
+def _merge_component(conn: Connection, component: set[UUID]) -> tuple[UUID, list[UUID]]:
+    """Put every record of one component under one entity. The entity holding the
+    earliest-ingested member keeps its id (ADR-002); the others are absorbed and deleted."""
+    order = _ingest_order(conn, component)
+    membership = _membership(conn, component)
+    rank = {rid: i for i, rid in enumerate(order)}
+    entities = sorted({e for e in membership.values()},
+                      key=lambda e: min(rank[r] for r, ent in membership.items() if ent == e))
+    if entities:
+        keeper = entities[0]
+    else:
+        keeper = uuid4()
+        conn.execute(_INSERT_ENTITY, {"id": keeper})
+    absorbed = entities[1:]
+    to_add = [rid for rid in order if membership.get(rid) != keeper]
+    if to_add:
+        if absorbed:
+            conn.execute(_MOVE_ALERTS, {"keeper": keeper, "ids": absorbed})
+        conn.execute(_DELETE_MEMBERS, {"ids": to_add})
+        for rid in to_add:
+            conn.execute(_INSERT_MEMBER, {"entity_id": keeper, "record_id": rid})
+        if absorbed:
+            conn.execute(_DELETE_EMPTY_ENTITIES, {"ids": absorbed})
+        if entities:
+            conn.execute(_BUMP_ENTITY, {"id": keeper})
+    return keeper, absorbed
+
+
+def _split_entity(conn: Connection, entity_id: UUID, groups: list[frozenset[UUID]]) -> list[UUID]:
+    """Partition one entity's members. The group with the earliest-ingested member keeps
+    the id; every other group becomes a new entity (singletons included, so the UI can
+    navigate to each side)."""
+    order = _ingest_order(conn, set().union(*groups))
+    groups = sorted(groups, key=lambda g: min(order.index(r) for r in g))
+    conn.execute(_BUMP_ENTITY, {"id": entity_id})
+    result = [entity_id]
+    for group in groups[1:]:
+        new_id = uuid4()
+        conn.execute(_INSERT_ENTITY, {"id": new_id})
+        conn.execute(_DELETE_MEMBERS, {"ids": list(group)})
+        for rid in group:
+            conn.execute(_INSERT_MEMBER, {"entity_id": new_id, "record_id": rid})
+        result.append(new_id)
+    return result
+
+
+# Rule run and alert reconciliation --------------------------------------------------------
+
+def _alert_key(alert: SafetyAlert) -> tuple[UUID, str, UUID, str, str]:
+    return (alert.allergy_ref.source_record_id, alert.allergy_ref.resource_id,
+            alert.order_ref.source_record_id, alert.order_ref.resource_id, alert.tier.value)
+
+
+def _raise_alert(conn: Connection, ctx: EventContext, entity_id: UUID, flag: RuleFlag, at: datetime) -> SafetyAlert:
+    alert = to_safety_alert(flag, alert_id=uuid4(), entity_id=entity_id, identified_at=at)
+    conn.execute(_INSERT_ALERT, {
+        "id": alert.id, "entity_id": entity_id, "rule_id": RULE_ID, "rule_version": RULE_VERSION, "tier": alert.tier.value,
+        "allergy_record_id": alert.allergy_ref.source_record_id, "allergy_resource_id": alert.allergy_ref.resource_id,
+        "order_record_id": alert.order_ref.source_record_id, "order_resource_id": alert.order_ref.resource_id,
+        "revealed_by_merge": alert.revealed_by_merge, "severity": alert.severity, "status": alert.status.value,
+        "card_text": alert.card_text, "citation": json.dumps(alert.citation.model_dump()) if alert.citation else None,
+        "constructed_scenario": alert.constructed_scenario, "identified_at": at,
+    })
+    write_event(conn, ctx, EventType.ALERT_RAISED, entity_id=entity_id, outcome=f"TIER_{alert.tier.value}", payload={
+        "alertId": str(alert.id), "ruleId": RULE_ID, "ruleVersion": RULE_VERSION, "tier": alert.tier.value,
+        "revealedByMerge": alert.revealed_by_merge, "allergyRef": alert.allergy_ref.model_dump(by_alias=True, mode="json"),
+        "orderRef": alert.order_ref.model_dump(by_alias=True, mode="json"), "constructedScenario": alert.constructed_scenario,
+    })
+    return alert
+
+
+def _retract_alert(conn: Connection, ctx: EventContext, alert: SafetyAlert, at: datetime) -> None:
+    conn.execute(_RETRACT_ALERT, {"id": alert.id, "at": at})
+    write_event(conn, ctx, EventType.ALERT_RETRACTED, entity_id=alert.entity_id, outcome=f"TIER_{alert.tier.value}",
+                payload={"alertId": str(alert.id), "ruleId": RULE_ID, "ruleVersion": RULE_VERSION,
+                         "reason": "no approved path between the allergy record and the order record"})
+
+
+def reconcile_alerts(conn: Connection, ctx: EventContext, entity_id: UUID) -> tuple[list[SafetyAlert], list[UUID]]:
+    """Run BL-AMOX-01 over the entity and make safety_alert agree with it: flags the rule
+    no longer supports are RETRACTED, new ones are raised, matching ones are kept.
+    Returns (current PRELIMINARY alerts, retracted alert ids)."""
+    at = _now()
+    wanted = {flag.key: flag for flag in evaluate(load_members(conn, entity_id))}
+    retracted: list[UUID] = []
+    kept: set[tuple] = set()
+    for alert in read_alerts(conn, entity_id, status=AlertStatus.PRELIMINARY):
+        key = _alert_key(alert)
+        if key in wanted:
+            kept.add(key)
+        else:
+            _retract_alert(conn, ctx, alert, at)
+            retracted.append(alert.id)
+    for key, flag in wanted.items():
+        if key not in kept:
+            _raise_alert(conn, ctx, entity_id, flag, at)
+    return read_alerts(conn, entity_id, status=AlertStatus.PRELIMINARY), retracted
+
+
+# Public seam -----------------------------------------------------------------------------
+
+def apply_approve(conn: Connection, pair_id: UUID, decision_id: UUID, *, mode: Mode = Mode.LOCAL,
+                  request_id: str | None = None) -> tuple[Entity, list[SafetyAlert]]:
+    """After the LINKED decision row exists: rebuild the component, write the entity and
+    its members, append ENTITY_MERGED, run the rule, raise or retract alerts."""
+    row = _decision(conn, pair_id, decision_id, DecisionStatus.LINKED)
+    ctx = _context(row, mode, request_id)
+    edges = _linked_edges(conn)
+    component = set(components([(a, b) for a, b, _ in edges], [row["record_a_id"], row["record_b_id"]])[row["record_a_id"]])
+    conflicts = conn.execute(_NOT_A_MATCH_INSIDE, {"ids": list(component)}).all()
+    if conflicts:
+        raise CannotLinkConflict(f"not_a_match inside the would-be entity: {[(str(a), str(b)) for a, b in conflicts]}")
+    keeper, absorbed = _merge_component(conn, component)
+    write_event(conn, ctx, EventType.ENTITY_MERGED, entity_id=keeper, pair_id=pair_id, decision_id=decision_id,
+                outcome="MERGED", payload={"memberCount": len(component), "absorbedEntityIds": [str(e) for e in absorbed],
+                                           "linkedEdgeCount": sum(1 for a, b, _ in edges if a in component and b in component)})
+    alerts, _ = reconcile_alerts(conn, ctx, keeper)
+    entity = read_entity(conn, keeper)
+    assert entity is not None
+    return entity, alerts
+
+
+def apply_reject(conn: Connection, pair_id: UUID, decision_id: UUID, *, mode: Mode = Mode.LOCAL,
+                 request_id: str | None = None) -> None:
+    """A REJECTED decision changes no entity and the rule stays silent. DIFFERENT_PERSON
+    remembers the pair in not_a_match (idempotent); INSUFFICIENT_EVIDENCE writes nothing."""
+    row = _decision(conn, pair_id, decision_id, DecisionStatus.REJECTED)
+    if row["reason_code"] == ReasonCode.DIFFERENT_PERSON.value:
+        conn.execute(_INSERT_NOT_A_MATCH, {"a": row["record_a_id"], "b": row["record_b_id"],
+                                           "decision_id": decision_id, "actor": row["actor"]})
+
+
+def _regroup(conn: Connection, ctx: EventContext, entity_id: UUID, *, pair_id: UUID | None, decision_id: UUID | None,
+             revoked: list[UUID]) -> SplitResult:
+    members = {r[0] for r in conn.execute(_ENTITY_MEMBERS, {"entity_id": entity_id})}
+    edges = [(a, b) for a, b, _ in _linked_edges(conn) if a in members and b in members]
+    groups = list({c for c in components(edges, members).values()})
+    entity_ids = _split_entity(conn, entity_id, groups) if len(groups) > 1 else [entity_id]
+    write_event(conn, ctx, EventType.ENTITY_SPLIT, entity_id=entity_id, pair_id=pair_id, decision_id=decision_id,
+                outcome="SPLIT", payload={"resultingEntityIds": [str(e) for e in entity_ids],
+                                          "revokedDecisionIds": [str(d) for d in revoked]})
+    retracted: list[UUID] = []
+    entities: list[Entity] = []
+    for eid in entity_ids:
+        _, gone = reconcile_alerts(conn, ctx, eid)
+        retracted.extend(gone)
+        entity = read_entity(conn, eid)
+        assert entity is not None
+        entities.append(entity)
+    return SplitResult(entities=entities, revoked_decision_ids=revoked, retracted_alert_ids=retracted)
+
+
+def apply_revoke(conn: Connection, pair_id: UUID, decision_id: UUID, *, mode: Mode = Mode.LOCAL,
+                 request_id: str | None = None) -> SplitResult | None:
+    """After a REVOKED decision row exists: recompute the entity's components and retract
+    flags that lost their approved path. None when neither record is in an entity."""
+    row = _decision(conn, pair_id, decision_id, DecisionStatus.REVOKED)
+    ctx = _context(row, mode, request_id)
+    if row["reason_code"] == ReasonCode.DIFFERENT_PERSON.value:
+        conn.execute(_INSERT_NOT_A_MATCH, {"a": row["record_a_id"], "b": row["record_b_id"],
+                                           "decision_id": decision_id, "actor": row["actor"]})
+    membership = _membership(conn, {row["record_a_id"], row["record_b_id"]})
+    if not membership:
+        return None
+    entity_id = next(iter(membership.values()))
+    return _regroup(conn, ctx, entity_id, pair_id=pair_id, decision_id=decision_id, revoked=[decision_id])
+
+
+def apply_split(conn: Connection, entity_id: UUID, source_record_ids: list[UUID], *, actor: str,
+                actor_type: ActorType = ActorType.REGISTRAR, reason_code: ReasonCode, note: str | None = None,
+                mode: Mode = Mode.LOCAL, request_id: str | None = None) -> SplitResult:
+    """Scaffold for Q4.2 (POST /entities/{id}/splits): move ``source_record_ids`` out of
+    the entity by revoking every LINKED edge that crosses the partition (ADR-002)."""
+    members = {r[0] for r in conn.execute(_ENTITY_MEMBERS, {"entity_id": entity_id})}
+    side = set(source_record_ids)
+    if not members:
+        raise LinkError(f"entity {entity_id} has no members")
+    if not side or not side < members:
+        raise LinkError("sourceRecordIds must be a non-empty proper subset of the entity's members")
+    ctx = EventContext(actor=actor, actor_type=actor_type, mode=mode, request_id=request_id)
+    revoked: list[UUID] = []
+    for a, b, pair_id in _linked_edges(conn):
+        if (a in side) != (b in side) and a in members and b in members:
+            decision_id = uuid4()
+            conn.execute(_INSERT_REVOKED_DECISION, {"id": decision_id, "pair_id": pair_id, "actor": actor,
+                                                    "actor_type": actor_type.value, "reason_code": reason_code.value, "note": note})
+            write_event(conn, ctx, EventType.LINK_REVOKED, entity_id=entity_id, pair_id=pair_id, decision_id=decision_id,
+                        outcome=reason_code.value, payload={"reasonCode": reason_code.value})
+            if reason_code == ReasonCode.DIFFERENT_PERSON:
+                conn.execute(_INSERT_NOT_A_MATCH, {"a": a, "b": b, "decision_id": decision_id, "actor": actor})
+            revoked.append(decision_id)
+    return _regroup(conn, ctx, entity_id, pair_id=None, decision_id=None, revoked=revoked)
