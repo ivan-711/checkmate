@@ -208,12 +208,17 @@ def test_unparsable_since_is_a_422_envelope(client):
     assert r.headers["X-Request-Id"]
 
 
-def test_since_without_an_offset_is_read_as_utc(client):
+def test_since_must_be_an_rfc3339_date_time_with_an_offset(client):
+    """The contract declares format: date-time (RFC 3339): a time and an offset are both required."""
     since = datetime.now(UTC)
     with engine.begin() as conn:
         at = _insert_at(conn, since, 1)
     naive = since.replace(tzinfo=None).isoformat()
-    assert _ids(client.get(f"{API}/events", params={"since": naive}).json()) == at
+    r = client.get(f"{API}/events", params={"since": naive})
+    assert r.status_code == 422, r.text
+    assert r.json()["error"]["code"] == "VALIDATION_ERROR"
+    zulu = since.isoformat().replace("+00:00", "Z")
+    assert _ids(client.get(f"{API}/events", params={"since": zulu}).json()) == at
 
 
 UPPER_SNAKE_ENUM_KEY = re.compile(r"^[A-Z][A-Z0-9_]*$")

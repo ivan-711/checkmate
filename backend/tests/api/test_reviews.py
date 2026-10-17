@@ -174,3 +174,57 @@ def test_transition_table():
     assert transition(DecisionStatus.REJECTED, IE, A, None) == Transition.EFFECT
     assert transition(DecisionStatus.REVOKED, DP, A, None) == Transition.NOT_PENDING
     assert transition(DecisionStatus.REVOKED, DP, R, DP) == Transition.NOT_PENDING
+
+
+def test_same_state_approve_returns_the_entitys_current_alerts(client, pair_id, monkeypatch):
+    """R3b (demo path): a double-click sends a second Approve with a fresh key. The 200 same-state answer
+    must carry the entity's current alerts, or a UI that renders from it would drop the flag card."""
+    from datetime import UTC, datetime
+
+    from backend.api import reviews as reviews_route
+    from contracts.models.alerts import AlertStatus, AlertTier, ResourceRef, SafetyAlert
+
+    link = reviews_route.link
+    real_approve = link.apply_approve
+    raised: list[SafetyAlert] = []
+
+    def approve_with_alert(conn, pair, decision_id):
+        entity, _ = real_approve(conn, pair, decision_id)
+        member = entity.members[0]
+        ref = ResourceRef(
+            source_record_id=member.source_record_id, source_system=member.source_system, resource_id="r1"
+        )
+        raised.append(
+            SafetyAlert(
+                id=uuid.uuid4(),
+                entity_id=entity.id,
+                tier=AlertTier.A,
+                allergy_ref=ref,
+                order_ref=ref,
+                revealed_by_merge=True,
+                status=AlertStatus.PRELIMINARY,
+                card_text="flagged for clinician review",
+                identified_at=datetime.now(UTC),
+            )
+        )
+        return entity, list(raised)
+
+    monkeypatch.setattr(link, "apply_approve", approve_with_alert)
+    monkeypatch.setattr(
+        link, "alerts_for_entity", lambda conn, entity_id: [a for a in raised if a.entity_id == entity_id]
+    )
+    first = review(client, pair_id, approve_body())
+    assert first.status_code == 201, first.text
+    assert len(first.json()["alerts"]) == 1
+    second = review(client, pair_id, approve_body())  # fresh key: the same-state branch
+    assert second.status_code == 200, second.text
+    assert second.json()["entity"]["id"] == first.json()["entity"]["id"]
+    assert [a["id"] for a in second.json()["alerts"]] == [a["id"] for a in first.json()["alerts"]]
+
+
+def test_same_state_reject_carries_no_entity_and_no_alerts(client, pair_id):
+    review(client, pair_id, reject_body("INSUFFICIENT_EVIDENCE"))
+    again = review(client, pair_id, reject_body("INSUFFICIENT_EVIDENCE"))
+    assert again.status_code == 200
+    assert again.json()["entity"] is None
+    assert again.json()["alerts"] == []

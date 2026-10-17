@@ -7,11 +7,13 @@ never skips or repeats a row even when several events share one timestamp.
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from collections import Counter
+from datetime import datetime
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Query
-from pydantic.alias_generators import to_camel
+from pydantic import BeforeValidator
 from sqlalchemy import text
 
 from backend.api.common import invalid_cursor, pack_cursor, unpack_cursor
@@ -22,10 +24,21 @@ from contracts.models.common import ErrorCode, Page
 from contracts.models.events import EventLogRow, Versions
 from contracts.version import API_PREFIX, LIST_LIMIT_DEFAULT, LIST_LIMIT_MAX
 
+# RFC 3339 date-time, the contract's ``format: date-time``: full-date "T" full-time, offset required.
+RFC3339_DATE_TIME = re.compile(r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$")
 
-def as_utc(moment: datetime) -> datetime:
-    """A time without an offset is read as UTC, never as the database session's time zone."""
-    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+
+def rfc3339_date_time(value):
+    """Lax datetime parsing would read 0.5 or 1700000000 as Unix times and 2026-10-17 as midnight in no
+    stated zone; the feed takes only what the contract declares. Anything else is the 422 envelope."""
+    if value is None or isinstance(value, datetime):
+        return value
+    if not isinstance(value, str) or not RFC3339_DATE_TIME.match(value):
+        raise ValueError("since must be an RFC 3339 date-time with a time and an offset, e.g. 2026-10-17T21:00:00Z")
+    return datetime.fromisoformat(value.upper())  # an impossible date or time raises ValueError: also 422
+
+
+Since = Annotated[datetime | None, BeforeValidator(rfc3339_date_time)]
 
 
 def encode_event_cursor(ts: datetime, event_id: UUID, since: datetime | None = None) -> str:
@@ -53,7 +66,6 @@ def decode_event_cursor(cursor: str) -> tuple[datetime, UUID, datetime | None]:
 
 def effective_since(requested: datetime | None, from_cursor: datetime | None) -> datetime | None:
     """The cursor carries the filter it was issued under; a different ``since`` beside it is a client error."""
-    requested = as_utc(requested) if requested is not None else None
     if requested is not None and requested != from_cursor:
         raise ApiError(ErrorCode.VALIDATION_ERROR, "since differs from the filter the cursor was issued for")
     return from_cursor if from_cursor is not None else requested
@@ -90,18 +102,33 @@ def contract_versions(stored: dict | None) -> dict:
     return {k: v for k, v in (stored or {}).items() if k in VERSION_KEYS}
 
 
-UPPER_SNAKE_ENUM_KEY = re.compile(r"^[A-Z][A-Z0-9_]*$")
+SNAKE_CASE_IDENTIFIER = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
+
+
+def snake_to_camel(key: str) -> str:
+    """A plain word join; pydantic's to_camel turns x_2y into x2Y."""
+    first, *rest = key.split("_")
+    return first + "".join(word[:1].upper() + word[1:] for word in rest)
 
 
 def camel_keys(value):
-    """Payload keys as the wire wants them (JSON is camelCase), at any depth; values untouched.
-    Stored rows keep the keys their writer chose. A key that is an enum value (band_counts maps
-    AUTO_LINK, REVIEW, KEEP_SEPARATE to counts) stays UPPER_SNAKE, as the contract serves enums."""
-    if isinstance(value, dict):
-        return {(k if UPPER_SNAKE_ENUM_KEY.match(k) else to_camel(k)): camel_keys(v) for k, v in value.items()}
+    """Payload keys as the wire wants them (JSON is camelCase), at any depth; values untouched, and stored
+    rows keep the keys their writer chose. Only snake_case identifiers (lowercase words joined by
+    underscores) change. Every other key is data or already camelCase and is served exactly as stored:
+    a uuid, an enum value such as AUTO_LINK, HTTPStatus, alertId. A conversion that would land on a key
+    already present, or on another key's conversion, is skipped, so no value is ever dropped."""
     if isinstance(value, list):
         return [camel_keys(v) for v in value]
-    return value
+    if not isinstance(value, dict):
+        return value
+    targets = {k: snake_to_camel(k) for k in value if SNAKE_CASE_IDENTIFIER.match(k)}
+    claims = Counter(targets.values())
+    served = {}
+    for key, inner in value.items():
+        target = targets.get(key)
+        out_key = target if target is not None and target not in value and claims[target] == 1 else key
+        served[out_key] = camel_keys(inner)
+    return served
 
 
 def event_from_row(row) -> EventLogRow:
@@ -122,7 +149,7 @@ def event_from_row(row) -> EventLogRow:
 )
 def list_events(
     engine: EngineDep,
-    since: datetime | None = None,
+    since: Since = None,
     limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX),
     cursor: str | None = None,
 ) -> Page[EventLogRow]:
@@ -130,7 +157,7 @@ def list_events(
     cursor_since = None
     if cursor:
         params["after_ts"], params["after_id"], cursor_since = decode_event_cursor(cursor)
-    since = effective_since(since, cursor_since) if cursor else (as_utc(since) if since is not None else None)
+    since = effective_since(since, cursor_since) if cursor else since
     if since is not None:
         params["since"] = since
     with engine.connect() as conn:

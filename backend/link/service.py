@@ -8,6 +8,7 @@ the evidence view are coded against:
     apply_reject(conn, pair_id, decision_id) -> None
     preview_approve(conn, pair_id) -> MergePreview
     entity_for_pair(conn, pair_id) -> Entity | None     (the entity a LINKED pair belongs to)
+    alerts_for_entity(conn, entity_id) -> list[SafetyAlert]  (its current, PRELIMINARY alerts; read only)
 
 All three run inside the caller's transaction on ``conn`` (a SQLAlchemy Connection); the
 pair row is already locked ``FOR UPDATE`` by the route. Events the seam writes
@@ -62,6 +63,12 @@ def apply_reject(conn: Connection, pair_id: UUID, decision_id: UUID) -> None:
 def entity_for_pair(conn: Connection, pair_id: UUID) -> Entity | None:
     """STAND-IN (W3b replaces with an entity_member lookup): the entity a LINKED pair belongs to."""
     return _standin_entity(conn, pair_id)
+
+
+def alerts_for_entity(conn: Connection, entity_id: UUID) -> list[SafetyAlert]:
+    """STAND-IN (W3b replaces, e.g. with golden.read_alerts(conn, entity_id, status=PRELIMINARY)): the
+    entity's current alerts, read only. The stand-in raises none, so there are none to read."""
+    return []
 
 
 def preview_approve(conn: Connection, pair_id: UUID) -> MergePreview:
