@@ -76,3 +76,23 @@ def test_designed_422_exclusion_is_exactly_the_cursor_since_and_idempotency_oper
     run = step["run"]
     assert "--exclude-checks not_a_server_error,positive_data_acceptance" in run and '"${include[@]}"' in run
     assert "--checks all --exclude-checks not_a_server_error \"${exclude[@]}\"" in run
+
+
+def test_request_log_check_reads_the_structured_status_not_the_query_string(tmp_path):
+    """A fuzzed `?status=517` on uvicorn's access line is not a 5xx (seen in CI at 29bae25)."""
+    import subprocess
+
+    step = next(s for s in _jobs()["contract-test"]["steps"] if "status=5" in (s.get("run") or ""))
+    log = tmp_path / "request.log"
+    log.write_text(
+        "INFO checkmate.request method=GET path=/api/v1/alerts status=422 latency_ms=3 mode=REPLAY request_id=x\n"
+        'INFO:     127.0.0.1:51024 - "GET /api/v1/alerts?status=517&limit=150 HTTP/1.1" 422 Unprocessable Entity\n'
+        "INFO checkmate.request method=GET path=/api/v1/events status=501 latency_ms=1 mode=REPLAY request_id=y\n")
+    ok = subprocess.run(["bash", "-c", step["run"]], check=False, cwd=tmp_path, capture_output=True, text=True)
+    assert ok.returncode == 0, ok.stdout + ok.stderr
+    log.write_text(log.read_text() + "INFO checkmate.request method=GET path=/x status=500 latency_ms=2 mode=REPLAY\n")
+    bad = subprocess.run(["bash", "-c", step["run"]], check=False, cwd=tmp_path, capture_output=True, text=True)
+    assert bad.returncode != 0 and "status=500" in bad.stdout
+    log.write_text('INFO:     127.0.0.1:1 - "GET /?status=500 HTTP/1.1" 200 OK\n')
+    empty = subprocess.run(["bash", "-c", step["run"]], check=False, cwd=tmp_path, capture_output=True, text=True)
+    assert empty.returncode != 0 and "vacuous" in empty.stdout

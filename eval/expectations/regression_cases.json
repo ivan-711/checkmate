@@ -1,6 +1,6 @@
 {
   "description": "Regression cases through the engine the app uses (eval.harness.product.load_engine), banded at the app's current threshold row (eval.harness.current_thresholds). Inputs are scorer inputs only; the expected outcome is kept apart and never reaches the engine. Identities are invented for this file: no showcase (hero) or evaluation patient appears here.",
-  "author": "Gojo (evaluation harness, lane W5)",
+  "author": "Christian Flores (evaluation harness, lane W5)",
   "cases": [
     {
       "id": "same-person-nickname-typo-missing-phone",
