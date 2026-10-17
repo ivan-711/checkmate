@@ -1,6 +1,6 @@
 # contracts/ — the frozen shared surface
 
-Author: Gojo (lead session) · frozen at tag `contracts-v1`, 2026-10-17 · architecture v0.5.2 §0, §4, §5, §22.4; ADR-016.
+Author: Christian Flores (lead session) · frozen at tag `contracts-v1`, 2026-10-17 · architecture v0.5.2 §0, §4, §5, §22.4; ADR-016.
 
 Everything every lane builds against lives here: Pydantic models (the source of truth), the generated `openapi.json`, the FrontDesk tool schemas, the SQL migration, the `policy.decide` signature, and two placeholder fixtures. The frontend's typed client is generated from `openapi.json`; nobody hand-writes API types.
 

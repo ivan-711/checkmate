@@ -19,27 +19,83 @@ At runtime, separately: Gemini runs the intake conversation, language handling a
 
 All design documents (PRD, architecture, evaluation plan, UX spec) were written before the event and shown to the organizers' rule; every line of code, every migration, and every prompt file in this repository was written after 12:00 CT on 2026-10-17. Confirmed with the organizers at the 11:00 opening.
 
-## Status
+## How to run
 
-Repository bootstrapped 2026-10-17 12:55 CT. The contract freeze (`contracts/`, tag `contracts-v1`) follows at 13:15. "How to run", the architecture diagram, data provenance, decisions and the known-limits list land through the docs lane and are filled from frozen run manifests, never estimated.
+Requires Docker. From the repository root:
+
+```sh
+make up
+```
+
+`make up` builds and starts the database and the API (`Makefile`, `docker-compose.yml`); the API container applies the migrations before it starts (`backend/Dockerfile`), so the API can take a few seconds to answer after `make up` returns. Then open http://127.0.0.1:8000/api/v1/health and expect `"db":"UP"` (`backend/app/main.py`, `contracts/models/health.py`).
+
+To drop the synthetic database and start over:
+
+```sh
+make down-v
+make up
+```
+
+`make down-v` removes the database volume (`Makefile`); the next `make up` recreates it and reapplies the migrations (`backend/Dockerfile`). The seed loader is not on `main` yet, so the tables start empty.
+
+Compose publishes both ports on 127.0.0.1 only (`docker-compose.yml`). Routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the contract's error envelope (`contracts/api_spec.py`).
+
+## Architecture
+
+What exists on `main` today. Components are added to this diagram only when their pull request merges.
+
+```mermaid
+flowchart LR
+    contracts["contracts/<br/>Pydantic models, openapi.json,<br/>migration 0001, fixtures"]
+    api["API process<br/>FastAPI, port 8000<br/>backend/app/main.py"]
+    db[("TimescaleDB<br/>event_log hypertable")]
+    aggs["Continuous aggregates, real-time<br/>band_flow_1m<br/>review_outcomes_5m<br/>agent_gate_5m"]
+    contracts -- "routes and models" --> api
+    contracts -- "migration 0001" --> db
+    api -- "SQL over one pool" --> db
+    db --> aggs
+```
+
+| Node | Files |
+|---|---|
+| contracts | `contracts/README.md`, `contracts/api_spec.py`, `contracts/openapi.json`, `contracts/models/`, `contracts/fixtures/` |
+| API process | `backend/app/main.py`, `backend/app/db.py`, `backend/app/config.py` |
+| TimescaleDB | `docker-compose.yml`, `contracts/migrations/0001_initial.sql` |
+| Continuous aggregates | `contracts/migrations/0001_initial.sql` (`materialized_only = false` on all three) |
 
 ## Repository layout
 
-| Directory | Contents |
-|---|---|
-| `contracts/` | Pydantic models, OpenAPI spec, SQL migrations, policy signature, tool schemas, fixtures. Frozen at 13:15; any later change is a recorded fork |
-| `backend/` | FastAPI on 127.0.0.1: ingestion, blocking, features, scorer, bands, clustering, golden record, timeline, rule, event writer, what-ifs; `backend/policy/` the gate; `backend/frontdesk/` the intake agent, replay and steps |
-| `frontend/` | Next.js kiosk and registrar screens; talks only to the API described in `contracts/` |
-| `eval/` | Evaluation harness, acceptance script, scripted intakes, run manifests |
-| `data/` | Download scripts with hashes, corruption generator, hero selector, scenario export. Raw datasets are never committed |
-| `docs/` | README sources, architecture diagram, Devpost text, video script, spikes |
-| `tools/` | Isolated local processes (vitals probe), separate from the backend lockfile |
-| `.github/` | CI: lint, tests, contract test, fixture check, frontend build, harness on merge, secret scan |
+| Directory | Owner lanes (`CLAUDE.md`) | Contents |
+|---|---|---|
+| `contracts/` | lead session | The frozen contract, tag `contracts-v1` (`contracts/README.md`) |
+| `backend/` | W1, W2, W3a, W3b and wave 2 | `backend/app/`: health route, error envelope, request id and log line, one database pool |
+| `frontend/` | W4 and wave 2 UI lanes | Empty until W4 merges |
+| `eval/` | W5, Q2, Q5 | Empty until W5 merges |
+| `data/` | W1, W5 | Empty until W1 merges |
+| `docs/` | D1, D2, D3 | `docs/LICENSES.md`, `docs/devpost-outline.md` |
+| `tools/` | Q15 | Empty |
+| `.github/` | W5 | Empty until W5 merges |
+
+## Data provenance
+
+| Source | Use | Terms | Files |
+|---|---|---|---|
+| Synthea synthetic patients, November 2021 sample | Demo and development records | Apache-2.0 | Raw files are never committed (`.gitignore`: `data/synthea/`) |
+| b.well public synthetic patient-matching benchmark, derived from ONC challenge data | Evaluation only, never committed or displayed | Described by the test-set authors as synthetic; terms not located | Never committed (`.gitignore`: `data/onc/`, `data/benchmark/`) |
+
+Third-party code licenses are listed in `docs/LICENSES.md`.
+
+## Not for clinical use
+
+CheckMate is a synthetic-data prototype for identity reconciliation and evidence display. Flags are rule-based, cite their sources, are shown only after a person approves an identity link, and do not direct treatment. Not for clinical use. No clinician has reviewed the rule, the class table or the wording. Absence of a flag does not mean absence of a conflict.
+
+The contract's default flag footer, `CARD_FOOTER` in `contracts/models/alerts.py`, names what the rule does not check. It also says that absence of a flag is not evidence that no conflict exists, and that no clinician reviewed the rule or its wording.
 
 ## Known limits and non-goals
 
-Filled from the PRD known-limits list at the docs lane. Standing items: synthetic data only; no authentication (a reviewer or registrar name is a recorded label, not an authenticated identity); one process on one laptop bound to localhost; the live agent depends on the Gemini API, with a labeled REPLAY as the fallback.
-
-## License and data
-
-Code license to be set at the docs lane. Synthea sample data is Apache-2.0. The b.well public synthetic patient-matching benchmark derived from ONC challenge data is described by the test-set authors as synthetic; its terms were not located, so it is used for evaluation only, never committed or displayed.
+- **Synthetic data only.** The database holds only synthetic records and is dropped with one command (`docker-compose.yml`, `Makefile`); source datasets are never committed (`.gitignore`).
+- **Two sources at the core path:** an ER FHIR record and a clinic CSV row (`contracts/fixtures/scenario.json`).
+- **Thresholds are evaluation thresholds, not clinical ones.** Today the only threshold set is the hand-set placeholder `provisional-0`, with no source run (`contracts/migrations/0001_initial.sql`). The scorer lanes replace it with thresholds fit on the synthetic labeled set, reported with n. Auto-link defaults to off (`contracts/models/thresholds.py`).
+- **No authentication.** A registrar name is a recorded label, not an authenticated identity (`contracts/models/reviews.py`).
+- **One process on one laptop, bound to localhost** (`docker-compose.yml`, `Makefile`).
+- **The live agent depends on the Gemini API,** with a labeled REPLAY fallback; the API starts in REPLAY (`FRONTDESK_AGENT_MODE` in `docker-compose.yml`, `backend/app/config.py`, `contracts/models/health.py`).

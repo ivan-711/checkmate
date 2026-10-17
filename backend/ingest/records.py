@@ -11,6 +11,7 @@ taxonomy row changed: the Synthea person id, narrative and extensions are droppe
 documents (SSN, licence, passport) are dropped, every clinical resource id is re-minted per
 record, and display strings that echo the name are rewritten to the rendered name.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -40,8 +41,19 @@ PATIENT_REFERENCE_KEYS = ("subject", "patient")
 # Columns that are never part of a clinic export (identity documents and geocoding).
 # Columns that are never part of a clinic export: identity documents, geocoding, money, and the
 # location columns (COUNTY, FIPS, BIRTHPLACE) that would survive an address edit or removal.
-CLINIC_DROPPED_COLUMNS = ("SSN", "DRIVERS", "PASSPORT", "LAT", "LON", "COUNTY", "FIPS", "BIRTHPLACE",
-                          "HEALTHCARE_EXPENSES", "HEALTHCARE_COVERAGE", "INCOME")
+CLINIC_DROPPED_COLUMNS = (
+    "SSN",
+    "DRIVERS",
+    "PASSPORT",
+    "LAT",
+    "LON",
+    "COUNTY",
+    "FIPS",
+    "BIRTHPLACE",
+    "HEALTHCARE_EXPENSES",
+    "HEALTHCARE_COVERAGE",
+    "INCOME",
+)
 CSV_CLINICAL_LISTS = ("allergies", "medications", "encounters")
 CSV_ENCOUNTER_ID_COLUMNS = ("ID", "ENCOUNTER")
 CSV_SEX_CODES = {"male": "M", "female": "F"}
@@ -101,8 +113,15 @@ def render_fhir_patient(identity: Identity, base: dict, local_id: str) -> dict:
         "resourceType": "Patient",
         "id": str(record_id(SOURCE_ER_FHIR, local_id)),
         # the record's own MRN only; it is the source_local_id and never shared between records
-        "identifier": [{"type": {"coding": [{"system": IDENTIFIER_TYPE_SYSTEM, "code": "MR", "display": "Medical Record Number"}]},
-                        "system": MRN_SYSTEM, "value": local_id}],
+        "identifier": [
+            {
+                "type": {
+                    "coding": [{"system": IDENTIFIER_TYPE_SYSTEM, "code": "MR", "display": "Medical Record Number"}]
+                },
+                "system": MRN_SYSTEM,
+                "value": local_id,
+            }
+        ],
     }
     for key in PATIENT_KEPT_FIELDS:
         if key in base:
@@ -125,7 +144,16 @@ def render_fhir_patient(identity: Identity, base: dict, local_id: str) -> dict:
     if identity.phone:
         patient["telecom"] = [{"system": "phone", "value": identity.phone, "use": "home"}]
     if identity.address_line or identity.city or identity.postal_code:
-        address = {k: v for k, v in (("city", identity.city), ("state", identity.state), ("postalCode", identity.postal_code), ("country", "US")) if v}
+        address = {
+            k: v
+            for k, v in (
+                ("city", identity.city),
+                ("state", identity.state),
+                ("postalCode", identity.postal_code),
+                ("country", "US"),
+            )
+            if v
+        }
         if identity.address_line:
             address["line"] = [identity.address_line]
         patient["address"] = [address]
@@ -145,7 +173,9 @@ def _relabel_patient_references(resources: list[dict], name: str) -> None:
                 ref["display"] = name
 
 
-def fhir_draft(identity: Identity, bundle: FhirPatientBundle, local_id: str, is_constructed: bool = False) -> SourceRecordDraft:
+def fhir_draft(
+    identity: Identity, bundle: FhirPatientBundle, local_id: str, is_constructed: bool = False
+) -> SourceRecordDraft:
     record_uuid = str(record_id(SOURCE_ER_FHIR, local_id))
     payload = {
         "patient": render_fhir_patient(identity, bundle.patient, local_id),
@@ -155,12 +185,19 @@ def fhir_draft(identity: Identity, bundle: FhirPatientBundle, local_id: str, is_
         "medications": bundle.medications,
     }
     # Re-mint every clinical resource id per record so two variants of one person share none.
-    id_map = {res["id"]: _per_record_id(record_uuid, res["id"]) for key in FHIR_CLINICAL_LISTS for res in payload[key] if res.get("id")}
+    id_map = {
+        res["id"]: _per_record_id(record_uuid, res["id"])
+        for key in FHIR_CLINICAL_LISTS
+        for res in payload[key]
+        if res.get("id")
+    }
     id_map[bundle.patient_id] = record_uuid
     payload = _remap_ids(payload, id_map)
     for key in FHIR_CLINICAL_LISTS:
         _relabel_patient_references(payload[key], display_name(identity))
-    return SourceRecordDraft(SOURCE_ER_FHIR, local_id, payload, identity_from_patient(payload["patient"]), is_constructed)
+    return SourceRecordDraft(
+        SOURCE_ER_FHIR, local_id, payload, identity_from_patient(payload["patient"]), is_constructed
+    )
 
 
 def canonical_headers(row: dict[str, str]) -> dict[str, str]:
@@ -181,20 +218,22 @@ def render_csv_row(identity: Identity, base: dict[str, str], local_id: str, incl
     row = {k: v for k, v in canonical_headers(base).items() if k not in CLINIC_DROPPED_COLUMNS}
     row["ID"] = local_id
     parsed_dob = parse_date(identity.birth_date)
-    row.update({
-        "BIRTHDATE": parsed_dob.strftime("%m/%d/%Y") if parsed_dob else (identity.birth_date or ""),
-        "PREFIX": identity.prefix or "",
-        "FIRST": identity.given or "",
-        "MIDDLE": identity.middle or "",
-        "LAST": identity.family or "",
-        "SUFFIX": identity.suffix or "",
-        "MAIDEN": identity.maiden or "",
-        "GENDER": CSV_SEX_CODES.get((identity.sex or "").lower(), identity.sex or ""),
-        "ADDRESS": identity.address_line or "",
-        "CITY": identity.city or "",
-        "STATE": identity.state or "",
-        "ZIP": identity.postal_code or "",
-    })
+    row.update(
+        {
+            "BIRTHDATE": parsed_dob.strftime("%m/%d/%Y") if parsed_dob else (identity.birth_date or ""),
+            "PREFIX": identity.prefix or "",
+            "FIRST": identity.given or "",
+            "MIDDLE": identity.middle or "",
+            "LAST": identity.family or "",
+            "SUFFIX": identity.suffix or "",
+            "MAIDEN": identity.maiden or "",
+            "GENDER": CSV_SEX_CODES.get((identity.sex or "").lower(), identity.sex or ""),
+            "ADDRESS": identity.address_line or "",
+            "CITY": identity.city or "",
+            "STATE": identity.state or "",
+            "ZIP": identity.postal_code or "",
+        }
+    )
     if include_phone and identity.phone:
         row["PHONE"] = identity.phone
     else:
@@ -202,7 +241,9 @@ def render_csv_row(identity: Identity, base: dict[str, str], local_id: str, incl
     return row
 
 
-def csv_draft(identity: Identity, patient: CsvPatient, local_id: str, include_phone: bool, is_constructed: bool = False) -> SourceRecordDraft:
+def csv_draft(
+    identity: Identity, patient: CsvPatient, local_id: str, include_phone: bool, is_constructed: bool = False
+) -> SourceRecordDraft:
     payload = {
         "patient": render_csv_row(identity, patient.row, local_id, include_phone),
         "allergies": patient.allergies,
@@ -210,12 +251,18 @@ def csv_draft(identity: Identity, patient: CsvPatient, local_id: str, include_ph
         "encounters": patient.encounters,
     }
     # Encounter ids are shared across the clinical rows of one person; re-mint them per record.
-    id_map = {value: _per_record_id(local_id, value)
-              for key in CSV_CLINICAL_LISTS for row in payload[key]
-              for col, value in row.items() if col and col.upper() in CSV_ENCOUNTER_ID_COLUMNS and value}
+    id_map = {
+        value: _per_record_id(local_id, value)
+        for key in CSV_CLINICAL_LISTS
+        for row in payload[key]
+        for col, value in row.items()
+        if col and col.upper() in CSV_ENCOUNTER_ID_COLUMNS and value
+    }
     id_map[patient.patient_id] = local_id
     payload = _remap_ids(payload, id_map)
-    return SourceRecordDraft(SOURCE_CLINIC_CSV, local_id, payload, identity_from_row(payload["patient"]), is_constructed)
+    return SourceRecordDraft(
+        SOURCE_CLINIC_CSV, local_id, payload, identity_from_row(payload["patient"]), is_constructed
+    )
 
 
 def plain_fhir_draft(bundle: FhirPatientBundle) -> SourceRecordDraft:

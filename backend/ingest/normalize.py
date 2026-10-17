@@ -1,48 +1,24 @@
-"""S2 normalize: the one place names, dates, phones and addresses are folded (architecture §3, §4).
+"""The S1 -> S2 hand-off for ingest: the fielded identity a loader reads, normalized by backend.core.
 
-Everything downstream (block keys, W2 features) reads the folded forms produced here, so the
-rules live in one module: strip Synthea's appended name digits first, keep the accented
-original next to an NFKD + casefold copy, split the DOB into parts, phone to E.164, ZIP to 5.
+Ingest keeps no folding, phone, ZIP or placeholder rules of its own (issue #10). The app, the
+harness and ingest share ``backend.core.normalize``: ``normalized_row`` is the one row both the CLI
+store and the corpus-mode scenario loader write, and its block keys are computed from that row
+exactly as the FrontDesk gate and match runs recompute them.
 """
+
 from __future__ import annotations
 
-import re
-import unicodedata
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
-# Synthea appends a run of digits to every name token ("Ahmed109", "O'Reilly797").
-_TRAILING_DIGITS = re.compile(r"\d+$")
-_NON_DIGITS = re.compile(r"\D")
-_WHITESPACE = re.compile(r"\s+")
-# Punctuation that registration desks drop or keep at random; folded away so "O'Reilly" == "OReilly".
-_DROPPED_PUNCT = re.compile(r"[\'’.,]")
-_HYPHENS = re.compile(r"[-‐‑‒–—/]")
-
-# Hot-block rule (architecture §3): these values never form a block key and trip the
-# PLACEHOLDER_* negative rules downstream.
-PLACEHOLDER_NAMES = frozenset({
-    "unknown", "unk", "test", "patient", "baby", "babyboy", "babygirl", "boy", "girl", "doe",
-    "none", "null", "n a", "na", "xxx", "zzz", "temp", "noname", "no name",
-})
-PLACEHOLDER_DOBS = frozenset({date(1900, 1, 1), date(1901, 1, 1), date(1800, 1, 1), date(1, 1, 1), date(1111, 11, 11)})
-# Fictional NANP numbers are NXX-555-01XX; Synthea's own numbers are 555-NNN-NNNN, so only the
-# 555-01XX local part and one-repeated-digit numbers count as placeholders.
-_FICTIONAL_LOCAL_PREFIX = "55501"
-PHONE_LOCAL_LEN = 7
-# ZIPs that registration systems use when the real one is unknown; they never form a block key.
-PLACEHOLDER_ZIPS = frozenset({"00000", "12345", "99999"})
-
-SEX_BY_RAW = {"male": "MALE", "m": "MALE", "female": "FEMALE", "f": "FEMALE"}
-
-ISO_DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
-US_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
+from backend.core.normalize import Normalized, coerce_normalized, normalize_record, parse_dob_parts
 
 
 @dataclass(frozen=True)
 class Identity:
     """The demographic fields a source record carries, before any folding. Strings are raw
-    (digits already stripped by the loader); None means the source has no value."""
+    (Synthea digits already stripped by the loader); None means the source has no value."""
 
     given: str | None = None
     middle: str | None = None
@@ -61,138 +37,91 @@ class Identity:
     mother_maiden: str | None = None
 
 
-@dataclass(frozen=True)
-class NormalizedFields:
-    """Exactly the columns of normalized_record (migration 0001)."""
+def identity_fields(identity: Identity) -> dict[str, str | None]:
+    """The identity under the field names ``backend.core.normalize.normalize_record`` reads.
 
-    given_name: str | None
-    family_name: str | None
-    given_name_folded: str | None
-    family_name_folded: str | None
-    birth_date: date | None
-    birth_year: int | None
-    birth_month: int | None
-    birth_day: int | None
-    sex: str | None
-    phone_e164: str | None
-    address_line: str | None
-    zip5: str | None
+    Middle name, prefix, maiden name and language have no normalized column; the suffix goes in
+    so a generation suffix ("Jr.") reaches the GENERATION_SUFFIX_MISMATCH rule.
+    """
+    return {
+        "given_name": identity.given,
+        "family_name": identity.family,
+        "suffix": identity.suffix,
+        "birth_date": identity.birth_date,
+        "sex": identity.sex,
+        "phone": identity.phone,
+        "address_line": identity.address_line,
+        "zip": identity.postal_code,
+    }
 
 
-def strip_synthea_digits(text: str | None) -> str | None:
-    """'Ahmed109' -> 'Ahmed'; "O'Reilly797" -> "O'Reilly"; 'Isabela97 Vásquez905' -> 'Isabela Vásquez'."""
+# Display spelling of core's sex codes. The source card, the golden record's MAJORITY rule and the
+# frozen fixtures all use MALE/FEMALE; core reads either form back to M/F.
+DISPLAY_SEX = {"M": "MALE", "F": "FEMALE"}
+
+
+def _as_registered(text: str | None) -> str | None:
+    """The value as the registration typed it (Synthea digits already stripped), whitespace collapsed."""
     if text is None:
         return None
-    tokens = [_TRAILING_DIGITS.sub("", t) for t in text.split()]
-    cleaned = " ".join(t for t in tokens if t)
-    return cleaned or None
+    return " ".join(text.split()) or None
 
 
-def clean_text(text: str | None) -> str | None:
-    """Collapse whitespace; empty becomes None so SQL NULL means 'absent' everywhere."""
-    if text is None:
-        return None
-    cleaned = _WHITESPACE.sub(" ", text).strip()
-    return cleaned or None
+def normalized_row(identity: Identity) -> dict[str, Any]:
+    """The ``normalized_record`` row (without ``record_id``) for one source record.
+
+    Display columns keep the registration's spelling (given_name, family_name, address_line; sex as
+    MALE/FEMALE), as before issue #10, because the source card and the golden record render them;
+    switching them to core's case-folded form would change what a judge sees (fork issue #13).
+    Every other column is backend.core's normalization of those same values, so core reads this row
+    back to exactly the record ``normalize_identity`` returns, and keys computed from it match the gate.
+    """
+    given = _as_registered(identity.given)
+    family = _as_registered(identity.family)
+    if family and identity.suffix and normalize_record(identity_fields(identity)).suffix:
+        # A generation suffix ("Jr.") rides on the surname, where core splits it off again, so the
+        # GENERATION_SUFFIX_MISMATCH rule still sees it; a professional suffix ("MD") is not carried.
+        family = f"{family} {_as_registered(identity.suffix)}"
+    address = _as_registered(identity.address_line)
+    core = normalize_record(
+        {
+            "given_name": given,
+            "family_name": family,
+            "birth_date": identity.birth_date,
+            "sex": identity.sex,
+            "phone": identity.phone,
+            "address_line": address,
+            "zip": identity.postal_code,
+        }
+    )
+    return {
+        "given_name": given,
+        "family_name": family,
+        "given_name_folded": core.given_name_folded,
+        "family_name_folded": core.family_name_folded,
+        "birth_date": core.birth_date,
+        "birth_year": core.birth_year,
+        "birth_month": core.birth_month,
+        "birth_day": core.birth_day,
+        "sex": DISPLAY_SEX.get(core.sex or ""),
+        "phone_e164": core.phone_e164,
+        "address_line": address,
+        "zip5": core.zip5,
+    }
 
 
-def strip_accents(text: str) -> str:
-    """NFKD decomposition with the combining marks removed: 'Núñez' -> 'Nunez'."""
-    decomposed = unicodedata.normalize("NFKD", text)
-    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-
-
-def fold(text: str | None) -> str | None:
-    """Accent-fold, casefold, hyphen to space, apostrophes and periods dropped."""
-    if text is None:
-        return None
-    stripped = _DROPPED_PUNCT.sub("", strip_accents(text))
-    stripped = _HYPHENS.sub(" ", stripped)
-    return clean_text(stripped.casefold())
+def normalize_identity(identity: Identity) -> Normalized:
+    """The record as backend.core reads the stored row: what blocking, features and the gate see."""
+    return coerce_normalized(normalized_row(identity))
 
 
 def parse_date(text: str | None) -> date | None:
-    """ISO (Synthea) or MM/DD/YYYY (clinic export). Impossible dates give None rather than raising:
-    a corrupted record is still a record."""
-    if not text:
+    """A full calendar date from core's DOB parser, or None when a part is missing or impossible.
+
+    The renderers and the generator need a ``date`` to re-emit ISO (FHIR) or MM/DD/YYYY (clinic)
+    and to shift or swap parts; parsing stays in one place.
+    """
+    year, month, day = parse_dob_parts(text)
+    if year is None or month is None or day is None:
         return None
-    text = text.strip()
-    if m := ISO_DATE.match(text):
-        y, mo, d = (int(g) for g in m.groups())
-    elif m := US_DATE.match(text):
-        mo, d, y = (int(g) for g in m.groups())
-    else:
-        return None
-    try:
-        return date(y, mo, d)
-    except ValueError:
-        return None
-
-
-def phone_to_e164(phone: str | None) -> str | None:
-    """US numbers only: 10 digits, or 11 starting with 1. Anything else is not a phone."""
-    if not phone:
-        return None
-    digits = _NON_DIGITS.sub("", phone)
-    if len(digits) == 10:
-        return "+1" + digits
-    if len(digits) == 11 and digits[0] == "1":
-        return "+" + digits
-    return None
-
-
-def zip5(postal_code: str | None) -> str | None:
-    if not postal_code:
-        return None
-    digits = _NON_DIGITS.sub("", postal_code)
-    return digits[:5] if len(digits) >= 5 else None
-
-
-def normalize_sex(sex: str | None) -> str | None:
-    if not sex:
-        return None
-    return SEX_BY_RAW.get(sex.strip().lower())
-
-
-def is_placeholder_name(folded: str | None) -> bool:
-    """Per token, so 'baby boy' or 'unknown unknown' is a placeholder, while 'ana boy' is a name."""
-    if not folded:
-        return True
-    return folded in PLACEHOLDER_NAMES or all(token in PLACEHOLDER_NAMES for token in folded.split())
-
-
-def is_placeholder_dob(value: date | None) -> bool:
-    return value is None or value in PLACEHOLDER_DOBS
-
-
-def is_placeholder_phone(e164: str | None) -> bool:
-    """One repeated digit over the number or over its 7-digit local part (617-000-0000), or the
-    NXX-555-01XX fictional block: anything that would put unrelated people in one phone block."""
-    if e164 is None:
-        return True
-    local = e164[-PHONE_LOCAL_LEN:]
-    return len(set(e164[-10:])) == 1 or len(set(local)) == 1 or local.startswith(_FICTIONAL_LOCAL_PREFIX)
-
-
-def is_placeholder_zip(value: str | None) -> bool:
-    return value is None or value in PLACEHOLDER_ZIPS or len(set(value)) == 1
-
-
-def normalize_identity(identity: Identity) -> NormalizedFields:
-    given = clean_text(strip_synthea_digits(identity.given))
-    family = clean_text(strip_synthea_digits(identity.family))
-    dob = parse_date(identity.birth_date)
-    return NormalizedFields(
-        given_name=given,
-        family_name=family,
-        given_name_folded=fold(given),
-        family_name_folded=fold(family),
-        birth_date=dob,
-        birth_year=dob.year if dob else None,
-        birth_month=dob.month if dob else None,
-        birth_day=dob.day if dob else None,
-        sex=normalize_sex(identity.sex),
-        phone_e164=phone_to_e164(identity.phone),
-        address_line=clean_text(identity.address_line),
-        zip5=zip5(identity.postal_code),
-    )
+    return date(year, month, day)

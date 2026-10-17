@@ -4,13 +4,15 @@ only (ADR-004). Every other resource type in the bundle is dropped unread.
 Field paths were checked against the Nov 2021 sample on 2026-10-17 (transaction bundles,
 ``fullUrl = urn:uuid:<id>``, phone ``555-NNN-NNNN``, language under ``communication[0]``).
 """
+
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from backend.ingest.normalize import Identity, strip_synthea_digits
+from backend.core.normalize import strip_synthea_digits
+from backend.ingest.normalize import Identity
 
 PARSED_RESOURCE_TYPES = ("Patient", "AllergyIntolerance", "MedicationRequest", "Encounter")
 MOTHERS_MAIDEN_URL = "http://hl7.org/fhir/StructureDefinition/patient-mothersMaidenName"

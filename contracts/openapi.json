@@ -2344,6 +2344,7 @@
             "type": "string"
           },
           "sources": {
+            "description": "the scenario's showcase source cards (the hero pair's records), never the whole loaded corpus",
             "items": {
               "$ref": "#/components/schemas/SourceCard"
             },
@@ -3193,7 +3194,7 @@
     },
     "/api/v1/candidate-pairs": {
       "get": {
-        "description": "Lane W3a. Review queue ordered by |p-0.5|. Bounded list.",
+        "description": "Lane W3a. Review queue ordered by |p-0.5|. Bounded list. `recordId` (additive) keeps only pairs that include that source record, so the UI binds the hero pair in one request.",
         "operationId": "list_candidate_pairs_api_v1_candidate_pairs_get",
         "parameters": [
           {
@@ -3242,6 +3243,23 @@
                 }
               ],
               "title": "Origin"
+            }
+          },
+          {
+            "in": "query",
+            "name": "recordId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Recordid"
             }
           },
           {
@@ -4628,6 +4646,78 @@
           }
         },
         "summary": "Create Session",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/sessions/current": {
+      "get": {
+        "description": "Lane W3a (additive). The current demo session, so a reloaded page rebinds the hero without a reset; 404 before the first reset.",
+        "operationId": "get_current_session_api_v1_sessions_current_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
+          }
+        },
+        "summary": "Get Current Session",
         "tags": [
           "core"
         ]
