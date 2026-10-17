@@ -26,7 +26,9 @@ PARENT_CHILD_MIN_YEAR_GAP = 18  # taxonomy N3: same full name, DOB at least 18 y
 TWIN_GIVEN_JW_MAX = 0.85  # taxonomy N2: same DOB and surname, clearly different given name
 SAME_NAME_JW_MIN = 0.95  # "same full name" for the parent/child rule
 
-# A placeholder threshold set so the 15:30 checkpoint can band pairs under handset-0.
+# A placeholder threshold set so the 15:30 checkpoint can band pairs under the hand-set weights.
+# Its id still says handset-0: renaming a threshold set is a threshold change (a fork), and the
+# cutoffs are the same numbers the handset-1 scores are read against.
 # W3a replaces it with cutoffs chosen on out-of-fold development raw scores (section 6).
 DEMO_THRESHOLDS = ThresholdSet(
     thresholds_id="demo-handset-0",

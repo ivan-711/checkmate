@@ -76,7 +76,7 @@ def test_platt_display_map_is_monotone_when_a_is_negative():
 
 
 def test_handset_weights_version_and_identical_record_scores_high_different_people_low():
-    assert HANDSET_WEIGHTS.scorer_version == HANDSET_SCORER_VERSION == "handset-0"
+    assert HANDSET_WEIGHTS.scorer_version == HANDSET_SCORER_VERSION == "handset-1"
     same = score_pair(compute_features(normalize_record(BASE), normalize_record(BASE)), HANDSET_WEIGHTS)
     other = score_pair(
         compute_features(
@@ -109,11 +109,11 @@ def test_weights_json_round_trip(tmp_path):
     save_weights(HANDSET_WEIGHTS, path)
     loaded = load_weights(path)
     assert loaded == HANDSET_WEIGHTS
-    assert json.loads(path.read_text())["scorer_version"] == "handset-0"
+    assert json.loads(path.read_text())["scorer_version"] == HANDSET_SCORER_VERSION
 
 
 def test_handset_json_on_disk_equals_the_in_code_weights():
-    assert load_weights("handset-0") == HANDSET_WEIGHTS
+    assert load_weights(HANDSET_SCORER_VERSION) == HANDSET_WEIGHTS
 
 
 def test_load_weights_distinguishes_paths_from_version_names(tmp_path):

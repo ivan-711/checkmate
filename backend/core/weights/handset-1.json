@@ -2,7 +2,7 @@
   "intercept": -11.0,
   "platt_a": null,
   "platt_b": null,
-  "scorer_version": "handset-0",
+  "scorer_version": "handset-1",
   "trained_on": {},
   "weights": {
     "address_jaccard": 1.2,
