@@ -8,8 +8,10 @@ with the contract's error envelope; each lane's router replaces its stubs by add
 from __future__ import annotations
 
 import logging
+import uuid
+from typing import Annotated
 
-from fastapi import Request
+from fastapi import Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
@@ -19,12 +21,25 @@ from backend.api import events, match_runs, pairs, reviews, sessions, thresholds
 from backend.app import request_context
 from backend.app.config import load_settings
 from backend.app.db import db_is_up, make_engine
+from backend.app.deps import EngineDep
 from backend.app.errors import ApiError
-from backend.app.openapi_meta import common_error_responses
+from backend.app.openapi_meta import common_error_responses, error_responses
+from backend.golden.service import alert_page, entity_exists, read_alerts, read_entity, read_timeline
+from backend.golden.timeline import BadCursor
+from backend.link.service import CannotLinkConflict
 from contracts.api_spec import build_app, error_envelope
-from contracts.models.common import ErrorCode
+from contracts.models.alerts import AlertStatus, SafetyAlert
+from contracts.models.common import ErrorCode, Page
+from contracts.models.entities import Entity, TimelineEvent
 from contracts.models.health import AgentStatus, DependencyStatus, Health, HealthVersions
-from contracts.version import API_PREFIX, CONTRACT_VERSION, POLICY_VERSION, TOOL_SCHEMA_VERSION
+from contracts.version import (
+    API_PREFIX,
+    CONTRACT_VERSION,
+    LIST_LIMIT_DEFAULT,
+    LIST_LIMIT_MAX,
+    POLICY_VERSION,
+    TOOL_SCHEMA_VERSION,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("checkmate.request")
@@ -42,6 +57,9 @@ IMPLEMENTED = frozenset(
         ("GET", API_PREFIX + "/metrics/tiles"),  # W3a
         ("GET", API_PREFIX + "/threshold-sets/current"),  # W3a (stub added to the contract at 256ca4a)
         ("GET", API_PREFIX + "/events"),  # W3a (additive contract route e591005, G16 step 7)
+        ("GET", API_PREFIX + "/entities/{entity_id}"),  # W3b
+        ("GET", API_PREFIX + "/entities/{entity_id}/timeline"),  # W3b
+        ("GET", API_PREFIX + "/alerts"),  # W3b
     }
 )
 app = build_app(implemented=IMPLEMENTED)
@@ -71,6 +89,15 @@ app.add_middleware(
 @app.exception_handler(ApiError)
 async def _api_error(_: Request, exc: ApiError):
     return error_envelope(exc.code, exc.message, exc.details)
+
+
+@app.exception_handler(CannotLinkConflict)
+async def _cannot_link(_: Request, exc: CannotLinkConflict):
+    """The link service refused: a not_a_match pair inside the would-be entity (architecture §7), or a
+    DIFFERENT_PERSON reject of records already linked through another approval. Same 409 as the
+    review route's own check, never a 500; the client gets the class's public message, no record ids."""
+    log.info("cannot link: %s request_id=%s", type(exc).__name__, request_context.current().request_id)
+    return error_envelope(ErrorCode.CANNOT_LINK_CONFLICT, exc.public_message)
 
 
 @app.exception_handler(PoolTimeout)
@@ -142,3 +169,66 @@ def health() -> Health:  # sync: db_is_up blocks, so it runs in the threadpool, 
             git_sha=settings.git_sha,
         ),
     )
+
+
+# W3b: read-time golden record, timeline and alerts (architecture section 5, section 8; ADR-014).
+# Real handlers for the three stubs named in IMPLEMENTED above. Same engine dependency and the
+# same documented errors as the frozen stubs; ``limit`` above LIST_LIMIT_MAX is a 422, as the
+# frozen schema says.
+Limit = Annotated[int, Query(ge=1, le=LIST_LIMIT_MAX)]
+_ENTITY_ERRORS = error_responses(ErrorCode.NOT_FOUND) | common_error_responses()
+
+
+@app.get(
+    API_PREFIX + "/entities/{entity_id}",
+    response_model=Entity,
+    tags=["core"],
+    responses=_ENTITY_ERRORS,
+    description="Lane W3b. Read-time golden record with crosswalks.",
+)
+def get_entity(entity_id: uuid.UUID, engine: EngineDep):
+    with engine.connect() as conn:
+        entity = read_entity(conn, entity_id)
+    return entity if entity is not None else error_envelope(ErrorCode.NOT_FOUND, "entity not found")
+
+
+@app.get(
+    API_PREFIX + "/entities/{entity_id}/timeline",
+    response_model=Page[TimelineEvent],
+    tags=["core"],
+    responses=_ENTITY_ERRORS,
+    description="Lane W3b. Timeline across the entity's sources; bounded keyset list.",
+)
+def get_entity_timeline(
+    entity_id: uuid.UUID, engine: EngineDep, limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None
+):
+    try:
+        with engine.connect() as conn:
+            page = read_timeline(conn, entity_id, limit, cursor)
+    except BadCursor as exc:
+        return error_envelope(ErrorCode.VALIDATION_ERROR, str(exc))
+    return page if page is not None else error_envelope(ErrorCode.NOT_FOUND, "entity not found")
+
+
+@app.get(
+    API_PREFIX + "/alerts",
+    response_model=Page[SafetyAlert],
+    tags=["core"],
+    responses=_ENTITY_ERRORS,
+    description="Lane W3b. DetectedIssue-shaped alerts, optionally for one entity; bounded keyset list.",
+)
+def list_alerts(
+    engine: EngineDep,
+    entity_id: Annotated[uuid.UUID | None, Query(alias="entityId")] = None,
+    status: AlertStatus | None = None,
+    limit: Limit = LIST_LIMIT_DEFAULT,
+    cursor: str | None = None,
+):
+    with engine.connect() as conn:
+        if entity_id is not None and not entity_exists(conn, entity_id):
+            return error_envelope(ErrorCode.NOT_FOUND, "entity not found")
+        alerts = read_alerts(conn, entity_id, status=status)
+    try:
+        return alert_page(alerts, limit, cursor)
+    except BadCursor as exc:
+        return error_envelope(ErrorCode.VALIDATION_ERROR, str(exc))

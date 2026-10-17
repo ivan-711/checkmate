@@ -34,6 +34,7 @@ include = ["contracts*", "backend*"]
 
 [tool.setuptools.package-data]
 "backend.core" = ["weights/*.json"]
+"backend.rule" = ["cache/*.json", "cache/labels/*.json"]
 
 [build-system]
 requires = ["setuptools>=69"]
