@@ -8,24 +8,38 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from typing import Annotated
 
-from fastapi import Request
+from fastapi import Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
 from backend.app.config import load_settings
 from backend.app.db import db_is_up, make_engine
+from backend.golden.service import alert_page, read_alerts, read_entity, read_timeline
 from contracts.api_spec import build_app, error_envelope
-from contracts.models.common import ErrorCode
+from contracts.models.alerts import AlertStatus, SafetyAlert
+from contracts.models.common import ERROR_STATUS, ErrorCode, ErrorEnvelope, Page
+from contracts.models.entities import Entity, TimelineEvent
 from contracts.models.health import AgentStatus, DependencyStatus, Health, HealthVersions
-from contracts.version import API_PREFIX, CONTRACT_VERSION, POLICY_VERSION, TOOL_SCHEMA_VERSION
+from contracts.version import (
+    API_PREFIX,
+    CONTRACT_VERSION,
+    LIST_LIMIT_DEFAULT,
+    LIST_LIMIT_MAX,
+    POLICY_VERSION,
+    TOOL_SCHEMA_VERSION,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("checkmate.request")
 settings = load_settings()
 engine = make_engine(settings.database_url)
 # Routes the backend implements for real; their stubs are dropped. Lanes add to this set.
-IMPLEMENTED = frozenset({("GET", API_PREFIX + "/health")})
+IMPLEMENTED = frozenset({
+    ("GET", API_PREFIX + "/health"),
+    ("GET", API_PREFIX + "/entities/{entity_id}"),  # W3b
+})
 app = build_app(implemented=IMPLEMENTED)
 
 app.add_middleware(
@@ -74,3 +88,37 @@ async def health() -> Health:
             git_sha=settings.git_sha,
         ),
     )
+
+
+# W3b: read-time golden record, timeline and alerts (architecture section 5, section 8; ADR-014).
+# The timeline and alerts routes are additive to contracts-v1 (flagged in the lane's PR).
+Limit = Annotated[int, Query(ge=1, le=LIST_LIMIT_MAX, description="clamped to the contract's bounds")]
+_NOT_FOUND = {404: {"model": ErrorEnvelope, "description": ErrorCode.NOT_FOUND.value}}
+_COMMON = {ERROR_STATUS[c]: {"model": ErrorEnvelope, "description": c.value}
+           for c in (ErrorCode.VALIDATION_ERROR, ErrorCode.INTERNAL)}
+
+
+@app.get(API_PREFIX + "/entities/{entity_id}", response_model=Entity, tags=["core"], responses=_NOT_FOUND | _COMMON,
+         description="Lane W3b. Read-time golden record with crosswalks.")
+def get_entity(entity_id: uuid.UUID):
+    with engine.connect() as conn:
+        entity = read_entity(conn, entity_id)
+    return entity if entity is not None else error_envelope(ErrorCode.NOT_FOUND, "entity not found")
+
+
+@app.get(API_PREFIX + "/entities/{entity_id}/timeline", response_model=Page[TimelineEvent], tags=["core"],
+         responses=_NOT_FOUND | _COMMON,
+         description="Lane W3b (additive). Timeline from the members' encounters, allergies and orders; bounded keyset list.")
+def get_entity_timeline(entity_id: uuid.UUID, limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None):
+    with engine.connect() as conn:
+        page = read_timeline(conn, entity_id, limit, cursor)
+    return page if page is not None else error_envelope(ErrorCode.NOT_FOUND, "entity not found")
+
+
+@app.get(API_PREFIX + "/alerts", response_model=Page[SafetyAlert], tags=["core"], responses=_COMMON,
+         description="Lane W3b (additive). DetectedIssue-shaped alerts for one entity; bounded keyset list.")
+def list_alerts(entity_id: Annotated[uuid.UUID, Query(alias="entityId")], status: AlertStatus | None = None,
+                limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None):
+    with engine.connect() as conn:
+        alerts = read_alerts(conn, entity_id, status=status)
+    return alert_page(alerts, limit, cursor)
