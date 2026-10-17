@@ -153,23 +153,36 @@ def assign(corpus: Corpus, cfg: SplitConfig | None = None) -> Assignment:
     return assignment
 
 
+def _unit(assignment: Assignment, person_id: str, record_id: str) -> str:
+    if person_id not in assignment.component_of_person:
+        raise LeakageError(f"person {person_id} (record {record_id}) is not assigned to any component")
+    return assignment.unit_of_person(person_id)
+
+
 def assert_no_leakage(corpus: Corpus, assignment: Assignment) -> None:
-    """Step 5. Raises ``LeakageError`` on the first violation."""
+    """Step 5. Raises ``LeakageError`` on the first violation.
+
+    Checked per record (its person and every donor share one unit), per person (one unit only), per
+    entity (every fragment of one truth entity sits in one unit, even when fragments carry different
+    person ids), and per component (a fold exactly when it is in development)."""
     seen_unit: dict[str, str] = {}
+    entity_unit: dict[str, tuple[str, str]] = {}
+    entity_of = corpus.entity_of()
     for rec in corpus.records:
-        person = rec["person_id"]
-        unit = assignment.unit_of_person(person)
-        derived = [person, *(rec.get("donor_person_ids") or ())]
-        for pid in derived:
-            if pid not in assignment.component_of_person:
-                raise LeakageError(f"person {pid} (record {rec['record_id']}) is not assigned to any component")
-            other = assignment.unit_of_person(pid)
+        rid = rec["record_id"]
+        unit = _unit(assignment, rec["person_id"], rid)
+        for pid in [rec["person_id"], *(rec.get("donor_person_ids") or ())]:
+            other = _unit(assignment, pid, rid)
             if other != unit:
-                raise LeakageError(
-                    f"record {rec['record_id']} derives from {pid} in {other} but sits in {unit}")
+                raise LeakageError(f"record {rid} derives from {pid} in {other} but sits in {unit}")
             previous = seen_unit.setdefault(pid, unit)
             if previous != unit:
                 raise LeakageError(f"person {pid} appears in {previous} and {unit}")
+        entity = entity_of.get(rid)
+        if entity is not None:
+            first_unit, first_record = entity_unit.setdefault(entity, (unit, rid))
+            if first_unit != unit:
+                raise LeakageError(f"entity {entity} has record {first_record} in {first_unit} and {rid} in {unit}")
     for cid, part in assignment.partition_of_component.items():
         if part == PARTITION_DEVELOPMENT and cid not in assignment.fold_of_component:
             raise LeakageError(f"development component {cid} has no fold")

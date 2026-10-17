@@ -25,10 +25,21 @@ def test_c_high_reaches_alpha_at_the_support_floor():
     sel = select_thresholds(_separable(), ThresholdConfig(alpha=0.01, beta=0.02, min_components=50))
     assert sel.c_high_reachable and not sel.c_high_fallback_used
     assert sel.components_at_c_high >= 50
-    assert sel.envelope_at_c_high <= 0.01
-    # the lucky false pair at 3.0 sits below c_high because the envelope is monotone from the right
-    assert sel.c_high > 3.0
+    # c = 3 holds 97 auto-links with one false (1.03%), too few to resolve alpha, so it does not enter the
+    # envelope of lower cutoffs; c = 2 holds 121 auto-links with the same false pair: 0.83% <= alpha
+    assert sel.c_high == 2.0
+    assert sel.envelope_at_c_high == pytest.approx(1 / 121)
     assert sel.c_low <= sel.c_high
+
+
+def test_lucky_dip_under_a_resolvable_dirty_region_is_not_picked():
+    # 100 clean pairs at 6; 48 true + 2 false at 5 (1.33% at c=5, 150 auto-links, resolvable);
+    # 100 clean pairs at 4 dilute the rate at c=4 to 0.8%. The envelope keeps c=4 and c=5 above alpha.
+    rows = [sp(i, 6.0, True) for i in range(100)]
+    rows += [sp(200 + i, 5.0, True) for i in range(48)] + [sp(400 + i, 5.0, False) for i in range(2)]
+    rows += [sp(600 + i, 4.0, True) for i in range(100)]
+    sel = select_thresholds(rows, ThresholdConfig(alpha=0.01, min_components=50))
+    assert sel.c_high_reachable and sel.c_high == 6.0 and sel.envelope_at_c_high == 0.0
 
 
 def test_support_floor_forces_fallback_when_too_few_components():

@@ -20,11 +20,13 @@ the G16 path is live) and then asserts zero non-501 5xx lines in the API request
 
 ## Steps the script asserts
 
-1. Reset, then two source cards render (`ER_FHIR` and `CLINIC_CSV`).
+1. Reset, then two source cards render (`ER_FHIR` and `CLINIC_CSV`), each showing the hero's given and
+   family name as exported in `data/scenarios/hero/scenario.json` (override with `CHECKMATE_SCENARIO`).
 2. Resolve shows the hero pair in `REVIEW` with the evidence rail.
 3. Reject with reason `INSUFFICIENT_EVIDENCE` and a note: no flag card; an event row `link_rejected`.
 4. Resolve again, Approve with a note (and the reason control if shown).
-5. Cards collapse into one golden record with crosswalk chips; the timeline shows both sources.
+5. Cards collapse into one golden record (showing the exported golden given and family name) with
+   crosswalk chips; the timeline shows both sources.
 6. The neutral flag card carries `BL-AMOX-01`, the constructed-scenario chip, the words
    "flagged for clinician review", no `role="alert"`, none of the never-say words.
 7. `GET /api/v1/events` has one row per action, as deltas against a snapshot taken before the run

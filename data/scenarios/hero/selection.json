@@ -251,8 +251,18 @@
       "accent_hyphen_surname_robust": true,
       "intake_rendering_review": true,
       "fixture_check_bounds": false,
-      "spanish_name": true
+      "spanish_name": false
     },
+    "level": 3,
+    "required": [
+      "baseline_review",
+      "remove_address_keep_separate",
+      "change_birth_year_keep_separate",
+      "swap_dob_day_month_robust",
+      "accent_hyphen_surname_robust",
+      "intake_rendering_review",
+      "fixture_check_bounds"
+    ],
     "distance_to_midpoint": 1.784041,
     "tie_break": "cb0439cff6eb212bd17afd4e3958ffc0a75da0b511cb7bb06db1308d6324ee5e"
   },
@@ -264,7 +274,7 @@
     "accent_hyphen_surname_robust": "ACCENT_HYPHEN_SURNAME moves p by at most the tolerance (0.05; level 2: 0.10)",
     "intake_rendering_review": "the intake rendering of the ER fragment lands in REVIEW against the Clinic record",
     "fixture_check_bounds": "p in [0,1]; no AUTO_LINK; no what-if raises p above baseline + 0.005; no negative rule",
-    "spanish_name": "Spanish-language name (level 0 only)"
+    "spanish_name": "Spanish-language name (reported as a fact; required at level 0 only)"
   },
   "candidates": [
     {
@@ -493,8 +503,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": true,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 1.784041,
       "tie_break": "cb0439cff6eb212bd17afd4e3958ffc0a75da0b511cb7bb06db1308d6324ee5e"
     },
@@ -724,8 +744,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 2.768485,
       "tie_break": "6631b7137c1ce6252eab99547e916801e678e60b1aaee7384a30556c801b1a14"
     },
@@ -955,8 +985,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 2.798182,
       "tie_break": "17f9b95415c7522a242113800ee222ce5a7bb2d00d0e79823642f15224edcb73"
     },
@@ -1186,8 +1226,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 4.198182,
       "tie_break": "bb264218688f40ac9643320da8cbb81684d8d0ccdbff50e09332c06230efc329"
     },
@@ -1417,8 +1467,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 4.398182,
       "tie_break": "232e2c66b010d3e37afbb08eed70eebcfd0e73d7820062407a4485d5a8635be3"
     },
@@ -1650,6 +1710,16 @@
         "fixture_check_bounds": false,
         "spanish_name": true
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 4.398182,
       "tie_break": "38d630c701bbca02a126e100e2479fc8fe87276b02898a95c519f59118bdae47"
     },
@@ -1879,8 +1949,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 4.398182,
       "tie_break": "5cc35a219b60269fd9061b1639381678ab343be4d98d3ddb0dcc85a2a4c83694"
     },
@@ -2112,6 +2192,16 @@
         "fixture_check_bounds": false,
         "spanish_name": true
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 5.298182,
       "tie_break": "a6b5dde0ca133610cd4d1a8554d30fe9eb1bb79498719015902a101a41907495"
     },
@@ -2341,8 +2431,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 5.598182,
       "tie_break": "21fe2352cc8de65a6303bf8af82ceb216616887e4b95f907d7fdc7026674baf1"
     },
@@ -2572,8 +2672,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 5.598182,
       "tie_break": "352ae69c90fbb8f6e8b60f920de4b893f0878390a26c01abeb68e73d8f7f6bf6"
     },
@@ -2803,8 +2913,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 5.598182,
       "tie_break": "3e8c1ad8f0489cb15aba9eb580bab14b4cfd1e5921faa7165549f2c156645a7a"
     },
@@ -3034,8 +3154,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 5.598182,
       "tie_break": "9681c52845bf868339ba82f89a6c2ef96556e1599867ed156e165308cc0d5be8"
     },
@@ -3267,6 +3397,16 @@
         "fixture_check_bounds": false,
         "spanish_name": true
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 5.598182,
       "tie_break": "af374da799dadba703dc58119ff5c3dac5ec43bcffd3a85920a8a572a8248535"
     },
@@ -3496,8 +3636,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 5.598182,
       "tie_break": "c2ed5b3771d3311f1be2edb8bfe7318f4948e9baf98f98bb2ea498dbff2de49a"
     },
@@ -3727,8 +3877,18 @@
         "accent_hyphen_surname_robust": true,
         "intake_rendering_review": false,
         "fixture_check_bounds": false,
-        "spanish_name": true
+        "spanish_name": false
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 5.598182,
       "tie_break": "f164790218f462cd19cdf1607ddb0c7df75cabee75fad661b9d2df4ace087668"
     },
@@ -3960,6 +4120,16 @@
         "fixture_check_bounds": false,
         "spanish_name": true
       },
+      "level": 3,
+      "required": [
+        "baseline_review",
+        "remove_address_keep_separate",
+        "change_birth_year_keep_separate",
+        "swap_dob_day_month_robust",
+        "accent_hyphen_surname_robust",
+        "intake_rendering_review",
+        "fixture_check_bounds"
+      ],
       "distance_to_midpoint": 5.598182,
       "tie_break": "f17f560b63bb2a34811d7e690ce52cb9db174f616042eb3d9fee742b0ca0c922"
     }

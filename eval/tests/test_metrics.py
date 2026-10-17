@@ -29,8 +29,11 @@ def _toy():
     ]
 
 
+MISSED = [sp("m1", "m2", "E5", "E5", "C5", "C5", float("-inf"))]  # a true pair blocking never proposed
+
+
 def test_band_metrics_known_answers():
-    out = band_metrics(_toy(), true_pairs_total=5, c_low=0.0, c_high=2.0, seed=1, resamples=50)
+    out = band_metrics(_toy(), MISSED, c_low=0.0, c_high=2.0, seed=1, resamples=50)
     assert out["band.auto_link.count"]["value"] == 3
     assert out["band.auto_link.precision"]["value"] == 2 / 3
     assert out["false_merge_rate"]["value"] == 1 / 3
@@ -42,11 +45,14 @@ def test_band_metrics_known_answers():
     assert out["review_burden"]["value"] == 1 / 6
     assert out["missed_match_rate.scorer"]["value"] == 1 / 4
     assert out["band.review.true_pair_share"]["value"] == 1 / 4
+    # the missed pair keeps its own entity and component in the end-to-end n
+    assert out["recall.lenient.end_to_end"]["n_entities"] == 5
+    assert out["recall.lenient.end_to_end"]["n_components"] == 5
 
 
 def test_negative_rule_demotes_auto_link_to_review():
     rows = [sp("a1", "a2", "E1", "E1", "C1", "C1", 3.0, ["TWIN"]), sp("b1", "b2", "E2", "E2", "C2", "C2", 3.0)]
-    out = band_metrics(rows, 2, 0.0, 2.0, seed=1, resamples=10)
+    out = band_metrics(rows, [], 0.0, 2.0, seed=1, resamples=10)
     assert out["band.auto_link.count"]["value"] == 1
     assert out["band.review.count"]["value"] == 1
 
@@ -90,8 +96,11 @@ def test_bootstrap_weights_cross_component_pairs_by_product():
 
 
 def test_blocking_metrics():
-    out = blocking_metrics({("a", "b"), ("c", "d")}, {("a", "b"), ("x", "y")}, all_pairs_n=100)
-    assert out["blocking.recall"]["value"] == 0.5
+    true_pairs = [sp("a", "b", "E1", "E1", "C1", "C1", 1.0), sp("c", "d", "E2", "E2", "C2", "C2", 1.0)]
+    out = blocking_metrics(true_pairs, {("a", "b"), ("x", "y")}, all_pairs_n=100, seed=1, resamples=50)
+    cell = out["blocking.recall"]
+    assert cell["value"] == 0.5 and cell["n_pairs"] == 2 and cell["n_components"] == 2 and cell["ci95"]
+    assert cell["n_hit"] == 1 and cell["n_true_pairs"] == 2
     assert out["blocking.reduction_ratio"]["value"] == 0.98
     assert out["blocking.reduction_ratio"]["N"] == 100
 

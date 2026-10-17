@@ -19,6 +19,7 @@ dev = [
   "jsonschema>=4.23",
   "ruff>=0.6",
   "pyyaml>=6.0,<7",
+  "schemathesis==4.31.1",
 ]
 
 [tool.uv]

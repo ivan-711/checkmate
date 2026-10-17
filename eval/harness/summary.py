@@ -34,7 +34,9 @@ def render(numbers: dict, manifest: dict | None = None) -> str:
     if manifest:
         lines.append(f"Harness run `{manifest.get('runId')}` ({manifest.get('config')}, seed {manifest.get('seed')}, "
                      f"scorer `{manifest.get('scorerVersion')}`, thresholds `{manifest.get('thresholdSetId')}`), "
-                     "development components only, out of fold. Synthetic data; descriptive.")
+                     "development components only, out of fold. Synthetic data; descriptive. "
+                     f"95% intervals: percentile bootstrap over dependency components, "
+                     f"{manifest.get('bootstrapResamples')} seeded resamples.")
         lines.append("")
     lines.append("| Number | Value | 95% interval | n pairs | n entities | n components | flags |")
     lines.append("|---|---|---|---|---|---|---|")

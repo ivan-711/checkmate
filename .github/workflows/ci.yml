@@ -18,7 +18,6 @@ env:
   UV_VERSION: "0.10.9"
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "24"
-  SCHEMATHESIS_VERSION: "4.31.1"
   DATABASE_URL: postgresql://checkmate:checkmate@127.0.0.1:5432/checkmate
   FRONTDESK_AGENT_MODE: REPLAY
 
@@ -106,14 +105,17 @@ jobs:
           done
           echo "API did not come up"; cat request.log; exit 1
       - name: Contract test (contracts/README.md command; stubs answer 501 so not_a_server_error is excluded)
-        run: uvx --from "schemathesis==${SCHEMATHESIS_VERSION}" schemathesis run http://127.0.0.1:8000/openapi.json --checks all --exclude-checks not_a_server_error
+        # schemathesis is a locked dev dependency (uv.lock), never resolved live
+        run: uv run schemathesis run http://127.0.0.1:8000/openapi.json --checks all --exclude-checks not_a_server_error
       - name: No 5xx other than 501 in the request log
         run: |
           set -euo pipefail
+          total=$(grep -c 'status=' request.log || true)
+          if [ "$total" -eq 0 ]; then echo "request log has no request lines: the 5xx check would be vacuous"; exit 1; fi
           if grep -E 'status=5[0-9]{2}' request.log | grep -v 'status=501' | grep -q .; then
             echo "non-501 server errors in the request log:"; grep -E 'status=5[0-9]{2}' request.log | grep -v 'status=501'; exit 1
           fi
-          echo "request log: $(grep -c 'status=' request.log) requests, no non-501 5xx"
+          echo "request log: ${total} requests, no non-501 5xx"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
@@ -245,6 +247,8 @@ jobs:
           npx playwright test
       - name: No 5xx other than 501 in the request log (eval plan section 9, acceptance invariant)
         run: |
+          total=$(grep -c 'status=' request.log || true)
+          if [ "$total" -eq 0 ]; then echo "request log has no request lines: the 5xx check would be vacuous"; exit 1; fi
           if grep -E 'status=5[0-9]{2}' request.log | grep -v 'status=501' | grep -q .; then
             grep -E 'status=5[0-9]{2}' request.log | grep -v 'status=501'; exit 1
           fi
@@ -297,12 +301,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          previous=$(gh run list --workflow ci.yml --branch main --event push --status success --json databaseId --jq '.[0].databaseId' || true)
-          if [ -n "$previous" ] && gh run download "$previous" -n harness-run -D baseline 2>/dev/null; then
-            echo "baseline run $previous downloaded"; echo "dir=baseline" >> "$GITHUB_OUTPUT"
-          else
-            echo "no baseline run yet"; echo "dir=" >> "$GITHUB_OUTPUT"
+          # a failed listing or download fails the job: it must never read as "no baseline" and seed the next one
+          previous=$(gh run list --workflow ci.yml --branch main --event push --status success --limit 1 \
+            --json databaseId --jq '.[0].databaseId // empty')
+          if [ -z "$previous" ]; then
+            echo "no previous green main run: invariants only"; echo "dir=" >> "$GITHUB_OUTPUT"; exit 0
           fi
+          for attempt in 1 2 3; do
+            if gh run download "$previous" -n harness-run -D baseline; then
+              echo "baseline run $previous downloaded"; echo "dir=baseline" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            echo "download attempt ${attempt} failed; retry in 10 s"; rm -rf baseline; sleep 10
+          done
+          echo "green run $previous exists but its harness-run artifact could not be downloaded"; exit 1
       - name: Compare against tolerance (eval/expectations/tolerance.json)
         id: compare
         run: |

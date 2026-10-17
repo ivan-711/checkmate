@@ -29,12 +29,6 @@ if TYPE_CHECKING:
     from eval.harness.run import RunResult
 
 NAMESPACE = uuid.UUID("6f1b4a3e-2c7d-4d0a-9a6e-5a1e00000000")  # fixed: record ids are stable across runs
-CAPTIONS = {
-    WhatIfButton.REMOVE_ADDRESS: "Without the address there is not enough to link.",
-    WhatIfButton.CHANGE_BIRTH_YEAR: "A different birth year: not enough to link.",
-    WhatIfButton.SWAP_DOB_DAY_MONTH: "Day and month swapped: the engine has a named feature for this; the score barely moves.",
-    WhatIfButton.ACCENT_HYPHEN_SURNAME: "Accents and hyphens changed: a named feature; the score barely moves.",
-}
 BUTTON_FEATURE = {WhatIfButton.REMOVE_ADDRESS: "address_jaccard", WhatIfButton.CHANGE_BIRTH_YEAR: "dob_exact",
                   WhatIfButton.SWAP_DOB_DAY_MONTH: "dob_day_month_swap", WhatIfButton.ACCENT_HYPHEN_SURNAME: "family_name_jw"}
 MONTHS_ES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
@@ -135,7 +129,8 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
                              f"{hero.entity_id}{'' if qualified else ' (best partial; see hero.unmetCriteria)'}; "
                              f"scorer {scorer}; thresholds {thresholds_id}; seed {selection.seed}")
     scenario["hero"] = {"provisional": provisional, "constructedFloor": False, "selectedBy": "data/hero_select.py",
-                        "qualified": qualified, "unmetCriteria": hero.unmet(),
+                        "qualified": qualified, "unmetCriteria": hero.unmet(), "criteriaLevel": hero.level,
+                        "criteriaRequired": list(hero.required),
                         "criteria": {k: hero.criteria[k] for k in hero.criteria}, "criteriaText": selection.criteria,
                         "relaxationLevel": selection.relaxation_level, "drawnFromTest": selection.drawn_from_test,
                         "seed": selection.seed, "entityId": hero.entity_id, "scorerVersion": scorer,
@@ -208,7 +203,8 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
             "deltas": [{"feature": f, "logit": round(s.contributions.get(f, 0.0) - base.contributions.get(f, 0.0), 6), "value": None}
                        for f in FEATURES if abs(s.contributions.get(f, 0.0) - base.contributions.get(f, 0.0)) > 1e-9] or
                       [{"feature": feat, "logit": 0.0, "value": None}],
-            "caption": CAPTIONS[button], "counterfactualFields": {feat: _counterfactual(button, er, hero)},
+            "caption": whatifs.caption_for(button.value, base.band, s.band, s.p - base.p),
+            "counterfactualFields": {feat: _counterfactual(button, er, hero)},
             "alertWouldBeHidden": s.band == BAND_KEEP_SEPARATE, "heldOutRecall": recall, "seed": selection.seed,
         }
     intake = utterances(er)
@@ -222,7 +218,9 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
         "scorerVersion": scorer, "thresholdsId": thresholds_id,
         "cLow": c_low, "cHigh": c_high, "records": {"ER_FHIR": er, "CLINIC_CSV": clinic},
         "baseline": asdict(base), "whatIfs": {k: asdict(v) for k, v in hero.what_ifs.items()}, "intake": asdict(hero.intake),
-        "criteria": hero.criteria, "weights": dict(result.weights),
+        "exportedWhatIfKeys": {b.value: _whatif_key(b, hero) for b in WhatIfButton},
+        "criteria": hero.criteria, "criteriaLevel": hero.level, "criteriaRequired": list(hero.required),
+        "weights": dict(result.weights),
         "constructedOverlay": {"allergyRef": allergy_ref, "orderRef": order_ref, "isConstructed": True},
     }, indent=2, ensure_ascii=False) + "\n")
     (out / "frontdesk_intake.json").write_text(json.dumps({

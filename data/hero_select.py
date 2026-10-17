@@ -111,15 +111,21 @@ class Candidate:
     what_ifs: dict[str, Scored]
     intake: Scored
     criteria: dict[str, bool] = field(default_factory=dict)
+    level: int | None = None
+    required: list[str] = field(default_factory=list)
     distance_to_midpoint: float = 0.0
     tie_break: str = ""
 
     @property
     def passed(self) -> int:
-        return sum(1 for v in self.criteria.values() if v)
+        return sum(1 for k in self.required if self.criteria.get(k))
+
+    def qualifies(self) -> bool:
+        return all(self.criteria.get(k) for k in self.required)
 
     def unmet(self) -> list[str]:
-        return [k for k, v in self.criteria.items() if not v]
+        """Criteria required at ``level`` that the candidate does not meet."""
+        return [k for k in self.required if not self.criteria.get(k)]
 
 
 @dataclass
@@ -195,8 +201,10 @@ def evaluate(c: Candidate, level: Level, midpoint: float) -> Candidate:
         "fixture_check_bounds": (all(0.0 <= s.p <= 1.0 for s in every) and all(s.band != BAND_AUTO_LINK for s in every)
                                  and all(s.p <= base_p + P_RAISE_BOUND for s in c.what_ifs.values())
                                  and not c.baseline.negative_rules_fired),
-        "spanish_name": (c.language == "ES") if level.require_spanish else True,
+        "spanish_name": c.language == "ES",  # a fact; required only at level 0
     }
+    c.level = level.index
+    c.required = [k for k in c.criteria if k != "spanish_name" or level.require_spanish]
     c.distance_to_midpoint = round(abs(c.baseline.raw_score - midpoint), 6)
     return c
 
@@ -229,7 +237,7 @@ def select_hero(corpus: Corpus, assignment: Assignment, match: MatchFn, weights:
         "accent_hyphen_surname_robust": "ACCENT_HYPHEN_SURNAME moves p by at most the tolerance (0.05; level 2: 0.10)",
         "intake_rendering_review": "the intake rendering of the ER fragment lands in REVIEW against the Clinic record",
         "fixture_check_bounds": "p in [0,1]; no AUTO_LINK; no what-if raises p above baseline + 0.005; no negative rule",
-        "spanish_name": "Spanish-language name (level 0 only)",
+        "spanish_name": "Spanish-language name (reported as a fact; required at level 0 only)",
     }
     levels = list(LEVELS) if require_spanish else [lv for lv in LEVELS if not lv.require_spanish]
 
@@ -246,7 +254,7 @@ def select_hero(corpus: Corpus, assignment: Assignment, match: MatchFn, weights:
         counts: dict[str, int] = {}
         for level in levels:
             qualifiers = [evaluate(c, level, midpoint) for c in candidates]
-            qualifiers = [c for c in qualifiers if all(c.criteria.values())]
+            qualifiers = [c for c in qualifiers if c.qualifies()]
             counts[str(level.index)] = len(qualifiers)
             if qualifiers:
                 return candidates, min(qualifiers, key=_rank_key), level.index, counts, len(by_entity)

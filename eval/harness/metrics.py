@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import itertools
 import random
+from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
@@ -56,39 +57,51 @@ def support(pairs: Iterable[ScoredPair]) -> dict[str, int]:
     return {"n_pairs": len(pairs), "n_entities": len(entities), "n_components": len(components)}
 
 
-def _weighted_rate(numer: Sequence[ScoredPair], denom: Sequence[ScoredPair], counts: dict[str, int]) -> float | None:
-    """A pair inside one component takes that component's draw count; a cross-component pair takes
-    the product of both endpoints' draw counts (eval plan section 5)."""
+def _aggregate(numer: Sequence[ScoredPair], denom: Sequence[ScoredPair]):
+    """Per-component (numerator, denominator) pair counts, plus the cross-component pairs.
 
-    def weight(p: ScoredPair) -> int:
+    A pair inside one component takes that component's draw count; a cross-component pair takes the
+    product of both endpoints' draw counts (eval plan section 5), so both endpoints are resampled."""
+    numer_keys = Counter((p.record_a, p.record_b, p.entity_a, p.entity_b) for p in numer)
+    within: dict[str, list[int]] = {}
+    cross: dict[tuple[str, str], list[int]] = {}
+    for p in denom:
+        hit = 1 if numer_keys[(p.record_a, p.record_b, p.entity_a, p.entity_b)] > 0 else 0
         if p.component_a == p.component_b:
-            return counts.get(p.component_a, 0)
-        return counts.get(p.component_a, 0) * counts.get(p.component_b, 0)
-
-    d = sum(weight(p) for p in denom)
-    if d == 0:
-        return None
-    return sum(weight(p) for p in numer) / d
+            cell = within.setdefault(p.component_a, [0, 0])
+        else:
+            cell = cross.setdefault((p.component_a, p.component_b), [0, 0])
+        cell[0] += hit
+        cell[1] += 1
+    return within, cross
 
 
 def bootstrap_ci(numer: Sequence[ScoredPair], denom: Sequence[ScoredPair], seed: int,
                  resamples: int = BOOTSTRAP_RESAMPLES) -> list[float] | None:
     """Percentile grouped bootstrap over dependency components. Returns ``[low, high]`` or None when
-    the denominator is empty. The resampling unit is the component."""
-    components = sorted({c for p in denom for c in p.components})
-    if not components or not denom:
+    the denominator is empty. The resampling unit is the component; ``numer`` is a subset of ``denom``."""
+    if not denom:
         return None
+    within, cross = _aggregate(numer, denom)
+    components = sorted({c for p in denom for c in p.components})
     rng = random.Random(seed)
-    values: list[float] = []
     n = len(components)
+    values: list[float] = []
     for _ in range(resamples):
-        counts: dict[str, int] = {}
-        for _ in range(n):
-            c = components[rng.randrange(n)]
-            counts[c] = counts.get(c, 0) + 1
-        rate = _weighted_rate(numer, denom, counts)
-        if rate is not None:
-            values.append(rate)
+        counts = Counter(rng.choices(components, k=n))
+        num = den = 0
+        for comp, (h, d) in within.items():
+            k = counts.get(comp, 0)
+            if k:
+                num += k * h
+                den += k * d
+        for (ca, cb), (h, d) in cross.items():
+            k = counts.get(ca, 0) * counts.get(cb, 0)
+            if k:
+                num += k * h
+                den += k * d
+        if den:
+            values.append(num / den)
     if not values:
         return None
     values.sort()
@@ -131,15 +144,16 @@ def count(pairs: Sequence[ScoredPair]) -> dict:
     return {"value": len(pairs), **support(pairs)}
 
 
-def band_metrics(pairs: Sequence[ScoredPair], true_pairs_total: int, c_low: float, c_high: float, seed: int,
-                 resamples: int = BOOTSTRAP_RESAMPLES) -> dict[str, dict]:
+def band_metrics(pairs: Sequence[ScoredPair], missed_true: Sequence[ScoredPair], c_low: float, c_high: float,
+                 seed: int, resamples: int = BOOTSTRAP_RESAMPLES) -> dict[str, dict]:
     """Per-band precision and recall (the PRD wording), STRICT and LENIENT, false-merge rate,
-    review burden, missed-match rate. ``true_pairs_total`` is |P| so blocking misses count as misses."""
+    review burden, missed-match rate. ``missed_true`` are the true pairs blocking never proposed, each
+    with its own entities and components, so end-to-end recall counts them as misses (|P| denominator)."""
     by_band: dict[str, list[ScoredPair]] = {b: [] for b in BANDS}
     for p in pairs:
         by_band[p.band(c_low, c_high)].append(p)
     true_blocked = [p for p in pairs if p.is_match]
-    all_true = _phantom_true_pairs(true_blocked, true_pairs_total)
+    all_true = list(true_blocked) + list(missed_true)
     auto, review, keep = by_band[BAND_AUTO_LINK], by_band[BAND_REVIEW], by_band[BAND_KEEP_SEPARATE]
     auto_true = [p for p in auto if p.is_match]
     review_true = [p for p in review if p.is_match]
@@ -163,27 +177,17 @@ def band_metrics(pairs: Sequence[ScoredPair], true_pairs_total: int, c_low: floa
     return out
 
 
-def _phantom_true_pairs(true_blocked: Sequence[ScoredPair], true_pairs_total: int) -> list[ScoredPair]:
-    """End-to-end denominators include true pairs blocking missed. They enter with the component of a
-    neighbour so the bootstrap keeps the right support; their score is -inf so they are never counted."""
-    missed = true_pairs_total - len(true_blocked)
-    phantoms: list[ScoredPair] = []
-    for i in range(max(missed, 0)):
-        anchor = true_blocked[i % len(true_blocked)] if true_blocked else None
-        comp = anchor.component_a if anchor else f"missed:{i}"
-        ent = anchor.entity_a if anchor else f"missed:{i}"
-        phantoms.append(ScoredPair(f"missed:{i}", f"missed:{i}", ent, ent, comp, comp, float("-inf"), 0.0, ()))
-    return list(true_blocked) + phantoms
-
-
-def blocking_metrics(true_pairs: set[tuple[str, str]], blocked_pairs: set[tuple[str, str]], all_pairs_n: int) -> dict:
-    """Blocking recall |P ∩ B| / |P| and reduction ratio 1 − |B| / N, quoted with N."""
-    hit = len(true_pairs & blocked_pairs)
+def blocking_metrics(true_pairs: Sequence[ScoredPair], blocked: set[tuple[str, str]], all_pairs_n: int,
+                     seed: int, resamples: int = BOOTSTRAP_RESAMPLES) -> dict:
+    """Blocking recall |P ∩ B| / |P| (a rate with n and its interval) and reduction ratio 1 − |B| / N, quoted with N."""
+    hits = [p for p in true_pairs if (p.record_a, p.record_b) in blocked or (p.record_b, p.record_a) in blocked]
+    recall = rate(hits, true_pairs, seed, resamples)
+    recall.update(n_true_pairs=len(true_pairs), n_hit=len(hits),
+                  note="keys were built after reading the taxonomy; partly by construction")
     return {
-        "blocking.recall": {"value": (hit / len(true_pairs)) if true_pairs else None, "n_true_pairs": len(true_pairs),
-                            "n_hit": hit, "note": "keys were built after reading the taxonomy; partly by construction"},
-        "blocking.reduction_ratio": {"value": (1 - len(blocked_pairs) / all_pairs_n) if all_pairs_n else None,
-                                     "n_blocked": len(blocked_pairs), "N": all_pairs_n},
+        "blocking.recall": recall,
+        "blocking.reduction_ratio": {"value": (1 - len(blocked) / all_pairs_n) if all_pairs_n else None,
+                                     "n_blocked": len(blocked), "N": all_pairs_n},
     }
 
 

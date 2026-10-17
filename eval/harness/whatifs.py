@@ -84,3 +84,29 @@ TRANSFORMS: dict[str, Callable[[Record], Record]] = {
     SWAP_DOB_DAY_MONTH: swap_dob_day_month,
     ACCENT_HYPHEN_SURNAME: accent_plus_hyphen,
 }
+
+
+# Captions are derived from the band change and score movement the export actually ships (architecture
+# 9.1: narrate only the band changes that occur). "not enough to link" appears only with KEEP_SEPARATE,
+# and is abstention (INSUFFICIENT_EVIDENCE), never "two people".
+CAPTION_PREFIX = {REMOVE_ADDRESS: "Without the address", CHANGE_BIRTH_YEAR: "A different birth year",
+                  SWAP_DOB_DAY_MONTH: "Day and month swapped", ACCENT_HYPHEN_SURNAME: "Accents and hyphens changed"}
+NAMED_FEATURE = {SWAP_DOB_DAY_MONTH: "the engine has a named feature for this",
+                 ACCENT_HYPHEN_SURNAME: "a named feature"}
+BAND_WORDS = {"AUTO_LINK": "the auto-link band", "REVIEW": "review", "KEEP_SEPARATE": "keep separate"}
+BARELY_MOVES_P = 0.05  # the published robustness tolerance (eval plan section 3)
+
+
+def caption_for(button: str, baseline_band: str, what_if_band: str, delta_p: float) -> str:
+    prefix = CAPTION_PREFIX[button]
+    if what_if_band == "KEEP_SEPARATE" and baseline_band != "KEEP_SEPARATE":
+        if button == REMOVE_ADDRESS:
+            return "Without the address there is not enough to link."
+        return f"{prefix}: not enough to link."
+    if what_if_band != baseline_band:
+        return f"{prefix}: the pair moves to {BAND_WORDS[what_if_band]}."
+    movement = ("the score barely moves" if abs(delta_p) <= BARELY_MOVES_P
+                else f"the probability estimate moves by {delta_p:+.2f}")
+    if button in NAMED_FEATURE:
+        return f"{prefix}: {NAMED_FEATURE[button]}; {movement}."
+    return f"{prefix}: the pair stays in {BAND_WORDS[what_if_band]}; {movement}."

@@ -268,8 +268,18 @@
     "accent_hyphen_surname_robust": true,
     "intake_rendering_review": true,
     "fixture_check_bounds": false,
-    "spanish_name": true
+    "spanish_name": false
   },
+  "criteriaLevel": 3,
+  "criteriaRequired": [
+    "baseline_review",
+    "remove_address_keep_separate",
+    "change_birth_year_keep_separate",
+    "swap_dob_day_month_robust",
+    "accent_hyphen_surname_robust",
+    "intake_rendering_review",
+    "fixture_check_bounds"
+  ],
   "weights": {
     "intercept": -4.5,
     "given_name_jw": 1.4,

@@ -1,7 +1,7 @@
 """Choosing the operating point, false-merge first (eval plan section 5; architecture section 6).
 
 On out-of-fold development raw scores:
-    curve  = monotone envelope of FP_auto(c) / N_auto(c)
+    curve  = monotone envelope of FP_auto(c) / N_auto(c) (see ``_envelope``)
     c_high = smallest c with curve(c) <= alpha and auto-links at c drawn from >= min_components
              fallback if unreachable: the c with the lowest envelope value among c meeting the floor
     c_low  = largest c with missed_true(c) / N_true_blocked <= beta and review_burden <= max burden
@@ -10,6 +10,7 @@ The envelope value is descriptive, never a guarantee.
 """
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 
@@ -58,6 +59,30 @@ def _auto_at(pairs: Sequence[ScoredPair], c: float) -> list[ScoredPair]:
     return [p for p in pairs if p.raw_score >= c and not p.negative_rules_fired]
 
 
+def _envelope(raw_rate: list[float | None], autos: list[int], comps: list[int],
+              cfg: ThresholdConfig) -> list[float | None]:
+    """Monotone envelope from the right over the cutoffs whose rate can be trusted.
+
+    envelope(c) = max(rate(c), max of rate(c') over every c' > c that is *resolvable*). A cutoff is
+    resolvable when it meets the component support floor and holds at least ceil(1 / alpha) auto-links,
+    so one event moves its rate by no more than alpha. That keeps the envelope's purpose (a lucky dip
+    at a low c cannot win while a resolvable higher cutoff is dirtier) without letting one false pair
+    in a thin top region (n = 1, or 81 auto-links where one event is 1.2%) make alpha unreachable at
+    every cutoff below it (R5 #3). Derived from alpha and the floor; no new threshold value.
+    """
+    resolve_n = math.ceil(1.0 / cfg.alpha) if cfg.alpha > 0 else 1
+    envelope: list[float | None] = [None] * len(raw_rate)
+    running: float | None = None
+    for i in range(len(raw_rate) - 1, -1, -1):
+        own = raw_rate[i]
+        if own is not None:
+            envelope[i] = own if running is None else max(running, own)
+        resolvable = own is not None and comps[i] >= cfg.min_components and autos[i] >= resolve_n
+        if resolvable:
+            running = own if running is None else max(running, own)
+    return envelope
+
+
 def select_thresholds(pairs: Sequence[ScoredPair], cfg: ThresholdConfig | None = None) -> ThresholdSelection:
     cfg = cfg or ThresholdConfig()
     if not pairs:
@@ -71,14 +96,8 @@ def select_thresholds(pairs: Sequence[ScoredPair], cfg: ThresholdConfig | None =
         autos.append(len(auto))
         comps.append(len({k for p in auto for k in p.components}))
         raw_rate.append((sum(1 for p in auto if not p.is_match) / len(auto)) if auto else None)
-    # monotone envelope from the right: envelope(c) = max rate over c' >= c (a lucky noisy dip cannot win)
-    envelope: list[float | None] = [None] * len(cuts)
-    running: float | None = None
-    for i in range(len(cuts) - 1, -1, -1):
-        if raw_rate[i] is not None:
-            running = raw_rate[i] if running is None else max(running, raw_rate[i])
-        envelope[i] = running
-    supported = [i for i in range(len(cuts)) if comps[i] >= cfg.min_components and envelope[i] is not None]
+    supported = [i for i in range(len(cuts)) if comps[i] >= cfg.min_components and raw_rate[i] is not None]
+    envelope = _envelope(raw_rate, autos, comps, cfg)
     reachable = [i for i in supported if envelope[i] <= cfg.alpha]
     fallback = False
     if reachable:

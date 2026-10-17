@@ -10,6 +10,16 @@
       "change_birth_year_keep_separate",
       "fixture_check_bounds"
     ],
+    "criteriaLevel": 3,
+    "criteriaRequired": [
+      "baseline_review",
+      "remove_address_keep_separate",
+      "change_birth_year_keep_separate",
+      "swap_dob_day_month_robust",
+      "accent_hyphen_surname_robust",
+      "intake_rendering_review",
+      "fixture_check_bounds"
+    ],
     "criteria": {
       "baseline_review": true,
       "remove_address_keep_separate": true,
@@ -18,7 +28,7 @@
       "accent_hyphen_surname_robust": true,
       "intake_rendering_review": true,
       "fixture_check_bounds": false,
-      "spanish_name": true
+      "spanish_name": false
     },
     "criteriaText": {
       "baseline_review": "baseline band is REVIEW (never relaxed)",
@@ -28,7 +38,7 @@
       "accent_hyphen_surname_robust": "ACCENT_HYPHEN_SURNAME moves p by at most the tolerance (0.05; level 2: 0.10)",
       "intake_rendering_review": "the intake rendering of the ER fragment lands in REVIEW against the Clinic record",
       "fixture_check_bounds": "p in [0,1]; no AUTO_LINK; no what-if raises p above baseline + 0.005; no negative rule",
-      "spanish_name": "Spanish-language name (level 0 only)"
+      "spanish_name": "Spanish-language name (reported as a fact; required at level 0 only)"
     },
     "relaxationLevel": null,
     "drawnFromTest": false,
@@ -1003,7 +1013,7 @@
           "value": null
         }
       ],
-      "caption": "A different birth year: not enough to link.",
+      "caption": "A different birth year: the pair stays in review; the score barely moves.",
       "counterfactualFields": {
         "dob_exact": "1998-04-12"
       },

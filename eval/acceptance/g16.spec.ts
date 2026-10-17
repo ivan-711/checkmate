@@ -1,5 +1,36 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { API_BASE } from './playwright.config';
+
+// The hero the engine exported (data/hero_select.py). The cards and the golden record must be the
+// hero's, not any two records: a stub rendering two cards, REVIEW and BL-AMOX-01 must not pass.
+const SCENARIO_PATH = process.env.CHECKMATE_SCENARIO ?? resolve(__dirname, '../../data/scenarios/hero/scenario.json');
+
+interface HeroNormalized {
+  givenName: string | null;
+  familyName: string | null;
+  birthDate: string | null;
+}
+
+interface HeroScenario {
+  session: { sources: Array<{ record: { sourceSystem: string }; normalized: HeroNormalized }> };
+  entityIfApproved: { golden: Array<{ field: string; value: unknown }> };
+}
+
+const HERO = JSON.parse(readFileSync(SCENARIO_PATH, 'utf8')) as HeroScenario;
+
+function heroSource(system: string): HeroNormalized {
+  const source = HERO.session.sources.find((s) => s.record.sourceSystem === system);
+  if (!source) throw new Error(`scenario.json has no ${system} source`);
+  return source.normalized;
+}
+
+function heroGolden(field: string): string {
+  const value = HERO.entityIfApproved.golden.find((g) => g.field === field)?.value;
+  if (typeof value !== 'string' || value.length === 0) throw new Error(`scenario.json golden ${field} missing`);
+  return value;
+}
 
 /**
  * G16 demo path (CLAUDE.md wave 1, integration gate). Written before the UI exists: every locator
@@ -101,8 +132,14 @@ test.describe('G16 demo path', () => {
     await byId(page, T.resetButton).click();
     const cards = byId(page, T.sourceCard);
     await expect(cards).toHaveCount(2);
-    await expect(page.locator(`[data-testid="${T.sourceCard}"][data-source-system="ER_FHIR"]`)).toHaveCount(1);
-    await expect(page.locator(`[data-testid="${T.sourceCard}"][data-source-system="CLINIC_CSV"]`)).toHaveCount(1);
+    for (const system of ['ER_FHIR', 'CLINIC_CSV']) {
+      const card = page.locator(`[data-testid="${T.sourceCard}"][data-source-system="${system}"]`);
+      await expect(card).toHaveCount(1);
+      const hero = heroSource(system);
+      for (const value of [hero.givenName, hero.familyName]) {
+        if (value) await expect(card, `${system} card shows the hero's ${value}`).toContainText(value);
+      }
+    }
 
     // 2. resolve: the hero pair lands in REVIEW with the evidence rail
     await byId(page, T.resolveButton).click();
@@ -124,6 +161,8 @@ test.describe('G16 demo path', () => {
 
     // 5. cards collapse into one golden record with crosswalk chips; the timeline shows both sources
     await expect(byId(page, T.goldenRecord)).toBeVisible();
+    await expect(byId(page, T.goldenRecord)).toContainText(heroGolden('givenName'));
+    await expect(byId(page, T.goldenRecord)).toContainText(heroGolden('familyName'));
     await expect(byId(page, T.sourceCard)).toHaveCount(0);
     expect(await byId(page, T.crosswalkChip).count()).toBeGreaterThan(0);
     await expect(byId(page, T.timeline)).toBeVisible();

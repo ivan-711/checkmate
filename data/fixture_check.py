@@ -119,15 +119,28 @@ def run_checks(d: Path, strict: bool = False) -> list[Check]:
                             PASS if exported_band == base["band"] else FAIL, f"{exported_band} vs {base['band']}"))
 
     # the exported CHANGE_BIRTH_YEAR direction is the one the UI shows; the other enters only the criterion
-    exported_year = scenario["whatIfs"][whatifs.CHANGE_BIRTH_YEAR]["whatIf"]["rawScore"]
-    shown = {k: s for k, s in what.items() if not k.startswith(whatifs.CHANGE_BIRTH_YEAR)
-             or abs(s["raw_score"] - exported_year) < 1e-6}
+    exported_keys = hero.get("exportedWhatIfKeys") or {}
+    year_key = exported_keys.get(whatifs.CHANGE_BIRTH_YEAR)
+    if year_key is None:  # older exports: the direction whose raw score was shipped
+        shipped_raw = scenario["whatIfs"][whatifs.CHANGE_BIRTH_YEAR]["whatIf"]["rawScore"]
+        year_key = next(k for k, v in what.items() if k.startswith(whatifs.CHANGE_BIRTH_YEAR)
+                        and abs(v["raw_score"] - shipped_raw) < 1e-6)
+    shown = {k: v for k, v in what.items() if not k.startswith(whatifs.CHANGE_BIRTH_YEAR) or k == year_key}
+    unshipped = {k: v for k, v in what.items() if k not in shown}
     every = [base, intake, *shown.values()]
-    checks.append(Check("p in [0, 1] everywhere", PASS if all(0.0 <= s["p"] <= 1.0 for s in every) else FAIL))
-    checks.append(Check("no AUTO_LINK anywhere", PASS if all(s["band"] != BAND_AUTO_LINK for s in every) else FAIL,
-                        ", ".join(k for k, s in shown.items() if s["band"] == BAND_AUTO_LINK)))
-    raised = [k for k, s in shown.items() if s["p"] > base["p"] + P_RAISE_BOUND]
+    checks.append(Check("p in [0, 1] everywhere", PASS if all(0.0 <= v["p"] <= 1.0 for v in every) else FAIL))
+    shown_auto = [k for k, v in shown.items() if v["band"] == BAND_AUTO_LINK]
+    if base["band"] == BAND_AUTO_LINK or intake["band"] == BAND_AUTO_LINK:
+        shown_auto.append("baseline or intake")
+    unshipped_auto = [k for k, v in unshipped.items() if v["band"] == BAND_AUTO_LINK]
+    # both birth-year directions count (independent review #1): a shipped AUTO_LINK always fails; the
+    # direction not shipped warns on the provisional hero and fails the 20:00 gate (--strict)
+    status = FAIL if shown_auto else _soft(bool(unshipped_auto), strict)
+    checks.append(Check("no AUTO_LINK anywhere (both birth-year directions)", status,
+                        ", ".join(shown_auto + [f"{k} (not shipped)" for k in unshipped_auto])))
+    raised = [k for k, v in shown.items() if v["p"] > base["p"] + P_RAISE_BOUND]
     checks.append(Check(f"no what-if raises p above baseline + {P_RAISE_BOUND}", _soft(bool(raised), strict), ", ".join(raised)))
+    checks.extend(_caption_checks(scenario, hero, strict))
     checks.append(Check("no negative rule fires on the baseline", PASS if not base["negative_rules_fired"] else FAIL,
                         ", ".join(base["negative_rules_fired"])))
     checks.append(Check("bands come from the raw cutoffs", PASS if all(
@@ -164,6 +177,34 @@ def run_checks(d: Path, strict: bool = False) -> list[Check]:
                         "transcript authored before 16:00 (ADR-016 section 7)" if not transcript.exists()
                         else "replay adapter lands with lane Q1"))
     return checks
+
+
+def _caption_checks(scenario: dict, hero: dict, strict: bool) -> list[Check]:
+    """Every shipped caption and alert flag matches the band it ships with (R5 #1/#13; independent #2)."""
+    out: list[Check] = []
+    mismatched, hidden_wrong, unchanged = [], [], []
+    for button, wi in scenario["whatIfs"].items():
+        base_band, band = wi["baseline"]["band"], wi["whatIf"]["band"]
+        expected = whatifs.caption_for(button, base_band, band, wi["whatIf"]["p"] - wi["baseline"]["p"])
+        if wi["caption"] != expected or ("not enough to link" in wi["caption"].lower() and band != BAND_KEEP_SEPARATE):
+            mismatched.append(f"{button}: {wi['caption']!r} ships with {band}")
+        if wi["alertWouldBeHidden"] != (band == BAND_KEEP_SEPARATE):
+            hidden_wrong.append(f"{button}: alertWouldBeHidden={wi['alertWouldBeHidden']} with {band}")
+        if whatifs.BUTTON_KIND[button] == "band_changer" and band == base_band:
+            unchanged.append(button)
+    out.append(Check("captions match the band each what-if ships with", FAIL if mismatched else PASS,
+                     "; ".join(mismatched)))
+    out.append(Check("alertWouldBeHidden matches KEEP_SEPARATE", FAIL if hidden_wrong else PASS, "; ".join(hidden_wrong)))
+    criterion = {whatifs.REMOVE_ADDRESS: "remove_address_keep_separate",
+                 whatifs.CHANGE_BIRTH_YEAR: "change_birth_year_keep_separate"}
+    labelled = set(hero.get("unmetCriteria") or ())
+    honest = all(criterion[b] in labelled for b in unchanged) and not hero.get("qualified")
+    # a band-changer whose band did not change fails, unless the export is a best-partial hero that names
+    # this criterion as unmet (then it warns, and the 20:00 gate fails it)
+    status = PASS if not unchanged else (WARN if honest and not strict else FAIL)
+    out.append(Check("band-changers change the band", status,
+                     ", ".join(unchanged) + (" (best partial; listed in unmetCriteria)" if unchanged and honest else "")))
+    return out
 
 
 def _policy_check(scenario: dict, strict: bool) -> Check:

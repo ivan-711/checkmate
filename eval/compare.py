@@ -39,6 +39,13 @@ def compare(baseline: dict, candidate: dict, tolerance: dict, baseline_metrics: 
     if invariants_only:
         notes.append("no baseline run: invariants checked, tolerance not applied")
         return breaches, notes
+    data_a = {k: (baseline_metrics or {}).get(k) for k in ("fixtureHashes", "seed")}
+    data_b = {k: (candidate_metrics or {}).get(k) for k in ("fixtureHashes", "seed")}
+    if baseline_metrics and candidate_metrics and data_a != data_b:
+        # tolerance compares like with like: same seed and data, so a difference comes from the merge
+        notes.append("baseline and candidate differ in data (fixture hashes or seed): tolerance not applied; "
+                     "this run is the new baseline")
+        return breaches, notes
     scorer = (candidate_metrics or {}).get("scorerVersion")
     before = tolerance.get("beforeFirstTrainedScorer", {})
     if before.get("invariantsOnly") and scorer in before.get("standInScorerVersions", []):

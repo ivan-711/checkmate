@@ -60,10 +60,11 @@ from eval.harness.whatifs import BUTTON_CATEGORIES, BUTTON_KIND, BUTTONS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EXPECTATIONS_DIR = REPO_ROOT / "eval" / "expectations"
+ACCEPTANCE_DIR = REPO_ROOT / "eval" / "acceptance"
+ACCEPTANCE_SKIP_DIRS = frozenset({"node_modules", "test-results", "playwright-report", "__pycache__"})
 RUNS_DIR = REPO_ROOT / "eval" / "runs"
 FAST_LATENCY = (20, 200)   # warm-up, timed: per merge
 FULL_LATENCY = (latency_mod.WARMUP_CALLS, latency_mod.TIMED_CALLS)
-FAST_BOOTSTRAP = 200
 EXPORT_DECIMALS = 6
 
 
@@ -115,6 +116,31 @@ def expectations_config(expectations_dir: Path) -> tuple[ThresholdConfig, SplitC
     return thresholds, splits, cfg
 
 
+def acceptance_hashes(acceptance_dir: Path = ACCEPTANCE_DIR) -> dict[str, str]:
+    """sha256 of every protected acceptance file (eval plan section 9), installed packages and reports excluded."""
+    out: dict[str, str] = {}
+    if not acceptance_dir.exists():
+        return out
+    for path in sorted(acceptance_dir.rglob("*")):
+        rel = path.relative_to(acceptance_dir)
+        if path.is_file() and not ACCEPTANCE_SKIP_DIRS & set(rel.parts):
+            out[rel.as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return out
+
+
+def held_out_families(expectations: Mapping) -> frozenset[str]:
+    """The seeded held-out families (config.json heldOutFamilies.drawn): never trained, tuned or run per merge."""
+    return frozenset((expectations.get("heldOutFamilies") or {}).get("drawn") or ())
+
+
+def without_held_out(records: Sequence[Record], held_out: frozenset[str]) -> list[Record]:
+    """Development view: a record carrying a held-out corruption family is out of training, thresholds and
+    per-merge metrics; it is scored once, in the test pass."""
+    if not held_out:
+        return list(records)
+    return [r for r in records if not held_out & set(r.get("categories") or ())]
+
+
 def expectations_hashes(expectations_dir: Path) -> dict[str, str]:
     """sha256 of every protected expectation file (eval plan section 9, protected expectations)."""
     out: dict[str, str] = {}
@@ -147,6 +173,17 @@ def true_pairs_within(records: Sequence[Record], entity_of: Mapping[str, str]) -
     return pairs
 
 
+def _truth_pair(a_id: str, b_id: str, by_id: Mapping[str, Record], entity_of: Mapping[str, str],
+                assignment: Assignment) -> ScoredPair:
+    """A true pair blocking never proposed: its own entity and components, score -inf (never counted as found)."""
+    a, b = by_id[a_id], by_id[b_id]
+    return ScoredPair(record_a=a_id, record_b=b_id, entity_a=entity_of[a_id], entity_b=entity_of[b_id],
+                      component_a=assignment.component_of_person[a["person_id"]],
+                      component_b=assignment.component_of_person[b["person_id"]],
+                      raw_score=float("-inf"), p=0.0, negative_rules_fired=(),
+                      categories=tuple(sorted(set(a.get("categories") or ()) | set(b.get("categories") or ()))))
+
+
 def _score_pairs(pairs: set[tuple[str, str]], by_id: Mapping[str, Record], entity_of: Mapping[str, str],
                  assignment: Assignment, match: MatchFn, weights: Mapping[str, float]) -> list[ScoredPair]:
     placeholder = {"c_low": 0.0, "c_high": 0.0}  # bands are recomputed from the raw score after selection
@@ -164,31 +201,46 @@ def _score_pairs(pairs: set[tuple[str, str]], by_id: Mapping[str, Record], entit
     return out
 
 
-def out_of_fold(corpus: Corpus, assignment: Assignment, cfg: RunConfig) -> tuple[list[ScoredPair], dict]:
-    """Grouped 5-fold out-of-fold scoring over development components (split steps 4 and 6)."""
+def out_of_fold(corpus: Corpus, assignment: Assignment, cfg: RunConfig,
+                held_out: frozenset[str] = frozenset()) -> tuple[list[ScoredPair], dict]:
+    """Grouped 5-fold out-of-fold scoring over development components (split steps 4 and 6).
+    Only development records reach ``fit``, ``block`` and ``match``; held-out families are excluded."""
     by_id = corpus.record_by_id()
     entity_of = corpus.entity_of()
     units = development_units(assignment)
     scored: list[ScoredPair] = []
-    truth_total: set[tuple[str, str]] = set()
+    true_keys: set[tuple[str, str]] = set()
     blocked_total: set[tuple[str, str]] = set()
     all_pairs_n = 0
+    records_n = 0
     for unit in sorted(units):
-        fold_records = records_in(corpus, assignment, {unit})
-        train_records = records_in(corpus, assignment, units - {unit})
+        fold_records = without_held_out(records_in(corpus, assignment, {unit}), held_out)
+        train_records = without_held_out(records_in(corpus, assignment, units - {unit}), held_out)
         train_ids = {r["record_id"] for r in train_records}
         train_truth = [t for t in corpus.truth if t.record_id in train_ids]
         weights = cfg.fit(train_records, train_truth)
         assert_fit_partition(train_ids, units - {unit}, corpus, assignment, f"scorer for {unit}")
         blocked = cfg.block(fold_records)
-        truth_total |= true_pairs_within(fold_records, entity_of)
+        true_keys |= true_pairs_within(fold_records, entity_of)
         blocked_total |= blocked
         n = len(fold_records)
+        records_n += n
         all_pairs_n += n * (n - 1) // 2
         scored.extend(_score_pairs(blocked, by_id, entity_of, assignment, cfg.match, weights))
-    meta = {"truePairs": truth_total, "blockedPairs": blocked_total, "allPairsN": all_pairs_n,
-            "records": sum(1 for r in corpus.records if assignment.unit_of_person(r["person_id"]) in units)}
+    true_objs = [_truth_pair(a, b, by_id, entity_of, assignment) for a, b in sorted(true_keys)]
+    missed = [p for p in true_objs if (p.record_a, p.record_b) not in blocked_total]
+    meta = {"truePairs": true_objs, "missedTrue": missed, "blockedPairs": blocked_total, "allPairsN": all_pairs_n,
+            "records": records_n}
     return scored, meta
+
+
+def candidate_pair_hash(corpus: Corpus, assignment: Assignment, cfg: RunConfig, held_out: frozenset[str]) -> str:
+    """The idempotent-ingest pair-set hash, blocked fold by fold over development records only
+    (section 9: the per-merge run never hands a test or showcase record to ``block``)."""
+    pairs: set[tuple[str, str]] = set()
+    for unit in sorted(development_units(assignment)):
+        pairs |= cfg.block(without_held_out(records_in(corpus, assignment, {unit}), held_out))
+    return hashlib.sha256(json.dumps(sorted(pairs)).encode()).hexdigest()
 
 
 def category_numbers(pairs: Sequence[ScoredPair], c_low: float, c_high: float, families: Sequence[str],
@@ -250,7 +302,10 @@ def errors_by_band(pairs: Sequence[ScoredPair], c_low: float, c_high: float) -> 
 
 def run(cfg: RunConfig) -> RunResult:
     threshold_cfg, split_cfg, expectations = expectations_config(cfg.expectations_dir)
-    resamples = cfg.bootstrap_resamples or (FAST_BOOTSTRAP if cfg.fast else expectations["bootstrapResamples"])
+    # one interval method everywhere: the configured resample count (1,000), per merge and at 20:00
+    resamples = cfg.bootstrap_resamples or int(expectations["bootstrapResamples"])
+    held_out = held_out_families(expectations)
+    families = tuple(f for f in cfg.families if f not in held_out)
     warmup, timed = cfg.latency_calls or (FAST_LATENCY if cfg.fast else FULL_LATENCY)
     bootstrap_seed = int(expectations["bootstrapSeed"]) ^ cfg.seed
 
@@ -261,26 +316,24 @@ def run(cfg: RunConfig) -> RunResult:
 
     corpus = load()
     fixture_hashes = corpus_hashes(corpus)
-    # invariant: idempotent ingest (loading twice gives the same records, truth and candidate-pair set)
-    second = load()
-    second_hashes = corpus_hashes(second)
-
-    def pair_hash(c: Corpus) -> str:
-        return hashlib.sha256(json.dumps(sorted(cfg.block(c.records))).encode()).hexdigest()
-
-    idempotent = (fixture_hashes == second_hashes and pair_hash(corpus) == pair_hash(second)
-                  and len(corpus.records) == len(second.records))
-
     assignment = assign(corpus, split_cfg)  # raises LeakageError on any hit
-    scored, meta = out_of_fold(corpus, assignment, cfg)
+    # invariant: idempotent ingest. Loading twice gives the same records, truth, split and candidate-pair set
+    second = load()
+    second_assignment = assign(second, split_cfg)
+    idempotent = (fixture_hashes == corpus_hashes(second) and len(corpus.records) == len(second.records)
+                  and assignment.as_json() == second_assignment.as_json()
+                  and candidate_pair_hash(corpus, assignment, cfg, held_out)
+                  == candidate_pair_hash(second, second_assignment, cfg, held_out))
+    scored, meta = out_of_fold(corpus, assignment, cfg, held_out)
     selection = select_thresholds(scored, threshold_cfg)
     c_low, c_high = selection.c_low, selection.c_high
     thresholds_id = thresholds_id_for(selection, cfg.scorer_version, fixture_hashes)
 
     numbers: dict[str, dict] = {}
-    numbers.update(band_metrics(scored, len(meta["truePairs"]), c_low, c_high, bootstrap_seed, resamples))
-    numbers.update(blocking_metrics(meta["truePairs"], meta["blockedPairs"], meta["allPairsN"]))
-    numbers.update(category_numbers(scored, c_low, c_high, cfg.families, bootstrap_seed, resamples))
+    numbers.update(band_metrics(scored, meta["missedTrue"], c_low, c_high, bootstrap_seed, resamples))
+    numbers.update(blocking_metrics(meta["truePairs"], meta["blockedPairs"], meta["allPairsN"], bootstrap_seed,
+                                    resamples))
+    numbers.update(category_numbers(scored, c_low, c_high, families, bootstrap_seed, resamples))
     numbers["thresholds.c_low"] = {"value": c_low}
     numbers["thresholds.c_high"] = {"value": c_high}
     numbers["thresholds.alpha_target_reachable"] = {"value": selection.c_high_reachable,
@@ -294,7 +347,7 @@ def run(cfg: RunConfig) -> RunResult:
 
     # final fit on all development components (split step 6, development-wide fit only for the final fit)
     dev_units = development_units(assignment)
-    dev_records = records_in(corpus, assignment, dev_units)
+    dev_records = without_held_out(records_in(corpus, assignment, dev_units), held_out)
     dev_ids = {r["record_id"] for r in dev_records}
     weights = cfg.fit(dev_records, [t for t in corpus.truth if t.record_id in dev_ids])
     assert_fit_partition(dev_ids, dev_units, corpus, assignment, "final scorer")
@@ -330,11 +383,13 @@ def run(cfg: RunConfig) -> RunResult:
     manifest = {
         "runId": run_id, "createdAt": datetime.now(UTC).isoformat(), "config": cfg.name, "fast": cfg.fast,
         "regime": "development" + (" + single test pass" if cfg.include_test_pass else ""),
-        "seed": cfg.seed, "families": list(cfg.families), "fixtureHashes": fixture_hashes,
+        "seed": cfg.seed, "families": list(families), "heldOutFamilies": sorted(held_out),
+        "fixtureHashes": fixture_hashes,
         "benchmarkCommit": None, "split": assignment.summary(corpus.records), "scorerVersion": cfg.scorer_version,
         "thresholdSetId": thresholds_id, "thresholds": {"cLow": c_low, "cHigh": c_high},
         "gitSha": git_sha(), "shards": 1, "bootstrapResamples": resamples, "bootstrapSeed": bootstrap_seed,
-        "expectations": expectations_hashes(cfg.expectations_dir), **cfg.extra_manifest,
+        "expectations": expectations_hashes(cfg.expectations_dir), "acceptance": acceptance_hashes(),
+        **cfg.extra_manifest,
     }
     thresholds_doc = {
         "thresholdsId": thresholds_id, "cLow": c_low, "cHigh": c_high, "tLowDisplay": t_low, "tHighDisplay": t_high,
@@ -355,6 +410,7 @@ def run(cfg: RunConfig) -> RunResult:
                           "truePairsDevelopment": len(meta["truePairs"]), "blockedPairsDevelopment": len(meta["blockedPairs"]),
                           "allPairsDevelopment": meta["allPairsN"]},
                "graph": assignment.summary(corpus.records), "expectations": manifest["expectations"],
+               "acceptance": manifest["acceptance"], "heldOutFamilies": sorted(held_out),
                "testRuns": 1 if cfg.include_test_pass else 0}
     (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (run_dir / "numbers.json").write_text(json.dumps(numbers_doc, indent=2, sort_keys=True) + "\n")
@@ -376,11 +432,14 @@ def _test_pass(corpus: Corpus, assignment: Assignment, cfg: RunConfig, weights: 
     entity_of = corpus.entity_of()
     test_records = records_in(corpus, assignment, {PARTITION_TEST})
     blocked = cfg.block(test_records)
-    truth = true_pairs_within(test_records, entity_of)
+    true_objs = [_truth_pair(a, b, by_id, entity_of, assignment)
+                 for a, b in sorted(true_pairs_within(test_records, entity_of))]
+    missed = [p for p in true_objs if (p.record_a, p.record_b) not in blocked]
     scored = _score_pairs(blocked, by_id, entity_of, assignment, cfg.match, weights)
     n = len(test_records)
-    out = {f"test.{k}": v for k, v in band_metrics(scored, len(truth), c_low, c_high, seed, resamples).items()}
-    out.update({f"test.{k}": v for k, v in blocking_metrics(truth, blocked, n * (n - 1) // 2).items()})
+    out = {f"test.{k}": v for k, v in band_metrics(scored, missed, c_low, c_high, seed, resamples).items()}
+    out.update({f"test.{k}": v for k, v in blocking_metrics(true_objs, blocked, n * (n - 1) // 2, seed,
+                                                              resamples).items()})
     out.update({f"test.{k}": v for k, v in category_numbers(scored, c_low, c_high, cfg.families, seed, resamples).items()})
     return out
 

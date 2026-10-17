@@ -35,6 +35,7 @@ def test_installs_only_from_lock_files():
     assert re.search(r"\buv sync(?! --frozen)", text) is None
     assert re.search(r"\bnpm install\b", text) is None
     assert re.search(r"\bpip install\b", text) is None
+    assert re.search(r"\buvx\b", text) is None, "uvx resolves dependencies live; run tools from the lock with uv run"
 
 
 def test_required_jobs_present():
