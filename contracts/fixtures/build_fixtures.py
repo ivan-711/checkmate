@@ -122,14 +122,14 @@ def build_scenario() -> dict:
                    "by an approved identity link. [Clinic CSV, allergies.csv row PLACEHOLDER] documents an allergy coded "
                    "penicillin V (RxNorm 7984; status active; verification not stated in source; reaction: anaphylaxis, severe). "
                    "This rule treats that code as penicillin-class. [ER FHIR, MedicationRequest/PLACEHOLDER] has an active "
-                   "order for amoxicillin 500 MG Oral Tablet, RxNorm 308192. The amoxicillin/clavulanate label (DailyMed, set "
-                   "f10634cb-6505-43f1-9b70-314c58673016, revised 10/2026) states: \"contraindicated in patients with a history "
+                   "order for amoxicillin 500 MG Oral Tablet, RxNorm 308192. The amoxicillin label (DailyMed, set "
+                   "d5eba477-e255-4d97-9e16-30543c298680, revised 3/2023) states: \"contraindicated in patients with a history "
                    "of serious hypersensitivity reactions (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin, "
                    "clavulanate or to other beta-lactam antibacterial drugs (e.g., penicillins and cephalosporins)\". "
                    "This is a rule-based flag on synthetic data. It does not say what the patient took or tolerated, or what "
                    "should be prescribed. A clinician decides."),
-        citation=Citation(label_name="Amoxicillin and clavulanate potassium (Chartwell RX)", set_id="f10634cb-6505-43f1-9b70-314c58673016",
-                          revised="10/2026", url="https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=f10634cb-6505-43f1-9b70-314c58673016",
+        citation=Citation(label_name="Amoxicillin for oral suspension (Proficient Rx)", set_id="d5eba477-e255-4d97-9e16-30543c298680",
+                          revised="3/2023", url="https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=d5eba477-e255-4d97-9e16-30543c298680",
                           quote=("contraindicated in patients with a history of serious hypersensitivity reactions (e.g., anaphylaxis "
                                  "or Stevens-Johnson syndrome) to amoxicillin, clavulanate or to other beta-lactam antibacterial drugs "
                                  "(e.g., penicillins and cephalosporins)")),

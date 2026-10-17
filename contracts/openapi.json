@@ -993,6 +993,65 @@
         "title": "HeldOutRecall",
         "type": "object"
       },
+      "HistoryEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "actorType": {
+            "title": "Actortype",
+            "type": "string"
+          },
+          "decisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisionid"
+          },
+          "eventType": {
+            "title": "Eventtype",
+            "type": "string"
+          },
+          "pairId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pairid"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "eventType",
+          "actor",
+          "actorType",
+          "summary"
+        ],
+        "title": "HistoryEvent",
+        "type": "object"
+      },
       "IntakeSession": {
         "additionalProperties": false,
         "properties": {
@@ -1514,6 +1573,90 @@
         "title": "Page[CandidatePair]",
         "type": "object"
       },
+      "Page_HistoryEvent_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEvent"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[HistoryEvent]",
+        "type": "object"
+      },
+      "Page_SafetyAlert_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SafetyAlert"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[SafetyAlert]",
+        "type": "object"
+      },
+      "Page_TimelineEvent_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineEvent"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[TimelineEvent]",
+        "type": "object"
+      },
       "PairOrigin": {
         "enum": [
           "MATCH_RUN",
@@ -2001,6 +2144,75 @@
         "title": "SourceRecord",
         "type": "object"
       },
+      "ThresholdSet": {
+        "additionalProperties": false,
+        "properties": {
+          "autoLinkEnabled": {
+            "default": false,
+            "description": "always false in the demo (ADR-015)",
+            "title": "Autolinkenabled",
+            "type": "boolean"
+          },
+          "cHigh": {
+            "title": "Chigh",
+            "type": "number"
+          },
+          "cLow": {
+            "title": "Clow",
+            "type": "number"
+          },
+          "isCalibrated": {
+            "default": false,
+            "description": "\"calibrated\" appears in the UI only when true",
+            "title": "Iscalibrated",
+            "type": "boolean"
+          },
+          "sourceRunId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcerunid"
+          },
+          "tHighDisplay": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thighdisplay"
+          },
+          "tLowDisplay": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlowdisplay"
+          },
+          "thresholdsId": {
+            "title": "Thresholdsid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "thresholdsId",
+          "cLow",
+          "cHigh"
+        ],
+        "title": "ThresholdSet",
+        "type": "object"
+      },
       "Tile": {
         "additionalProperties": false,
         "properties": {
@@ -2126,6 +2338,85 @@
         ],
         "title": "TilesResponse",
         "type": "object"
+      },
+      "TimelineEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Codes",
+            "type": "array"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "entityId": {
+            "format": "uuid",
+            "title": "Entityid",
+            "type": "string"
+          },
+          "isConstructed": {
+            "default": false,
+            "title": "Isconstructed",
+            "type": "boolean"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "title": "Occurredat",
+            "type": "string"
+          },
+          "resourceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resourceid"
+          },
+          "sourceRecordId": {
+            "format": "uuid",
+            "title": "Sourcerecordid",
+            "type": "string"
+          },
+          "sourceSystem": {
+            "title": "Sourcesystem",
+            "type": "string"
+          },
+          "type": {
+            "description": "e.g. ENCOUNTER, ALLERGY, MEDICATION_ORDER",
+            "title": "Type",
+            "type": "string"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/TimelineVerification"
+          }
+        },
+        "required": [
+          "entityId",
+          "occurredAt",
+          "type",
+          "display",
+          "sourceRecordId",
+          "sourceSystem",
+          "verification"
+        ],
+        "title": "TimelineEvent",
+        "type": "object"
+      },
+      "TimelineVerification": {
+        "enum": [
+          "CODED",
+          "CSV_DERIVED",
+          "AGENT_INTAKE_UNVERIFIED"
+        ],
+        "title": "TimelineVerification",
+        "type": "string"
       },
       "ToolCallCandidate": {
         "additionalProperties": false,
@@ -2363,6 +2654,105 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/alerts": {
+      "get": {
+        "description": "Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity; bounded list.",
+        "operationId": "list_alerts_api_v1_alerts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "entityId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entityid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SafetyAlert_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "List Alerts",
+        "tags": [
+          "core"
+        ]
+      }
+    },
     "/api/v1/candidate-pairs": {
       "get": {
         "description": "Lane W3a. Review queue ordered by |p-0.5|. Bounded list.",
@@ -2569,7 +2959,7 @@
     },
     "/api/v1/candidate-pairs/{pair_id}/reviews": {
       "post": {
-        "description": "Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. Idempotency-Key required; only PROPOSED moves; same-state request returns 200 with no new version.",
+        "description": "Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. Idempotency-Key required. PROPOSED or REJECTED may move to LINKED or REJECTED (a second review supersedes the first, so the demo can reject and then approve; history keeps both). LINKED only accepts the same-state APPROVE, which returns 200 with the current decision and no new version; any other request on a non-pending state is 409 DECISION_NOT_PENDING.",
         "operationId": "create_review_api_v1_candidate_pairs__pair_id__reviews_post",
         "parameters": [
           {
@@ -2842,6 +3232,210 @@
           }
         },
         "summary": "Get Entity",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/entities/{entity_id}/history": {
+      "get": {
+        "description": "Lane Q8 (additive). Identity history events for the entity; bounded list.",
+        "operationId": "get_entity_history_api_v1_entities__entity_id__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_HistoryEvent_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Get Entity History",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/entities/{entity_id}/timeline": {
+      "get": {
+        "description": "Lane W3b (additive). Timeline across the entity's sources; bounded list.",
+        "operationId": "get_entity_timeline_api_v1_entities__entity_id__timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_TimelineEvent_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Get Entity Timeline",
         "tags": [
           "core"
         ]
@@ -3337,6 +3931,58 @@
           }
         },
         "summary": "Create Session",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/threshold-sets/current": {
+      "get": {
+        "description": "Lane W3a (additive). The current raw-score cutoffs; Platt values display-only.",
+        "operationId": "get_current_thresholds_api_v1_threshold_sets_current_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThresholdSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Get Current Thresholds",
         "tags": [
           "core"
         ]
