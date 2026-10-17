@@ -1,0 +1,96 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000001",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "extension": [
+          {"url": "http://hl7.org/fhir/StructureDefinition/patient-mothersMaidenName", "valueString": "Isabela97 de Anda905"}
+        ],
+        "identifier": [
+          {"system": "https://github.com/synthetichealth/synthea", "value": "aaaaaaaa-0000-4000-8000-000000000001"},
+          {"type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v2-0203", "code": "MR"}]}, "system": "http://hospital.smarthealthit.org", "value": "aaaaaaaa-0000-4000-8000-000000000001"},
+          {"type": {"coding": [{"system": "http://terminology.hl7.org/CodeSystem/v2-0203", "code": "SS"}]}, "system": "http://hl7.org/fhir/sid/us-ssn", "value": "999-11-1111"}
+        ],
+        "name": [{"use": "official", "family": "Núñez-García77", "given": ["José45", "Luis12"], "prefix": ["Mr."]}],
+        "telecom": [{"system": "phone", "value": "555-123-4567", "use": "home"}],
+        "gender": "male",
+        "birthDate": "1990-03-07",
+        "address": [{"line": ["857 Kling Arcade"], "city": "Worcester", "state": "MA", "postalCode": "01604", "country": "US"}],
+        "communication": [{"language": {"coding": [{"system": "urn:ietf:bcp:47", "code": "es", "display": "Spanish"}]}}]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000002",
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "aaaaaaaa-0000-4000-8000-000000000002",
+        "status": "finished",
+        "class": {"code": "AMB"},
+        "type": [{"coding": [{"system": "http://snomed.info/sct", "code": "185345009", "display": "Encounter for symptom"}]}],
+        "subject": {"reference": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000001"},
+        "period": {"start": "2021-05-01T09:00:00-04:00", "end": "2021-05-01T09:15:00-04:00"}
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000003",
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "id": "aaaaaaaa-0000-4000-8000-000000000003",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "verificationStatus": {"coding": [{"code": "confirmed"}]},
+        "type": "allergy",
+        "category": ["medication"],
+        "criticality": "low",
+        "code": {"coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "7984", "display": "Penicillin V"}]},
+        "patient": {"reference": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000001"},
+        "recordedDate": "2020-02-02T10:00:00-05:00",
+        "reaction": [{"manifestation": [{"coding": [{"system": "http://snomed.info/sct", "code": "39579001", "display": "Anaphylaxis"}]}], "severity": "severe"}]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000004",
+      "resource": {
+        "resourceType": "Medication",
+        "id": "aaaaaaaa-0000-4000-8000-000000000004",
+        "code": {"coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": "308192", "display": "Amoxicillin 500 MG Oral Tablet"}]}
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000005",
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "aaaaaaaa-0000-4000-8000-000000000005",
+        "status": "active",
+        "intent": "order",
+        "medicationReference": {"reference": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000004"},
+        "subject": {"reference": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000001"},
+        "encounter": {"reference": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000002"},
+        "authoredOn": "2021-05-01T09:05:00-04:00"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000006",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "aaaaaaaa-0000-4000-8000-000000000006",
+        "status": "final",
+        "code": {"coding": [{"system": "http://loinc.org", "code": "8302-2", "display": "Body Height"}]},
+        "subject": {"reference": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000001"},
+        "valueQuantity": {"value": 175, "unit": "cm"}
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000007",
+      "resource": {
+        "resourceType": "Condition",
+        "id": "aaaaaaaa-0000-4000-8000-000000000007",
+        "code": {"coding": [{"system": "http://snomed.info/sct", "code": "444814009", "display": "Viral sinusitis"}]},
+        "subject": {"reference": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000001"}
+      }
+    }
+  ]
+}
