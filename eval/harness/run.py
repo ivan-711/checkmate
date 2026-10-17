@@ -6,10 +6,14 @@ scores development pairs out of fold, chooses ``c_low``/``c_high`` false-merge f
 published numbers with n, measures ``match()`` latency in process and writes
 ``eval/runs/<run_id>/{manifest,numbers,metrics,thresholds,run,splits}.json``.
 
+The command line measures the product: W1's corpus and W2's engine (``eval.harness.product``);
+it exits non-zero when either is absent and never falls back. ``RunConfig``'s defaults (the in-repo
+fixture and ``eval.harness.standin``) exist for the harness's own unit tests only.
+
 ``--fast`` is the per-merge config: P0 families, one seed, development components only. The test
 partition is scored only with ``include_test_pass=True`` (the single 20:00 pass), never per merge.
 
-    uv run python -m eval.harness.run --fast --seed 20261017
+    uv run python -m eval.harness.run --fast --seed 20261017 [--raw data/raw]
 """
 from __future__ import annotations
 
@@ -42,6 +46,7 @@ from eval.harness.splits import (
     LeakageError,
     SplitConfig,
     assert_fit_partition,
+    assert_no_leakage,
     assign,
     development_units,
     records_in,
@@ -66,6 +71,7 @@ RUNS_DIR = REPO_ROOT / "eval" / "runs"
 FAST_LATENCY = (20, 200)   # warm-up, timed: per merge
 FULL_LATENCY = (latency_mod.WARMUP_CALLS, latency_mod.TIMED_CALLS)
 EXPORT_DECIMALS = 6
+EXIT_PRODUCT_UNAVAILABLE = 4
 
 
 @dataclass
@@ -86,6 +92,7 @@ class RunConfig:
     bootstrap_resamples: int | None = None
     latency_calls: tuple[int, int] | None = None
     extra_manifest: dict = field(default_factory=dict)
+    provenance: dict = field(default_factory=dict)  # engine and corpus versions and hashes, into run.json
 
 
 @dataclass
@@ -243,15 +250,23 @@ def candidate_pair_hash(corpus: Corpus, assignment: Assignment, cfg: RunConfig, 
     return hashlib.sha256(json.dumps(sorted(pairs)).encode()).hexdigest()
 
 
-def category_numbers(pairs: Sequence[ScoredPair], c_low: float, c_high: float, families: Sequence[str],
-                     seed: int, resamples: int) -> dict[str, dict]:
-    """Per-category recall over true pairs carrying the category (T2) and per-button recall (T15)."""
+def category_numbers(pairs: Sequence[ScoredPair], missed_true: Sequence[ScoredPair], c_low: float, c_high: float,
+                     families: Sequence[str], seed: int, resamples: int) -> dict[str, dict]:
+    """Per-category (T2) and per-button (T15) recall over every eligible true pair, blocking misses included
+    (end to end), plus the share blocking proposed. A pair blocking never proposed counts as missed."""
     out: dict[str, dict] = {}
-    true_pairs = [p for p in pairs if p.is_match]
-    for fam in families:
-        members = [p for p in true_pairs if fam in p.categories]
+    true_pairs = [p for p in pairs if p.is_match] + list(missed_true)
+    blocked_ids = {(p.record_a, p.record_b) for p in pairs}
+
+    def recall_cells(prefix: str, members: list[ScoredPair]) -> None:
         strict = [p for p in members if p.band(c_low, c_high) == "AUTO_LINK"]
         lenient = [p for p in members if p.band(c_low, c_high) != "KEEP_SEPARATE"]
+        found = [p for p in members if (p.record_a, p.record_b) in blocked_ids]
+        out[f"{prefix}.recall.strict"] = rate(strict, members, seed, resamples)
+        out[f"{prefix}.recall.lenient"] = rate(lenient, members, seed, resamples)
+        out[f"{prefix}.blocking_recall"] = rate(found, members, seed, resamples)
+
+    for fam in families:
         if fam.startswith("N"):
             negatives = [p for p in pairs if not p.is_match and fam in p.categories]
             out[f"hard_negative.{fam}.auto_linked_wrongly"] = rate(
@@ -259,15 +274,10 @@ def category_numbers(pairs: Sequence[ScoredPair], c_low: float, c_high: float, f
             out[f"hard_negative.{fam}.sent_to_review"] = rate(
                 [p for p in negatives if p.band(c_low, c_high) == "REVIEW"], negatives, seed, resamples)
             continue
-        out[f"category.{fam}.recall.strict"] = rate(strict, members, seed, resamples)
-        out[f"category.{fam}.recall.lenient"] = rate(lenient, members, seed, resamples)
+        recall_cells(f"category.{fam}", [p for p in true_pairs if fam in p.categories])
     for button in BUTTONS:
         cats = BUTTON_CATEGORIES[button]
-        members = [p for p in true_pairs if any(c in p.categories for c in cats)]
-        strict = [p for p in members if p.band(c_low, c_high) == "AUTO_LINK"]
-        lenient = [p for p in members if p.band(c_low, c_high) != "KEEP_SEPARATE"]
-        out[f"button.{button}.recall.strict"] = rate(strict, members, seed, resamples)
-        out[f"button.{button}.recall.lenient"] = rate(lenient, members, seed, resamples)
+        recall_cells(f"button.{button}", [p for p in true_pairs if any(c in p.categories for c in cats)])
         out[f"button.{button}.kind"] = {"value": BUTTON_KIND[button], "category_ids": list(cats)}
     return out
 
@@ -314,12 +324,18 @@ def run(cfg: RunConfig) -> RunResult:
             return cfg.corpus_loader()
         return build_fixture(cfg.fixture or FixtureConfig(seed=cfg.seed, families=cfg.families))
 
+    def split_of(c: Corpus) -> Assignment:
+        if c.assignment is None:
+            return assign(c, split_cfg)  # raises LeakageError on any hit
+        assert_no_leakage(c, c.assignment)  # the generator's own split, checked the same way
+        return c.assignment
+
     corpus = load()
     fixture_hashes = corpus_hashes(corpus)
-    assignment = assign(corpus, split_cfg)  # raises LeakageError on any hit
+    assignment = split_of(corpus)
     # invariant: idempotent ingest. Loading twice gives the same records, truth, split and candidate-pair set
     second = load()
-    second_assignment = assign(second, split_cfg)
+    second_assignment = split_of(second)
     idempotent = (fixture_hashes == corpus_hashes(second) and len(corpus.records) == len(second.records)
                   and assignment.as_json() == second_assignment.as_json()
                   and candidate_pair_hash(corpus, assignment, cfg, held_out)
@@ -333,7 +349,7 @@ def run(cfg: RunConfig) -> RunResult:
     numbers.update(band_metrics(scored, meta["missedTrue"], c_low, c_high, bootstrap_seed, resamples))
     numbers.update(blocking_metrics(meta["truePairs"], meta["blockedPairs"], meta["allPairsN"], bootstrap_seed,
                                     resamples))
-    numbers.update(category_numbers(scored, c_low, c_high, families, bootstrap_seed, resamples))
+    numbers.update(category_numbers(scored, meta["missedTrue"], c_low, c_high, families, bootstrap_seed, resamples))
     numbers["thresholds.c_low"] = {"value": c_low}
     numbers["thresholds.c_high"] = {"value": c_high}
     numbers["thresholds.alpha_target_reachable"] = {"value": selection.c_high_reachable,
@@ -389,6 +405,10 @@ def run(cfg: RunConfig) -> RunResult:
         "thresholdSetId": thresholds_id, "thresholds": {"cLow": c_low, "cHigh": c_high},
         "gitSha": git_sha(), "shards": 1, "bootstrapResamples": resamples, "bootstrapSeed": bootstrap_seed,
         "expectations": expectations_hashes(cfg.expectations_dir), "acceptance": acceptance_hashes(),
+        "provenance": cfg.provenance or {"engine": "eval.harness.standin", "corpus": "eval.harness.fixture",
+                                         "note": "harness self-test inputs; not a product measurement"},
+        "heldOutNote": ("no held-out families drawn (config.json heldOutFamilies.drawn is empty): no held-out-family "
+                        "figure is published" if not held_out else "held-out families excluded per merge"),
         **cfg.extra_manifest,
     }
     thresholds_doc = {
@@ -411,6 +431,7 @@ def run(cfg: RunConfig) -> RunResult:
                           "allPairsDevelopment": meta["allPairsN"]},
                "graph": assignment.summary(corpus.records), "expectations": manifest["expectations"],
                "acceptance": manifest["acceptance"], "heldOutFamilies": sorted(held_out),
+               "provenance": manifest["provenance"], "heldOutNote": manifest["heldOutNote"],
                "testRuns": 1 if cfg.include_test_pass else 0}
     (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (run_dir / "numbers.json").write_text(json.dumps(numbers_doc, indent=2, sort_keys=True) + "\n")
@@ -440,19 +461,45 @@ def _test_pass(corpus: Corpus, assignment: Assignment, cfg: RunConfig, weights: 
     out = {f"test.{k}": v for k, v in band_metrics(scored, missed, c_low, c_high, seed, resamples).items()}
     out.update({f"test.{k}": v for k, v in blocking_metrics(true_objs, blocked, n * (n - 1) // 2, seed,
                                                               resamples).items()})
-    out.update({f"test.{k}": v for k, v in category_numbers(scored, c_low, c_high, cfg.families, seed, resamples).items()})
+    out.update({f"test.{k}": v for k, v in category_numbers(scored, missed, c_low, c_high, cfg.families, seed,
+                                                              resamples).items()})
     return out
 
 
+def product_config(args: argparse.Namespace) -> RunConfig:
+    """The production command's inputs: W1's corpus and W2's engine, or ``ProductUnavailable``."""
+    from eval.harness import product
+
+    engine = product.load_engine()
+    corpus_provenance: dict = {}
+
+    def loader() -> Corpus:
+        corpus, prov = product.load_corpus(args.seed, args.raw)
+        corpus_provenance.update(prov)
+        return corpus
+
+    loader()  # fail before the run starts if the corpus is absent; also fills the provenance
+    return RunConfig(name="fast" if args.fast else "development", seed=args.seed, fast=args.fast,
+                     include_test_pass=args.test_pass, out_dir=args.out, corpus_loader=loader,
+                     match=engine.match, fit=engine.fit, block=engine.block, scorer_version=engine.scorer_version,
+                     provenance={"engine": engine.provenance, "corpus": corpus_provenance})
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    from eval.harness.product import DEFAULT_RAW_DIR, ProductUnavailable
+
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--fast", action="store_true", help="per-merge config: P0 families, one seed, development only")
     parser.add_argument("--seed", type=int, default=20261017)
     parser.add_argument("--test-pass", action="store_true", help="the single 20:00 test pass (never per merge)")
     parser.add_argument("--out", type=Path, default=RUNS_DIR)
+    parser.add_argument("--raw", type=Path, default=DEFAULT_RAW_DIR, help="extracted Synthea sample (data/download.py)")
     args = parser.parse_args(argv)
-    cfg = RunConfig(name="fast" if args.fast else "development", seed=args.seed, fast=args.fast,
-                    include_test_pass=args.test_pass, out_dir=args.out)
+    try:
+        cfg = product_config(args)
+    except ProductUnavailable as exc:
+        print(f"PRODUCT UNAVAILABLE: {exc}", file=sys.stderr)
+        return EXIT_PRODUCT_UNAVAILABLE
     try:
         result = run(cfg)
     except LeakageError as exc:
