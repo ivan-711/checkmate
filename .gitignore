@@ -1,0 +1,49 @@
+# Worktrees for lane agents (two-machine plan rev 6)
+.worktrees/
+
+# Secrets: the Gemini key and any other credential live only here
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+frontend/.env*
+*.tsbuildinfo
+
+# Data that is never committed (ADR-008, architecture §12, §22A)
+data/raw/
+data/onc/
+data/benchmark/
+data/synthea/
+data/scenarios/cards/*.pdf
+*.pdf
+captures/
+
+# Run outputs and local state
+eval/runs/
+*.log
+.coverage
+htmlcov/
+.DS_Store
+.playwright/
+test-results/
+playwright-report/
+
+# Editors
+.idea/
+.vscode/
