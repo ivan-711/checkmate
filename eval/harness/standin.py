@@ -22,17 +22,20 @@ FEATURES = ("given_name_jw", "family_name_jw", "family_metaphone", "dob_exact", 
             "dob_one_digit_edit", "sex_match", "phone_match", "address_jaccard", "zip_match")
 
 DEFAULT_WEIGHTS: dict[str, float] = {
-    "intercept": -4.0,
-    "given_name_jw": 2.2,
-    "family_name_jw": 2.4,
-    "family_metaphone": 0.8,
-    "dob_exact": 2.6,
-    "dob_day_month_swap": 2.0,
-    "dob_one_digit_edit": 1.4,
-    "sex_match": 0.4,
-    "phone_match": 1.6,
-    "address_jaccard": 1.5,
-    "zip_match": 0.5,
+    # Stand-in weights only (W2 fits the real ones). Address and exact DOB carry the most weight so
+    # that a REVIEW pair can lose the band when the address goes or the birth year changes; the
+    # day/month swap feature sits just under exact DOB so the swap barely moves the score.
+    "intercept": -4.5,
+    "given_name_jw": 1.4,
+    "family_name_jw": 1.6,
+    "family_metaphone": 0.5,
+    "dob_exact": 3.0,
+    "dob_day_month_swap": 2.9,
+    "dob_one_digit_edit": 0.2,
+    "sex_match": 0.3,
+    "phone_match": 1.2,
+    "address_jaccard": 3.0,
+    "zip_match": 0.8,
 }
 
 PLACEHOLDER_DOBS = frozenset({"1900-01-01", "1800-01-01", "0001-01-01"})

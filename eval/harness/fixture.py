@@ -230,7 +230,7 @@ def build_fixture(cfg: FixtureConfig | None = None) -> Corpus:
             rec = dict(base)
             categories: list[str] = []
             if seq > 0:  # the first fragment is the clean rendering; later fragments carry edits
-                n_edits = rng.choices((0, 1, 2), weights=(0.25, 0.55, 0.20))[0]
+                n_edits = rng.choices((0, 1, 2, 3), weights=(0.20, 0.45, 0.25, 0.10))[0]
                 for family in rng.sample(tm_families, k=min(n_edits, len(tm_families))):
                     label = _apply_family(rec, family, rng)
                     if label:

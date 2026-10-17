@@ -1,0 +1,1400 @@
+{
+  "placeholder": false,
+  "watermark": "engine export by data/hero_select.py: PROVISIONAL hero E0001 (best partial; see hero.unmetCriteria); scorer standin-logistic-0; thresholds oof-d0ad2e9a590c; seed 20261017",
+  "hero": {
+    "provisional": true,
+    "constructedFloor": false,
+    "selectedBy": "data/hero_select.py",
+    "qualified": false,
+    "unmetCriteria": [
+      "change_birth_year_keep_separate",
+      "fixture_check_bounds"
+    ],
+    "criteria": {
+      "baseline_review": true,
+      "remove_address_keep_separate": true,
+      "change_birth_year_keep_separate": false,
+      "swap_dob_day_month_robust": true,
+      "accent_hyphen_surname_robust": true,
+      "intake_rendering_review": true,
+      "fixture_check_bounds": false,
+      "spanish_name": true
+    },
+    "criteriaText": {
+      "baseline_review": "baseline band is REVIEW (never relaxed)",
+      "remove_address_keep_separate": "REMOVE_ADDRESS drops to KEEP_SEPARATE (abstention: not enough to link)",
+      "change_birth_year_keep_separate": "CHANGE_BIRTH_YEAR +1 and -1 each drop to KEEP_SEPARATE (level 3: either)",
+      "swap_dob_day_month_robust": "SWAP_DOB_DAY_MONTH moves p by at most the tolerance (0.05; level 2: 0.10)",
+      "accent_hyphen_surname_robust": "ACCENT_HYPHEN_SURNAME moves p by at most the tolerance (0.05; level 2: 0.10)",
+      "intake_rendering_review": "the intake rendering of the ER fragment lands in REVIEW against the Clinic record",
+      "fixture_check_bounds": "p in [0,1]; no AUTO_LINK; no what-if raises p above baseline + 0.005; no negative rule",
+      "spanish_name": "Spanish-language name (level 0 only)"
+    },
+    "relaxationLevel": null,
+    "drawnFromTest": false,
+    "seed": 20261017,
+    "entityId": "E0001",
+    "scorerVersion": "standin-logistic-0",
+    "thresholdsId": "oof-d0ad2e9a590c",
+    "poolSize": 21,
+    "wording": "a selected showcase satisfying published criteria; aggregate metrics cover the full frozen test set"
+  },
+  "registrarLabels": [
+    "Registrar A",
+    "Registrar B",
+    "Registrar C"
+  ],
+  "session": {
+    "id": "00000000-0000-4000-8000-000000000100",
+    "scenarioId": "hero",
+    "scorerVersion": "standin-logistic-0",
+    "thresholdSetId": "oof-d0ad2e9a590c",
+    "createdAt": "2026-10-17T18:00:00Z",
+    "sources": [
+      {
+        "record": {
+          "id": "63805dda-fb10-5207-b2ce-3e9248dd63cb",
+          "sourceSystem": "ER_FHIR",
+          "sourceLocalId": "E0001-ER_FHIR-0",
+          "kind": "FHIR_PATIENT",
+          "payloadSha256": "4e9ee62fe310cdb4ebe3220fce37acf7dbbbee44d8971092b601e805332decb0",
+          "isConstructed": true,
+          "ingestedAt": "2026-10-17T18:00:00Z",
+          "rawPayload": null
+        },
+        "normalized": {
+          "recordId": "63805dda-fb10-5207-b2ce-3e9248dd63cb",
+          "givenName": "Michael",
+          "familyName": "Henderson",
+          "givenNameFolded": "michael",
+          "familyNameFolded": "henderson",
+          "birthDate": "1999-04-12",
+          "sex": "FEMALE",
+          "phoneE164": "+19205552719",
+          "addressLine": "6820 Spruce St",
+          "zip5": "54155"
+        },
+        "displayLabel": "ER FHIR"
+      },
+      {
+        "record": {
+          "id": "436d1df8-3555-583d-864e-d0b553b86777",
+          "sourceSystem": "CLINIC_CSV",
+          "sourceLocalId": "E0001-CLINIC_CSV-1",
+          "kind": "CSV_ROW",
+          "payloadSha256": "7508ef7c6720d0fdb0bcb2e0f503624842a1f271300a28a69f86b515a895762b",
+          "isConstructed": false,
+          "ingestedAt": "2026-10-17T18:00:00Z",
+          "rawPayload": null
+        },
+        "normalized": {
+          "recordId": "436d1df8-3555-583d-864e-d0b553b86777",
+          "givenName": "Mike",
+          "familyName": "Hendersen",
+          "givenNameFolded": "mike",
+          "familyNameFolded": "hendersen",
+          "birthDate": "2000-04-12",
+          "sex": "FEMALE",
+          "phoneE164": "+19205552719",
+          "addressLine": "6820 Spruce St",
+          "zip5": "54155"
+        },
+        "displayLabel": "Clinic CSV"
+      }
+    ],
+    "heroProvisional": true,
+    "heroConstructedFloor": false,
+    "previousSessionId": null
+  },
+  "pair": {
+    "pair": {
+      "id": "ad509973-d5ca-56a6-8d4a-c94d036d059f",
+      "recordAId": "63805dda-fb10-5207-b2ce-3e9248dd63cb",
+      "recordBId": "436d1df8-3555-583d-864e-d0b553b86777",
+      "blockKeys": [
+        "phone_last7:5552719",
+        "zip5_initial:54155:m"
+      ],
+      "origin": "MATCH_RUN",
+      "intakeSessionId": null,
+      "decision": {
+        "id": "bc940d63-e79e-5b17-952a-9e38c3e36304",
+        "pairId": "ad509973-d5ca-56a6-8d4a-c94d036d059f",
+        "version": 1,
+        "logit": 3.485859,
+        "p": 0.970283,
+        "band": "REVIEW",
+        "negativeRulesFired": [],
+        "status": "PROPOSED",
+        "actor": "system:scorer",
+        "actorType": "SYSTEM",
+        "reasonCode": null,
+        "note": null,
+        "decidedAt": "2026-10-17T18:00:00Z",
+        "scorerVersion": "standin-logistic-0",
+        "thresholdSetId": "oof-d0ad2e9a590c",
+        "evidenceSnapshot": {
+          "features": {
+            "given_name_jw": 1.0,
+            "family_name_jw": 1.0,
+            "family_metaphone": 1.0,
+            "dob_exact": null,
+            "dob_day_month_swap": null,
+            "dob_one_digit_edit": null,
+            "sex_match": 1.0,
+            "phone_match": 1.0,
+            "address_jaccard": 1.0,
+            "zip_match": 1.0
+          },
+          "missingFlags": {
+            "given_name_jw": false,
+            "family_name_jw": false,
+            "family_metaphone": false,
+            "dob_exact": true,
+            "dob_day_month_swap": true,
+            "dob_one_digit_edit": true,
+            "sex_match": false,
+            "phone_match": false,
+            "address_jaccard": false,
+            "zip_match": false
+          },
+          "weights": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 2.9,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          },
+          "intercept": -4.5,
+          "contributions": [
+            {
+              "feature": "given_name_jw",
+              "logit": 0.763636,
+              "value": 1.0
+            },
+            {
+              "feature": "family_name_jw",
+              "logit": 1.422222,
+              "value": 1.0
+            },
+            {
+              "feature": "family_metaphone",
+              "logit": 0.5,
+              "value": 1.0
+            },
+            {
+              "feature": "dob_exact",
+              "logit": 0.0,
+              "value": null
+            },
+            {
+              "feature": "dob_day_month_swap",
+              "logit": 0.0,
+              "value": null
+            },
+            {
+              "feature": "dob_one_digit_edit",
+              "logit": 0.0,
+              "value": null
+            },
+            {
+              "feature": "sex_match",
+              "logit": 0.3,
+              "value": 1.0
+            },
+            {
+              "feature": "phone_match",
+              "logit": 1.2,
+              "value": 1.0
+            },
+            {
+              "feature": "address_jaccard",
+              "logit": 3.0,
+              "value": 1.0
+            },
+            {
+              "feature": "zip_match",
+              "logit": 0.8,
+              "value": 1.0
+            }
+          ],
+          "rawScore": 3.485859,
+          "cLow": -0.096363636364,
+          "cHigh": 3.5,
+          "plattA": null,
+          "plattB": null,
+          "tLowDisplay": null,
+          "tHighDisplay": null,
+          "negativeRulesFired": [],
+          "scorerVersion": "standin-logistic-0",
+          "thresholdSetId": "oof-d0ad2e9a590c",
+          "policyVersion": null
+        }
+      },
+      "autoEligible": false
+    },
+    "recordA": {
+      "record": {
+        "id": "63805dda-fb10-5207-b2ce-3e9248dd63cb",
+        "sourceSystem": "ER_FHIR",
+        "sourceLocalId": "E0001-ER_FHIR-0",
+        "kind": "FHIR_PATIENT",
+        "payloadSha256": "4e9ee62fe310cdb4ebe3220fce37acf7dbbbee44d8971092b601e805332decb0",
+        "isConstructed": true,
+        "ingestedAt": "2026-10-17T18:00:00Z",
+        "rawPayload": null
+      },
+      "normalized": {
+        "recordId": "63805dda-fb10-5207-b2ce-3e9248dd63cb",
+        "givenName": "Michael",
+        "familyName": "Henderson",
+        "givenNameFolded": "michael",
+        "familyNameFolded": "henderson",
+        "birthDate": "1999-04-12",
+        "sex": "FEMALE",
+        "phoneE164": "+19205552719",
+        "addressLine": "6820 Spruce St",
+        "zip5": "54155"
+      },
+      "displayLabel": "ER FHIR"
+    },
+    "recordB": {
+      "record": {
+        "id": "436d1df8-3555-583d-864e-d0b553b86777",
+        "sourceSystem": "CLINIC_CSV",
+        "sourceLocalId": "E0001-CLINIC_CSV-1",
+        "kind": "CSV_ROW",
+        "payloadSha256": "7508ef7c6720d0fdb0bcb2e0f503624842a1f271300a28a69f86b515a895762b",
+        "isConstructed": false,
+        "ingestedAt": "2026-10-17T18:00:00Z",
+        "rawPayload": null
+      },
+      "normalized": {
+        "recordId": "436d1df8-3555-583d-864e-d0b553b86777",
+        "givenName": "Mike",
+        "familyName": "Hendersen",
+        "givenNameFolded": "mike",
+        "familyNameFolded": "hendersen",
+        "birthDate": "2000-04-12",
+        "sex": "FEMALE",
+        "phoneE164": "+19205552719",
+        "addressLine": "6820 Spruce St",
+        "zip5": "54155"
+      },
+      "displayLabel": "Clinic CSV"
+    },
+    "contributions": [
+      {
+        "feature": "given_name_jw",
+        "logit": 0.763636,
+        "value": 1.0
+      },
+      {
+        "feature": "family_name_jw",
+        "logit": 1.422222,
+        "value": 1.0
+      },
+      {
+        "feature": "family_metaphone",
+        "logit": 0.5,
+        "value": 1.0
+      },
+      {
+        "feature": "dob_exact",
+        "logit": 0.0,
+        "value": null
+      },
+      {
+        "feature": "dob_day_month_swap",
+        "logit": 0.0,
+        "value": null
+      },
+      {
+        "feature": "dob_one_digit_edit",
+        "logit": 0.0,
+        "value": null
+      },
+      {
+        "feature": "sex_match",
+        "logit": 0.3,
+        "value": 1.0
+      },
+      {
+        "feature": "phone_match",
+        "logit": 1.2,
+        "value": 1.0
+      },
+      {
+        "feature": "address_jaccard",
+        "logit": 3.0,
+        "value": 1.0
+      },
+      {
+        "feature": "zip_match",
+        "logit": 0.8,
+        "value": 1.0
+      }
+    ],
+    "history": [
+      {
+        "id": "bc940d63-e79e-5b17-952a-9e38c3e36304",
+        "pairId": "ad509973-d5ca-56a6-8d4a-c94d036d059f",
+        "version": 1,
+        "logit": 3.485859,
+        "p": 0.970283,
+        "band": "REVIEW",
+        "negativeRulesFired": [],
+        "status": "PROPOSED",
+        "actor": "system:scorer",
+        "actorType": "SYSTEM",
+        "reasonCode": null,
+        "note": null,
+        "decidedAt": "2026-10-17T18:00:00Z",
+        "scorerVersion": "standin-logistic-0",
+        "thresholdSetId": "oof-d0ad2e9a590c",
+        "evidenceSnapshot": {
+          "features": {
+            "given_name_jw": 1.0,
+            "family_name_jw": 1.0,
+            "family_metaphone": 1.0,
+            "dob_exact": null,
+            "dob_day_month_swap": null,
+            "dob_one_digit_edit": null,
+            "sex_match": 1.0,
+            "phone_match": 1.0,
+            "address_jaccard": 1.0,
+            "zip_match": 1.0
+          },
+          "missingFlags": {
+            "given_name_jw": false,
+            "family_name_jw": false,
+            "family_metaphone": false,
+            "dob_exact": true,
+            "dob_day_month_swap": true,
+            "dob_one_digit_edit": true,
+            "sex_match": false,
+            "phone_match": false,
+            "address_jaccard": false,
+            "zip_match": false
+          },
+          "weights": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 2.9,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          },
+          "intercept": -4.5,
+          "contributions": [
+            {
+              "feature": "given_name_jw",
+              "logit": 0.763636,
+              "value": 1.0
+            },
+            {
+              "feature": "family_name_jw",
+              "logit": 1.422222,
+              "value": 1.0
+            },
+            {
+              "feature": "family_metaphone",
+              "logit": 0.5,
+              "value": 1.0
+            },
+            {
+              "feature": "dob_exact",
+              "logit": 0.0,
+              "value": null
+            },
+            {
+              "feature": "dob_day_month_swap",
+              "logit": 0.0,
+              "value": null
+            },
+            {
+              "feature": "dob_one_digit_edit",
+              "logit": 0.0,
+              "value": null
+            },
+            {
+              "feature": "sex_match",
+              "logit": 0.3,
+              "value": 1.0
+            },
+            {
+              "feature": "phone_match",
+              "logit": 1.2,
+              "value": 1.0
+            },
+            {
+              "feature": "address_jaccard",
+              "logit": 3.0,
+              "value": 1.0
+            },
+            {
+              "feature": "zip_match",
+              "logit": 0.8,
+              "value": 1.0
+            }
+          ],
+          "rawScore": 3.485859,
+          "cLow": -0.096363636364,
+          "cHigh": 3.5,
+          "plattA": null,
+          "plattB": null,
+          "tLowDisplay": null,
+          "tHighDisplay": null,
+          "negativeRulesFired": [],
+          "scorerVersion": "standin-logistic-0",
+          "thresholdSetId": "oof-d0ad2e9a590c",
+          "policyVersion": null
+        }
+      }
+    ],
+    "mergePreview": {
+      "entityIdIfApproved": "75d888a9-9d44-529a-9928-a7389c3cef9c",
+      "memberCountIfApproved": 2,
+      "alertWouldFire": true
+    }
+  },
+  "entityIfApproved": {
+    "id": "75d888a9-9d44-529a-9928-a7389c3cef9c",
+    "version": 1,
+    "members": [
+      {
+        "sourceRecordId": "63805dda-fb10-5207-b2ce-3e9248dd63cb",
+        "sourceSystem": "ER_FHIR",
+        "isConstructed": true,
+        "verification": null
+      },
+      {
+        "sourceRecordId": "436d1df8-3555-583d-864e-d0b553b86777",
+        "sourceSystem": "CLINIC_CSV",
+        "isConstructed": false,
+        "verification": null
+      }
+    ],
+    "golden": [
+      {
+        "field": "givenName",
+        "value": "Mike",
+        "crosswalk": {
+          "sourceSystem": "CLINIC_CSV",
+          "sourceRecordId": "E0001-CLINIC_CSV-1"
+        },
+        "rule": "MOST_FREQUENT",
+        "alternates": [
+          {
+            "value": "Michael",
+            "crosswalk": {
+              "sourceSystem": "ER_FHIR",
+              "sourceRecordId": "E0001-ER_FHIR-0"
+            }
+          }
+        ]
+      },
+      {
+        "field": "familyName",
+        "value": "Hendersen",
+        "crosswalk": {
+          "sourceSystem": "CLINIC_CSV",
+          "sourceRecordId": "E0001-CLINIC_CSV-1"
+        },
+        "rule": "MOST_RECENT",
+        "alternates": [
+          {
+            "value": "Henderson",
+            "crosswalk": {
+              "sourceSystem": "ER_FHIR",
+              "sourceRecordId": "E0001-ER_FHIR-0"
+            }
+          }
+        ]
+      },
+      {
+        "field": "birthDate",
+        "value": "1999-04-12",
+        "crosswalk": {
+          "sourceSystem": "ER_FHIR",
+          "sourceRecordId": "E0001-ER_FHIR-0"
+        },
+        "rule": "MAJORITY",
+        "alternates": [
+          {
+            "value": "2000-04-12",
+            "crosswalk": {
+              "sourceSystem": "CLINIC_CSV",
+              "sourceRecordId": "E0001-CLINIC_CSV-1"
+            }
+          }
+        ]
+      },
+      {
+        "field": "phone",
+        "value": "+19205552719",
+        "crosswalk": {
+          "sourceSystem": "ER_FHIR",
+          "sourceRecordId": "E0001-ER_FHIR-0"
+        },
+        "rule": "MOST_RECENT",
+        "alternates": []
+      }
+    ],
+    "allLinksReviewerApproved": true
+  },
+  "timelineIfApproved": [
+    {
+      "entityId": "75d888a9-9d44-529a-9928-a7389c3cef9c",
+      "occurredAt": "2024-03-02T00:00:00Z",
+      "type": "ALLERGY",
+      "codes": [
+        "RxNorm:7984"
+      ],
+      "display": "Allergy to penicillin V (reaction: anaphylaxis, severe)",
+      "sourceRecordId": "436d1df8-3555-583d-864e-d0b553b86777",
+      "sourceSystem": "CLINIC_CSV",
+      "resourceId": "allergies.csv:E0001-CLINIC_CSV-1",
+      "verification": "CSV_DERIVED",
+      "isConstructed": false
+    },
+    {
+      "entityId": "75d888a9-9d44-529a-9928-a7389c3cef9c",
+      "occurredAt": "2026-10-17T18:00:00Z",
+      "type": "MEDICATION_ORDER",
+      "codes": [
+        "RxNorm:308192"
+      ],
+      "display": "Amoxicillin 500 MG Oral Tablet (active order)",
+      "sourceRecordId": "63805dda-fb10-5207-b2ce-3e9248dd63cb",
+      "sourceSystem": "ER_FHIR",
+      "resourceId": "MedicationRequest/E0001-ER_FHIR-0-amoxicillin",
+      "verification": "CODED",
+      "isConstructed": true
+    }
+  ],
+  "alertIfApproved": {
+    "id": "eac213c2-7dc3-526f-8606-49f911770e37",
+    "entityId": "75d888a9-9d44-529a-9928-a7389c3cef9c",
+    "ruleId": "BL-AMOX-01",
+    "ruleVersion": "v1",
+    "tier": "A",
+    "allergyRef": {
+      "sourceRecordId": "436d1df8-3555-583d-864e-d0b553b86777",
+      "sourceSystem": "CLINIC_CSV",
+      "resourceId": "allergies.csv:E0001-CLINIC_CSV-1"
+    },
+    "orderRef": {
+      "sourceRecordId": "63805dda-fb10-5207-b2ce-3e9248dd63cb",
+      "sourceSystem": "ER_FHIR",
+      "resourceId": "MedicationRequest/E0001-ER_FHIR-0-amoxicillin"
+    },
+    "revealedByMerge": true,
+    "severity": "moderate",
+    "status": "PRELIMINARY",
+    "cardText": "Flagged for clinician review. Two records that were previously separate are now linked to this patient by an approved identity link. [Clinic CSV, allergies.csv row E0001-CLINIC_CSV-1] documents an allergy coded penicillin V (RxNorm 7984; status active; verification not stated in source; reaction: anaphylaxis, severe). This rule treats that code as penicillin-class. [ER FHIR, MedicationRequest/E0001-ER_FHIR-0-amoxicillin] has an active order for amoxicillin 500 MG Oral Tablet, RxNorm 308192. The amoxicillin/clavulanate label (DailyMed, set f10634cb-6505-43f1-9b70-314c58673016, revised 10/2026) states: \"contraindicated in patients with a history of serious hypersensitivity reactions (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin, clavulanate or to other beta-lactam antibacterial drugs (e.g., penicillins and cephalosporins)\". This is a rule-based flag on synthetic data. It does not say what the patient took or tolerated, or what should be prescribed. A clinician decides.",
+    "cardFooter": "Rule BL-AMOX-01 v1. Not checked: cephalosporin cross-reactivity, intolerances, dose, free-text allergies. Absence of a flag is not evidence that no conflict exists. This rule and its wording were not reviewed by a clinician.",
+    "citation": {
+      "labelName": "Amoxicillin and clavulanate potassium (Chartwell RX)",
+      "setId": "f10634cb-6505-43f1-9b70-314c58673016",
+      "revised": "10/2026",
+      "url": "https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=f10634cb-6505-43f1-9b70-314c58673016",
+      "quote": "contraindicated in patients with a history of serious hypersensitivity reactions (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin, clavulanate or to other beta-lactam antibacterial drugs (e.g., penicillins and cephalosporins)"
+    },
+    "constructedScenario": true,
+    "identifiedAt": "2026-10-17T18:00:00Z"
+  },
+  "thresholds": {
+    "thresholdsId": "oof-d0ad2e9a590c",
+    "cLow": -0.096363636364,
+    "cHigh": 3.5,
+    "tLowDisplay": 0.475928,
+    "tHighDisplay": 0.970688,
+    "autoLinkEnabled": false,
+    "isCalibrated": false,
+    "sourceRunId": "c805b4ba-c3a0-41b7-bf63-48b059a07675"
+  },
+  "tiles": {
+    "tiles": [
+      {
+        "id": "DECISION_FLOW",
+        "aggregate": "band_flow_1m",
+        "windowMinutes": 60,
+        "buckets": [
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "REVIEW",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          },
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "KEEP_SEPARATE",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          },
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "AUTO_LINK",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          }
+        ],
+        "total": 0,
+        "realTime": true
+      },
+      {
+        "id": "HUMAN_REVIEW",
+        "aggregate": "review_outcomes_5m",
+        "windowMinutes": 60,
+        "buckets": [
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "APPROVED",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          },
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "REJECTED",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          }
+        ],
+        "total": 0,
+        "realTime": true
+      },
+      {
+        "id": "AGENT_GATE",
+        "aggregate": "agent_gate_5m",
+        "windowMinutes": 60,
+        "buckets": [
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "ALLOW",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          },
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "DENY",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          }
+        ],
+        "total": 0,
+        "realTime": true
+      }
+    ],
+    "asOf": "2026-10-17T18:00:00Z"
+  },
+  "whatIfs": {
+    "REMOVE_ADDRESS": {
+      "baseline": {
+        "p": 0.970283,
+        "rawScore": 3.485859,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.763636,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 1.422222,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.3,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 1.2,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 3.0,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.8,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "whatIf": {
+        "p": 0.422104,
+        "rawScore": -0.314141,
+        "band": "KEEP_SEPARATE",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.763636,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 1.422222,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.3,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 1.2,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.0,
+            "value": null
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "deltas": [
+        {
+          "feature": "address_jaccard",
+          "logit": -3.0,
+          "value": null
+        },
+        {
+          "feature": "zip_match",
+          "logit": -0.8,
+          "value": null
+        }
+      ],
+      "caption": "Without the address there is not enough to link.",
+      "counterfactualFields": {
+        "address_jaccard": null
+      },
+      "alertWouldBeHidden": true,
+      "heldOutRecall": [
+        {
+          "button": "REMOVE_ADDRESS",
+          "category": "L7",
+          "recall": 1.0,
+          "nPairs": 11,
+          "nEntities": 9,
+          "nComponents": 9,
+          "lowSupport": true
+        },
+        {
+          "button": "CHANGE_BIRTH_YEAR",
+          "category": "D3",
+          "recall": 1.0,
+          "nPairs": 13,
+          "nEntities": 12,
+          "nComponents": 12,
+          "lowSupport": true
+        },
+        {
+          "button": "SWAP_DOB_DAY_MONTH",
+          "category": "D1",
+          "recall": 1.0,
+          "nPairs": 3,
+          "nEntities": 2,
+          "nComponents": 2,
+          "lowSupport": true
+        },
+        {
+          "button": "ACCENT_HYPHEN_SURNAME",
+          "category": "S1+S5",
+          "recall": 1.0,
+          "nPairs": 9,
+          "nEntities": 5,
+          "nComponents": 5,
+          "lowSupport": true
+        }
+      ],
+      "seed": 20261017
+    },
+    "CHANGE_BIRTH_YEAR": {
+      "baseline": {
+        "p": 0.970283,
+        "rawScore": 3.485859,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.763636,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 1.422222,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.3,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 1.2,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 3.0,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.8,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "whatIf": {
+        "p": 0.970283,
+        "rawScore": 3.485859,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.763636,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 1.422222,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.3,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 1.2,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 3.0,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.8,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "deltas": [
+        {
+          "feature": "dob_exact",
+          "logit": 0.0,
+          "value": null
+        }
+      ],
+      "caption": "A different birth year: not enough to link.",
+      "counterfactualFields": {
+        "dob_exact": "2000-04-12"
+      },
+      "alertWouldBeHidden": false,
+      "heldOutRecall": [
+        {
+          "button": "REMOVE_ADDRESS",
+          "category": "L7",
+          "recall": 1.0,
+          "nPairs": 11,
+          "nEntities": 9,
+          "nComponents": 9,
+          "lowSupport": true
+        },
+        {
+          "button": "CHANGE_BIRTH_YEAR",
+          "category": "D3",
+          "recall": 1.0,
+          "nPairs": 13,
+          "nEntities": 12,
+          "nComponents": 12,
+          "lowSupport": true
+        },
+        {
+          "button": "SWAP_DOB_DAY_MONTH",
+          "category": "D1",
+          "recall": 1.0,
+          "nPairs": 3,
+          "nEntities": 2,
+          "nComponents": 2,
+          "lowSupport": true
+        },
+        {
+          "button": "ACCENT_HYPHEN_SURNAME",
+          "category": "S1+S5",
+          "recall": 1.0,
+          "nPairs": 9,
+          "nEntities": 5,
+          "nComponents": 5,
+          "lowSupport": true
+        }
+      ],
+      "seed": 20261017
+    },
+    "SWAP_DOB_DAY_MONTH": {
+      "baseline": {
+        "p": 0.970283,
+        "rawScore": 3.485859,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.763636,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 1.422222,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.3,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 1.2,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 3.0,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.8,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "whatIf": {
+        "p": 0.970283,
+        "rawScore": 3.485859,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.763636,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 1.422222,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.3,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 1.2,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 3.0,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.8,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "deltas": [
+        {
+          "feature": "dob_day_month_swap",
+          "logit": 0.0,
+          "value": null
+        }
+      ],
+      "caption": "Day and month swapped: the engine has a named feature for this; the score barely moves.",
+      "counterfactualFields": {
+        "dob_day_month_swap": "1999-12-04"
+      },
+      "alertWouldBeHidden": false,
+      "heldOutRecall": [
+        {
+          "button": "REMOVE_ADDRESS",
+          "category": "L7",
+          "recall": 1.0,
+          "nPairs": 11,
+          "nEntities": 9,
+          "nComponents": 9,
+          "lowSupport": true
+        },
+        {
+          "button": "CHANGE_BIRTH_YEAR",
+          "category": "D3",
+          "recall": 1.0,
+          "nPairs": 13,
+          "nEntities": 12,
+          "nComponents": 12,
+          "lowSupport": true
+        },
+        {
+          "button": "SWAP_DOB_DAY_MONTH",
+          "category": "D1",
+          "recall": 1.0,
+          "nPairs": 3,
+          "nEntities": 2,
+          "nComponents": 2,
+          "lowSupport": true
+        },
+        {
+          "button": "ACCENT_HYPHEN_SURNAME",
+          "category": "S1+S5",
+          "recall": 1.0,
+          "nPairs": 9,
+          "nEntities": 5,
+          "nComponents": 5,
+          "lowSupport": true
+        }
+      ],
+      "seed": 20261017
+    },
+    "ACCENT_HYPHEN_SURNAME": {
+      "baseline": {
+        "p": 0.970283,
+        "rawScore": 3.485859,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.763636,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 1.422222,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.3,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 1.2,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 3.0,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.8,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "whatIf": {
+        "p": 0.970283,
+        "rawScore": 3.485859,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.763636,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 1.422222,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.3,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 1.2,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 3.0,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.8,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "deltas": [
+        {
+          "feature": "family_name_jw",
+          "logit": 0.0,
+          "value": null
+        }
+      ],
+      "caption": "Accents and hyphens changed: a named feature; the score barely moves.",
+      "counterfactualFields": {
+        "family_name_jw": "Henderson"
+      },
+      "alertWouldBeHidden": false,
+      "heldOutRecall": [
+        {
+          "button": "REMOVE_ADDRESS",
+          "category": "L7",
+          "recall": 1.0,
+          "nPairs": 11,
+          "nEntities": 9,
+          "nComponents": 9,
+          "lowSupport": true
+        },
+        {
+          "button": "CHANGE_BIRTH_YEAR",
+          "category": "D3",
+          "recall": 1.0,
+          "nPairs": 13,
+          "nEntities": 12,
+          "nComponents": 12,
+          "lowSupport": true
+        },
+        {
+          "button": "SWAP_DOB_DAY_MONTH",
+          "category": "D1",
+          "recall": 1.0,
+          "nPairs": 3,
+          "nEntities": 2,
+          "nComponents": 2,
+          "lowSupport": true
+        },
+        {
+          "button": "ACCENT_HYPHEN_SURNAME",
+          "category": "S1+S5",
+          "recall": 1.0,
+          "nPairs": 9,
+          "nEntities": 5,
+          "nComponents": 5,
+          "lowSupport": true
+        }
+      ],
+      "seed": 20261017
+    }
+  },
+  "frontdeskIntake": {
+    "scenarioContextId": "hero-er-arrival",
+    "utteranceEs": "Me llamo Michael Henderson, nací el 12 de abril de 1999, mi teléfono es +19205552719, vivo en 6820 Spruce St.",
+    "utteranceEn": "My name is Michael Henderson, born April 12, 1999, my phone is +19205552719, I live at 6820 Spruce St.",
+    "expectedGate": {
+      "tool": "propose_new_chart",
+      "outcome": "DENY",
+      "reasonCode": "CANDIDATE_IN_REVIEW_OR_HIGHER"
+    }
+  }
+}

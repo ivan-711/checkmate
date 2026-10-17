@@ -1,0 +1,31 @@
+{
+  "scenarioContextId": "hero-er-arrival",
+  "utteranceEs": "Me llamo Michael Henderson, nací el 12 de abril de 1999, mi teléfono es +19205552719, vivo en 6820 Spruce St.",
+  "utteranceEn": "My name is Michael Henderson, born April 12, 1999, my phone is +19205552719, I live at 6820 Spruce St.",
+  "expectedProposeNewChartArgs": {
+    "givenName": "Michael",
+    "familyName": "Henderson",
+    "birthDate": "1999-04-12",
+    "sex": "FEMALE",
+    "phone": "+19205552719",
+    "addressLine": "6820 Spruce St",
+    "postalCode": "54155",
+    "preferredLanguage": "EN"
+  },
+  "expectedGate": {
+    "tool": "propose_new_chart",
+    "outcome": "DENY",
+    "reasonCode": "CANDIDATE_IN_REVIEW_OR_HIGHER",
+    "evidenceRecordId": "436d1df8-3555-583d-864e-d0b553b86777"
+  },
+  "loads": {
+    "clinicRecord": "E0001-CLINIC_CSV-1",
+    "erRecord": null,
+    "note": "the frontdesk-hero scenario loads the Clinic CSV record and decoys, not the ER record"
+  },
+  "constructedOrder": {
+    "resourceId": "MedicationRequest/E0001-ER_FHIR-0-amoxicillin",
+    "attachedBy": "executor",
+    "isConstructed": true
+  }
+}

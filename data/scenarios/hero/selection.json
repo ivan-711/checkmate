@@ -1,0 +1,2540 @@
+{
+  "ok": false,
+  "reason": "no hero qualifies at any relaxation level in the showcase pool (21 entities, 16 with one ER FHIR and one Clinic CSV record); test-split fallback not enabled (--allow-test-fallback); best partial E0001 misses ['change_birth_year_keep_separate', 'fixture_check_bounds']",
+  "seed": 20261017,
+  "scorer_version": "standin-logistic-0",
+  "thresholds_id": "oof-d0ad2e9a590c",
+  "c_low": -0.096363636364,
+  "c_high": 3.5,
+  "review_midpoint": 1.701818,
+  "pool_size": 21,
+  "candidate_count": 16,
+  "relaxation_level": null,
+  "relaxation_levels": [
+    "0: all criteria, Spanish-language name required",
+    "1: Spanish-name requirement dropped",
+    "2: robustness tolerance widened from 0.05 to 0.10",
+    "3: band-changers accept a drop at either +1 or -1 birth year",
+    "4: no hero qualifies: best partial candidate shown with the unmet criteria"
+  ],
+  "qualifier_count_per_level": {
+    "0": 0,
+    "1": 0,
+    "2": 0,
+    "3": 0
+  },
+  "drawn_from_test": false,
+  "hero": null,
+  "best_partial": {
+    "entity_id": "E0001",
+    "person_id": "P0001",
+    "language": "EN",
+    "er_record_id": "E0001-ER_FHIR-0",
+    "clinic_record_id": "E0001-CLINIC_CSV-1",
+    "baseline": {
+      "raw_score": 3.485859,
+      "p": 0.970283,
+      "band": "REVIEW",
+      "negative_rules_fired": [],
+      "contributions": {
+        "given_name_jw": 0.763636,
+        "family_name_jw": 1.422222,
+        "family_metaphone": 0.5,
+        "dob_exact": 0.0,
+        "dob_day_month_swap": 0.0,
+        "dob_one_digit_edit": 0.0,
+        "sex_match": 0.3,
+        "phone_match": 1.2,
+        "address_jaccard": 3.0,
+        "zip_match": 0.8
+      }
+    },
+    "what_ifs": {
+      "REMOVE_ADDRESS": {
+        "raw_score": -0.314141,
+        "p": 0.422104,
+        "band": "KEEP_SEPARATE",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 0.763636,
+          "family_name_jw": 1.422222,
+          "family_metaphone": 0.5,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 0.0,
+          "zip_match": 0.0
+        }
+      },
+      "CHANGE_BIRTH_YEAR:+1": {
+        "raw_score": 6.485859,
+        "p": 0.998477,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 0.763636,
+          "family_name_jw": 1.422222,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "CHANGE_BIRTH_YEAR:-1": {
+        "raw_score": 3.485859,
+        "p": 0.970283,
+        "band": "REVIEW",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 0.763636,
+          "family_name_jw": 1.422222,
+          "family_metaphone": 0.5,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "SWAP_DOB_DAY_MONTH": {
+        "raw_score": 3.485859,
+        "p": 0.970283,
+        "band": "REVIEW",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 0.763636,
+          "family_name_jw": 1.422222,
+          "family_metaphone": 0.5,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "ACCENT_HYPHEN_SURNAME": {
+        "raw_score": 3.485859,
+        "p": 0.970283,
+        "band": "REVIEW",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 0.763636,
+          "family_name_jw": 1.422222,
+          "family_metaphone": 0.5,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      }
+    },
+    "intake": {
+      "raw_score": 3.485859,
+      "p": 0.970283,
+      "band": "REVIEW",
+      "negative_rules_fired": [],
+      "contributions": {
+        "given_name_jw": 0.763636,
+        "family_name_jw": 1.422222,
+        "family_metaphone": 0.5,
+        "dob_exact": 0.0,
+        "dob_day_month_swap": 0.0,
+        "dob_one_digit_edit": 0.0,
+        "sex_match": 0.3,
+        "phone_match": 1.2,
+        "address_jaccard": 3.0,
+        "zip_match": 0.8
+      }
+    },
+    "criteria": {
+      "baseline_review": true,
+      "remove_address_keep_separate": true,
+      "change_birth_year_keep_separate": false,
+      "swap_dob_day_month_robust": true,
+      "accent_hyphen_surname_robust": true,
+      "intake_rendering_review": true,
+      "fixture_check_bounds": false,
+      "spanish_name": true
+    },
+    "distance_to_midpoint": 1.784041,
+    "tie_break": "cb0439cff6eb212bd17afd4e3958ffc0a75da0b511cb7bb06db1308d6324ee5e"
+  },
+  "criteria": {
+    "baseline_review": "baseline band is REVIEW (never relaxed)",
+    "remove_address_keep_separate": "REMOVE_ADDRESS drops to KEEP_SEPARATE (abstention: not enough to link)",
+    "change_birth_year_keep_separate": "CHANGE_BIRTH_YEAR +1 and -1 each drop to KEEP_SEPARATE (level 3: either)",
+    "swap_dob_day_month_robust": "SWAP_DOB_DAY_MONTH moves p by at most the tolerance (0.05; level 2: 0.10)",
+    "accent_hyphen_surname_robust": "ACCENT_HYPHEN_SURNAME moves p by at most the tolerance (0.05; level 2: 0.10)",
+    "intake_rendering_review": "the intake rendering of the ER fragment lands in REVIEW against the Clinic record",
+    "fixture_check_bounds": "p in [0,1]; no AUTO_LINK; no what-if raises p above baseline + 0.005; no negative rule",
+    "spanish_name": "Spanish-language name (level 0 only)"
+  },
+  "candidates": [
+    {
+      "entity_id": "E0001",
+      "person_id": "P0001",
+      "language": "EN",
+      "er_record_id": "E0001-ER_FHIR-0",
+      "clinic_record_id": "E0001-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 3.485859,
+        "p": 0.970283,
+        "band": "REVIEW",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 0.763636,
+          "family_name_jw": 1.422222,
+          "family_metaphone": 0.5,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": -0.314141,
+          "p": 0.422104,
+          "band": "KEEP_SEPARATE",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 0.763636,
+            "family_name_jw": 1.422222,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 6.485859,
+          "p": 0.998477,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 0.763636,
+            "family_name_jw": 1.422222,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 3.485859,
+          "p": 0.970283,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 0.763636,
+            "family_name_jw": 1.422222,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 3.485859,
+          "p": 0.970283,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 0.763636,
+            "family_name_jw": 1.422222,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 3.485859,
+          "p": 0.970283,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 0.763636,
+            "family_name_jw": 1.422222,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 3.485859,
+        "p": 0.970283,
+        "band": "REVIEW",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 0.763636,
+          "family_name_jw": 1.422222,
+          "family_metaphone": 0.5,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": true,
+        "remove_address_keep_separate": true,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": true,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 1.784041,
+      "tie_break": "cb0439cff6eb212bd17afd4e3958ffc0a75da0b511cb7bb06db1308d6324ee5e"
+    },
+    {
+      "entity_id": "E0053",
+      "person_id": "P0053",
+      "language": "EN",
+      "er_record_id": "E0053-ER_FHIR-0",
+      "clinic_record_id": "E0053-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": -1.066667,
+        "p": 0.256038,
+        "band": "KEEP_SEPARATE",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 0.933333,
+          "family_name_jw": 1.4,
+          "family_metaphone": 0.0,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 0.0,
+          "address_jaccard": 0.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": -1.866667,
+          "p": 0.133928,
+          "band": "KEEP_SEPARATE",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 0.933333,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.0,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 1.833333,
+          "p": 0.862158,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 0.933333,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.0,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 2.9,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 0.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": -1.066667,
+          "p": 0.256038,
+          "band": "KEEP_SEPARATE",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 0.933333,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.0,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 0.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": -0.866667,
+          "p": 0.295948,
+          "band": "KEEP_SEPARATE",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 0.933333,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.0,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 0.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": -1.066667,
+          "p": 0.256038,
+          "band": "KEEP_SEPARATE",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 0.933333,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.0,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 0.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": -1.066667,
+        "p": 0.256038,
+        "band": "KEEP_SEPARATE",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 0.933333,
+          "family_name_jw": 1.4,
+          "family_metaphone": 0.0,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 0.0,
+          "address_jaccard": 0.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": true,
+        "change_birth_year_keep_separate": true,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 2.768485,
+      "tie_break": "6631b7137c1ce6252eab99547e916801e678e60b1aaee7384a30556c801b1a14"
+    },
+    {
+      "entity_id": "E0021",
+      "person_id": "P0021",
+      "language": "EN",
+      "er_record_id": "E0021-ER_FHIR-0",
+      "clinic_record_id": "E0021-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 4.5,
+        "p": 0.989013,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.2,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 0.7,
+          "p": 0.668188,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 7.3,
+          "p": 0.999325,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 4.5,
+        "p": 0.989013,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.2,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 2.798182,
+      "tie_break": "17f9b95415c7522a242113800ee222ce5a7bb2d00d0e79823642f15224edcb73"
+    },
+    {
+      "entity_id": "E0054",
+      "person_id": "P0054",
+      "language": "EN",
+      "er_record_id": "E0054-ER_FHIR-0",
+      "clinic_record_id": "E0054-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 5.9,
+        "p": 0.997268,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.4,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 0.0,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 2.1,
+          "p": 0.890903,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 3.1,
+          "p": 0.956893,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 3.1,
+          "p": 0.956893,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 5.8,
+          "p": 0.996982,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 2.9,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 5.9,
+          "p": 0.997268,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 5.9,
+        "p": 0.997268,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.4,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 0.0,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 4.198182,
+      "tie_break": "bb264218688f40ac9643320da8cbb81684d8d0ccdbff50e09332c06230efc329"
+    },
+    {
+      "entity_id": "E0059",
+      "person_id": "P0059",
+      "language": "EN",
+      "er_record_id": "E0059-ER_FHIR-0",
+      "clinic_record_id": "E0059-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 6.1,
+        "p": 0.997762,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 0.0,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 2.3,
+          "p": 0.908877,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 3.3,
+          "p": 0.964429,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 3.3,
+          "p": 0.964429,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 6.1,
+          "p": 0.997762,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 6.1,
+          "p": 0.997762,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 6.1,
+        "p": 0.997762,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 0.0,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 4.398182,
+      "tie_break": "232e2c66b010d3e37afbb08eed70eebcfd0e73d7820062407a4485d5a8635be3"
+    },
+    {
+      "entity_id": "E0073",
+      "person_id": "P0073",
+      "language": "ES",
+      "er_record_id": "E0073-ER_FHIR-0",
+      "clinic_record_id": "E0073-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 6.1,
+        "p": 0.997762,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 0.0,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 2.3,
+          "p": 0.908877,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 3.3,
+          "p": 0.964429,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 3.3,
+          "p": 0.964429,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 6.1,
+          "p": 0.997762,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 5.985714,
+          "p": 0.997492,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.485714,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 6.1,
+        "p": 0.997762,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 0.0,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 4.398182,
+      "tie_break": "38d630c701bbca02a126e100e2479fc8fe87276b02898a95c519f59118bdae47"
+    },
+    {
+      "entity_id": "E0171",
+      "person_id": "P0171",
+      "language": "EN",
+      "er_record_id": "E0171-ER_FHIR-0",
+      "clinic_record_id": "E0171-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 6.1,
+        "p": 0.997762,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 0.0,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 2.3,
+          "p": 0.908877,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 3.3,
+          "p": 0.964429,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 3.3,
+          "p": 0.964429,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 6.1,
+          "p": 0.997762,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 6.1,
+          "p": 0.997762,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 0.0,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 6.1,
+        "p": 0.997762,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 0.0,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 4.398182,
+      "tie_break": "5cc35a219b60269fd9061b1639381678ab343be4d98d3ddb0dcc85a2a4c83694"
+    },
+    {
+      "entity_id": "E0043",
+      "person_id": "P0043",
+      "language": "ES",
+      "er_record_id": "E0043-ER_FHIR-0",
+      "clinic_record_id": "E0043-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 7.0,
+        "p": 0.999089,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.4,
+          "family_metaphone": 0.5,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 2.9,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 3.2,
+          "p": 0.960834,
+          "band": "REVIEW",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 2.9,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 4.1,
+          "p": 0.983698,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 4.1,
+          "p": 0.983698,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 7.1,
+          "p": 0.999176,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.4,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 7.1,
+          "p": 0.999176,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.5,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 2.9,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 7.0,
+        "p": 0.999089,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.4,
+          "family_metaphone": 0.5,
+          "dob_exact": 0.0,
+          "dob_day_month_swap": 2.9,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 5.298182,
+      "tie_break": "a6b5dde0ca133610cd4d1a8554d30fe9eb1bb79498719015902a101a41907495"
+    },
+    {
+      "entity_id": "E0127",
+      "person_id": "P0127",
+      "language": "EN",
+      "er_record_id": "E0127-ER_FHIR-0",
+      "clinic_record_id": "E0127-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 3.5,
+          "p": 0.970688,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 4.3,
+          "p": 0.986613,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 7.2,
+          "p": 0.999254,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 2.9,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 7.3,
+          "p": 0.999325,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 5.598182,
+      "tie_break": "21fe2352cc8de65a6303bf8af82ceb216616887e4b95f907d7fdc7026674baf1"
+    },
+    {
+      "entity_id": "E0000",
+      "person_id": "P0000",
+      "language": "EN",
+      "er_record_id": "E0000-ER_FHIR-0",
+      "clinic_record_id": "E0000-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 3.5,
+          "p": 0.970688,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 4.3,
+          "p": 0.986613,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 7.3,
+          "p": 0.999325,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 7.3,
+          "p": 0.999325,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 5.598182,
+      "tie_break": "352ae69c90fbb8f6e8b60f920de4b893f0878390a26c01abeb68e73d8f7f6bf6"
+    },
+    {
+      "entity_id": "E0100",
+      "person_id": "P0100",
+      "language": "EN",
+      "er_record_id": "E0100-ER_FHIR-0",
+      "clinic_record_id": "E0100-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 3.5,
+          "p": 0.970688,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 7.2,
+          "p": 0.999254,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 2.9,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 7.3,
+          "p": 0.999325,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 5.598182,
+      "tie_break": "3e8c1ad8f0489cb15aba9eb580bab14b4cfd1e5921faa7165549f2c156645a7a"
+    },
+    {
+      "entity_id": "E0075",
+      "person_id": "P0075",
+      "language": "EN",
+      "er_record_id": "E0075-ER_FHIR-0",
+      "clinic_record_id": "E0075-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 3.5,
+          "p": 0.970688,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 7.2,
+          "p": 0.999254,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 2.9,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 7.3,
+          "p": 0.999325,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 5.598182,
+      "tie_break": "9681c52845bf868339ba82f89a6c2ef96556e1599867ed156e165308cc0d5be8"
+    },
+    {
+      "entity_id": "E0018",
+      "person_id": "P0018",
+      "language": "ES",
+      "er_record_id": "E0018-ER_FHIR-0",
+      "clinic_record_id": "E0018-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 3.5,
+          "p": 0.970688,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 7.3,
+          "p": 0.999325,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 7.185714,
+          "p": 0.999243,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.485714,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 5.598182,
+      "tie_break": "af374da799dadba703dc58119ff5c3dac5ec43bcffd3a85920a8a572a8248535"
+    },
+    {
+      "entity_id": "E0045",
+      "person_id": "P0045",
+      "language": "EN",
+      "er_record_id": "E0045-ER_FHIR-0",
+      "clinic_record_id": "E0045-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 3.5,
+          "p": 0.970688,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 7.2,
+          "p": 0.999254,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 2.9,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 7.3,
+          "p": 0.999325,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 5.598182,
+      "tie_break": "c2ed5b3771d3311f1be2edb8bfe7318f4948e9baf98f98bb2ea498dbff2de49a"
+    },
+    {
+      "entity_id": "E0044",
+      "person_id": "P0044",
+      "language": "EN",
+      "er_record_id": "E0044-ER_FHIR-0",
+      "clinic_record_id": "E0044-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 3.5,
+          "p": 0.970688,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 7.3,
+          "p": 0.999325,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 7.3,
+          "p": 0.999325,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 5.598182,
+      "tie_break": "f164790218f462cd19cdf1607ddb0c7df75cabee75fad661b9d2df4ace087668"
+    },
+    {
+      "entity_id": "E0055",
+      "person_id": "P0055",
+      "language": "ES",
+      "er_record_id": "E0055-ER_FHIR-0",
+      "clinic_record_id": "E0055-CLINIC_CSV-1",
+      "baseline": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "what_ifs": {
+        "REMOVE_ADDRESS": {
+          "raw_score": 3.5,
+          "p": 0.970688,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 0.0,
+            "zip_match": 0.0
+          }
+        },
+        "CHANGE_BIRTH_YEAR:+1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "CHANGE_BIRTH_YEAR:-1": {
+          "raw_score": 4.5,
+          "p": 0.989013,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.2,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "SWAP_DOB_DAY_MONTH": {
+          "raw_score": 7.3,
+          "p": 0.999325,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.6,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        },
+        "ACCENT_HYPHEN_SURNAME": {
+          "raw_score": 7.166667,
+          "p": 0.999229,
+          "band": "AUTO_LINK",
+          "negative_rules_fired": [],
+          "contributions": {
+            "given_name_jw": 1.4,
+            "family_name_jw": 1.466667,
+            "family_metaphone": 0.5,
+            "dob_exact": 3.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
+            "sex_match": 0.3,
+            "phone_match": 1.2,
+            "address_jaccard": 3.0,
+            "zip_match": 0.8
+          }
+        }
+      },
+      "intake": {
+        "raw_score": 7.3,
+        "p": 0.999325,
+        "band": "AUTO_LINK",
+        "negative_rules_fired": [],
+        "contributions": {
+          "given_name_jw": 1.4,
+          "family_name_jw": 1.6,
+          "family_metaphone": 0.5,
+          "dob_exact": 3.0,
+          "dob_day_month_swap": 0.0,
+          "dob_one_digit_edit": 0.0,
+          "sex_match": 0.3,
+          "phone_match": 1.2,
+          "address_jaccard": 3.0,
+          "zip_match": 0.8
+        }
+      },
+      "criteria": {
+        "baseline_review": false,
+        "remove_address_keep_separate": false,
+        "change_birth_year_keep_separate": false,
+        "swap_dob_day_month_robust": true,
+        "accent_hyphen_surname_robust": true,
+        "intake_rendering_review": false,
+        "fixture_check_bounds": false,
+        "spanish_name": true
+      },
+      "distance_to_midpoint": 5.598182,
+      "tie_break": "f17f560b63bb2a34811d7e690ce52cb9db174f616042eb3d9fee742b0ca0c922"
+    }
+  ],
+  "wording": "a selected showcase satisfying published criteria; aggregate metrics cover the full frozen test set; headline metrics were frozen before selection"
+}

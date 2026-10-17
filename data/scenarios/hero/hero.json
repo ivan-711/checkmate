@@ -1,0 +1,207 @@
+{
+  "entityId": "E0001",
+  "provisional": true,
+  "qualified": false,
+  "unmetCriteria": [
+    "change_birth_year_keep_separate",
+    "fixture_check_bounds"
+  ],
+  "scorerVersion": "standin-logistic-0",
+  "thresholdsId": "oof-d0ad2e9a590c",
+  "cLow": -0.096363636364,
+  "cHigh": 3.5,
+  "records": {
+    "ER_FHIR": {
+      "person_id": "P0001",
+      "given_name": "Michael",
+      "family_name": "Henderson",
+      "birth_date": "1999-04-12",
+      "sex": "FEMALE",
+      "phone": "+19205552719",
+      "address_line": "6820 Spruce St",
+      "zip5": "54155",
+      "language": "EN",
+      "record_id": "E0001-ER_FHIR-0",
+      "source_system": "ER_FHIR",
+      "categories": [],
+      "donor_person_ids": [],
+      "entity_id": "E0001"
+    },
+    "CLINIC_CSV": {
+      "person_id": "P0001",
+      "given_name": "Mike",
+      "family_name": "Hendersen",
+      "birth_date": "2000-04-12",
+      "sex": "FEMALE",
+      "phone": "+19205552719",
+      "address_line": "6820 Spruce St",
+      "zip5": "54155",
+      "language": "EN",
+      "record_id": "E0001-CLINIC_CSV-1",
+      "source_system": "CLINIC_CSV",
+      "categories": [
+        "D3",
+        "T3",
+        "T1"
+      ],
+      "donor_person_ids": [],
+      "entity_id": "E0001"
+    }
+  },
+  "baseline": {
+    "raw_score": 3.485859,
+    "p": 0.970283,
+    "band": "REVIEW",
+    "negative_rules_fired": [],
+    "contributions": {
+      "given_name_jw": 0.763636,
+      "family_name_jw": 1.422222,
+      "family_metaphone": 0.5,
+      "dob_exact": 0.0,
+      "dob_day_month_swap": 0.0,
+      "dob_one_digit_edit": 0.0,
+      "sex_match": 0.3,
+      "phone_match": 1.2,
+      "address_jaccard": 3.0,
+      "zip_match": 0.8
+    }
+  },
+  "whatIfs": {
+    "REMOVE_ADDRESS": {
+      "raw_score": -0.314141,
+      "p": 0.422104,
+      "band": "KEEP_SEPARATE",
+      "negative_rules_fired": [],
+      "contributions": {
+        "given_name_jw": 0.763636,
+        "family_name_jw": 1.422222,
+        "family_metaphone": 0.5,
+        "dob_exact": 0.0,
+        "dob_day_month_swap": 0.0,
+        "dob_one_digit_edit": 0.0,
+        "sex_match": 0.3,
+        "phone_match": 1.2,
+        "address_jaccard": 0.0,
+        "zip_match": 0.0
+      }
+    },
+    "CHANGE_BIRTH_YEAR:+1": {
+      "raw_score": 6.485859,
+      "p": 0.998477,
+      "band": "AUTO_LINK",
+      "negative_rules_fired": [],
+      "contributions": {
+        "given_name_jw": 0.763636,
+        "family_name_jw": 1.422222,
+        "family_metaphone": 0.5,
+        "dob_exact": 3.0,
+        "dob_day_month_swap": 0.0,
+        "dob_one_digit_edit": 0.0,
+        "sex_match": 0.3,
+        "phone_match": 1.2,
+        "address_jaccard": 3.0,
+        "zip_match": 0.8
+      }
+    },
+    "CHANGE_BIRTH_YEAR:-1": {
+      "raw_score": 3.485859,
+      "p": 0.970283,
+      "band": "REVIEW",
+      "negative_rules_fired": [],
+      "contributions": {
+        "given_name_jw": 0.763636,
+        "family_name_jw": 1.422222,
+        "family_metaphone": 0.5,
+        "dob_exact": 0.0,
+        "dob_day_month_swap": 0.0,
+        "dob_one_digit_edit": 0.0,
+        "sex_match": 0.3,
+        "phone_match": 1.2,
+        "address_jaccard": 3.0,
+        "zip_match": 0.8
+      }
+    },
+    "SWAP_DOB_DAY_MONTH": {
+      "raw_score": 3.485859,
+      "p": 0.970283,
+      "band": "REVIEW",
+      "negative_rules_fired": [],
+      "contributions": {
+        "given_name_jw": 0.763636,
+        "family_name_jw": 1.422222,
+        "family_metaphone": 0.5,
+        "dob_exact": 0.0,
+        "dob_day_month_swap": 0.0,
+        "dob_one_digit_edit": 0.0,
+        "sex_match": 0.3,
+        "phone_match": 1.2,
+        "address_jaccard": 3.0,
+        "zip_match": 0.8
+      }
+    },
+    "ACCENT_HYPHEN_SURNAME": {
+      "raw_score": 3.485859,
+      "p": 0.970283,
+      "band": "REVIEW",
+      "negative_rules_fired": [],
+      "contributions": {
+        "given_name_jw": 0.763636,
+        "family_name_jw": 1.422222,
+        "family_metaphone": 0.5,
+        "dob_exact": 0.0,
+        "dob_day_month_swap": 0.0,
+        "dob_one_digit_edit": 0.0,
+        "sex_match": 0.3,
+        "phone_match": 1.2,
+        "address_jaccard": 3.0,
+        "zip_match": 0.8
+      }
+    }
+  },
+  "intake": {
+    "raw_score": 3.485859,
+    "p": 0.970283,
+    "band": "REVIEW",
+    "negative_rules_fired": [],
+    "contributions": {
+      "given_name_jw": 0.763636,
+      "family_name_jw": 1.422222,
+      "family_metaphone": 0.5,
+      "dob_exact": 0.0,
+      "dob_day_month_swap": 0.0,
+      "dob_one_digit_edit": 0.0,
+      "sex_match": 0.3,
+      "phone_match": 1.2,
+      "address_jaccard": 3.0,
+      "zip_match": 0.8
+    }
+  },
+  "criteria": {
+    "baseline_review": true,
+    "remove_address_keep_separate": true,
+    "change_birth_year_keep_separate": false,
+    "swap_dob_day_month_robust": true,
+    "accent_hyphen_surname_robust": true,
+    "intake_rendering_review": true,
+    "fixture_check_bounds": false,
+    "spanish_name": true
+  },
+  "weights": {
+    "intercept": -4.5,
+    "given_name_jw": 1.4,
+    "family_name_jw": 1.6,
+    "family_metaphone": 0.5,
+    "dob_exact": 3.0,
+    "dob_day_month_swap": 2.9,
+    "dob_one_digit_edit": 0.2,
+    "sex_match": 0.3,
+    "phone_match": 1.2,
+    "address_jaccard": 3.0,
+    "zip_match": 0.8
+  },
+  "constructedOverlay": {
+    "allergyRef": "allergies.csv:E0001-CLINIC_CSV-1",
+    "orderRef": "MedicationRequest/E0001-ER_FHIR-0-amoxicillin",
+    "isConstructed": true
+  }
+}
