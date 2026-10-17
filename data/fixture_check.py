@@ -22,6 +22,7 @@ SKIP into a failure, which is how the 20:00 gate runs it.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from collections.abc import Sequence
@@ -34,6 +35,7 @@ from contracts.models.sessions import SessionResponse
 from contracts.models.thresholds import ThresholdSet
 from contracts.models.tiles import TilesResponse
 from contracts.models.whatifs import WhatIfResponse
+from data import hero_overlay as overlay
 from data.hero_select import P_RAISE_BOUND, ROBUSTNESS_TOLERANCE, intake_rendering
 from eval.harness import standin, whatifs
 from eval.harness.types import BAND_AUTO_LINK, BAND_KEEP_SEPARATE, BAND_REVIEW, band_for
@@ -168,6 +170,8 @@ def run_checks(d: Path, strict: bool = False) -> list[Check]:
     checks.append(Check("selection recorded seed, pool and per-criterion results",
                         PASS if all(k in selection for k in ("seed", "pool_size", "candidates", "criteria")) else FAIL))
 
+    checks.extend(_overlay_checks(d, hero))
+
     # v0.4 checks: skip with a reason until their lanes land
     checks.append(_policy_check(scenario, strict))
     checks.append(Check("after a scripted approve, attach_history is ALLOWed and BL-AMOX-01 fires", _skip(strict),
@@ -177,6 +181,54 @@ def run_checks(d: Path, strict: bool = False) -> list[Check]:
                         "transcript authored before 16:00 (ADR-016 section 7)" if not transcript.exists()
                         else "replay adapter lands with lane Q1"))
     return checks
+
+
+def _overlay_checks(d: Path, hero: dict) -> list[Check]:
+    """The constructed overlay is present, labeled, placed as specified and leaves identity untouched."""
+    name = "constructed overlay present, labeled and placed (Synthea data plan section 4)"
+    problems: list[str] = []
+    manifest_path, fhir_path = d / overlay.MANIFEST_FILE, d / overlay.FHIR_FILE
+    patients_path, allergies_path = d / overlay.PATIENTS_FILE, d / overlay.ALLERGIES_FILE
+    missing = [p.name for p in (manifest_path, fhir_path, patients_path, allergies_path) if not p.exists()]
+    if missing:
+        return [Check(name, FAIL, f"missing {missing}; run `python -m data.hero_select`")]
+    manifest = json.loads(manifest_path.read_text())
+    if manifest.get("provenance") != overlay.PROVENANCE_SENTENCE or not manifest.get("constructed") or any(
+            item.get("provenance") != overlay.PROVENANCE_SENTENCE for item in manifest["constructed"]):
+        problems.append("scenario_manifest.json lacks the provenance sentence on every constructed item")
+    resources = [e["resource"] for e in json.loads(fhir_path.read_text()).get("entry", [])]
+    tag = {"system": overlay.PROVENANCE_SYSTEM, "code": overlay.PROVENANCE_CODE}
+    untagged = [r["resourceType"] for r in resources if tag not in (r.get("meta") or {}).get("tag", [])]
+    if untagged:
+        problems.append(f"FHIR overlay resources without the provenance tag: {untagged}")
+    if any(r["resourceType"] == "AllergyIntolerance" for r in resources):
+        problems.append("the ER source carries an AllergyIntolerance (it must be registered without the history)")
+    orders = [r for r in resources if r["resourceType"] == "MedicationRequest" and r.get("status") == "active"
+              and any(c.get("code") == overlay.ORDER_RXNORM for c in r["medicationCodeableConcept"]["coding"])]
+    if len(orders) != 1:
+        problems.append(f"expected one active RxNorm {overlay.ORDER_RXNORM} order in the ER source, found {len(orders)}")
+    with allergies_path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    if "CONSTRUCTED" not in (rows[0] if rows else {}):
+        problems.append("allergies.csv has no CONSTRUCTED column")
+    severe = [r for r in rows if r.get("CODE") == overlay.ALLERGY_RXNORM and r.get("TYPE") == "allergy"
+              and not r.get("STOP") and "SEVERE" in (r.get("SEVERITY1"), r.get("SEVERITY2"))]
+    if not severe:
+        problems.append(f"no active SEVERE RxNorm {overlay.ALLERGY_RXNORM} allergy row in the Clinic CSV")
+    elif orders and not all(orders[0]["authoredOn"][:10] > r["START"] for r in severe):
+        problems.append("the order is not authored after the allergy START")
+    er_patient = next((r for r in resources if r["resourceType"] == "Patient"), {})
+    er, clinic = hero["records"]["ER_FHIR"], hero["records"]["CLINIC_CSV"]
+    er_name = (er_patient.get("name") or [{}])[0]
+    if (er_name.get("given"), er_name.get("family"), er_patient.get("birthDate")) != (
+            [er["given_name"]], er["family_name"], er["birth_date"]):
+        problems.append("ER overlay identity differs from the selected ER record")
+    with patients_path.open(newline="", encoding="utf-8") as fh:
+        prow = next(csv.DictReader(fh), {})
+    if (prow.get("FIRST"), prow.get("LAST"), prow.get("BIRTHDATE"), prow.get("ADDRESS") or None) != (
+            clinic["given_name"], clinic["family_name"], clinic["birth_date"], clinic["address_line"]):
+        problems.append("Clinic overlay identity differs from the selected Clinic record")
+    return [Check(name, FAIL if problems else PASS, "; ".join(problems))]
 
 
 def _caption_checks(scenario: dict, hero: dict, strict: bool) -> list[Check]:

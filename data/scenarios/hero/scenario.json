@@ -573,7 +573,7 @@
       "display": "Allergy to penicillin V (reaction: anaphylaxis, severe)",
       "sourceRecordId": "436d1df8-3555-583d-864e-d0b553b86777",
       "sourceSystem": "CLINIC_CSV",
-      "resourceId": "allergies.csv:E0001-CLINIC_CSV-1",
+      "resourceId": "allergies.csv:fb9c4243-b5d8-5db3-a3af-0c23f444f2ac:7984:2024-03-02",
       "verification": "CSV_DERIVED",
       "isConstructed": false
     },
@@ -587,7 +587,7 @@
       "display": "Amoxicillin 500 MG Oral Tablet (active order)",
       "sourceRecordId": "63805dda-fb10-5207-b2ce-3e9248dd63cb",
       "sourceSystem": "ER_FHIR",
-      "resourceId": "MedicationRequest/E0001-ER_FHIR-0-amoxicillin",
+      "resourceId": "MedicationRequest/4ff02cb8-2459-551b-aabc-1b1f9924075f",
       "verification": "CODED",
       "isConstructed": true
     }
@@ -601,17 +601,17 @@
     "allergyRef": {
       "sourceRecordId": "436d1df8-3555-583d-864e-d0b553b86777",
       "sourceSystem": "CLINIC_CSV",
-      "resourceId": "allergies.csv:E0001-CLINIC_CSV-1"
+      "resourceId": "allergies.csv:fb9c4243-b5d8-5db3-a3af-0c23f444f2ac:7984:2024-03-02"
     },
     "orderRef": {
       "sourceRecordId": "63805dda-fb10-5207-b2ce-3e9248dd63cb",
       "sourceSystem": "ER_FHIR",
-      "resourceId": "MedicationRequest/E0001-ER_FHIR-0-amoxicillin"
+      "resourceId": "MedicationRequest/4ff02cb8-2459-551b-aabc-1b1f9924075f"
     },
     "revealedByMerge": true,
     "severity": "moderate",
     "status": "PRELIMINARY",
-    "cardText": "Flagged for clinician review. Two records that were previously separate are now linked to this patient by an approved identity link. [Clinic CSV, allergies.csv row E0001-CLINIC_CSV-1] documents an allergy coded penicillin V (RxNorm 7984; status active; verification not stated in source; reaction: anaphylaxis, severe). This rule treats that code as penicillin-class. [ER FHIR, MedicationRequest/E0001-ER_FHIR-0-amoxicillin] has an active order for amoxicillin 500 MG Oral Tablet, RxNorm 308192. The amoxicillin label (DailyMed, set d5eba477-e255-4d97-9e16-30543c298680, revised 3/2023) states: \"contraindicated in patients with a history of serious hypersensitivity reactions (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin, clavulanate or to other beta-lactam antibacterial drugs (e.g., penicillins and cephalosporins)\". This is a rule-based flag on synthetic data. It does not say what the patient took or tolerated, or what should be prescribed. A clinician decides.",
+    "cardText": "Flagged for clinician review. Two records that were previously separate are now linked to this patient by an approved identity link. [Clinic CSV, allergies.csv row fb9c4243-b5d8-5db3-a3af-0c23f444f2ac] documents an allergy coded penicillin V (RxNorm 7984; status active; verification not stated in source; reaction: anaphylaxis, severe). This rule treats that code as penicillin-class. [ER FHIR, MedicationRequest/4ff02cb8-2459-551b-aabc-1b1f9924075f] has an active order for amoxicillin 500 MG Oral Tablet, RxNorm 308192. The amoxicillin label (DailyMed, set d5eba477-e255-4d97-9e16-30543c298680, revised 3/2023) states: \"contraindicated in patients with a history of serious hypersensitivity reactions (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin, clavulanate or to other beta-lactam antibacterial drugs (e.g., penicillins and cephalosporins)\". This is a rule-based flag on synthetic data. It does not say what the patient took or tolerated, or what should be prescribed. A clinician decides.",
     "cardFooter": "Rule BL-AMOX-01 v1. Not checked: cephalosporin cross-reactivity, intolerances, dose, free-text allergies. Absence of a flag is not evidence that no conflict exists. This rule and its wording were not reviewed by a clinician.",
     "citation": {
       "labelName": "Amoxicillin for oral suspension (Proficient Rx)",

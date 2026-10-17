@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 from contracts.fixtures.build_fixtures import FEATURES, T0, build_scenario
 from contracts.models.common import Band
 from contracts.models.whatifs import WhatIfButton
+from data.hero_overlay import PROVENANCE_SENTENCE, write_overlay
 from data.hero_select import whatif_year_direction
 from eval.harness import whatifs
 from eval.harness.standin import block_keys, display_p, fold
@@ -121,8 +122,9 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
     decision_id = str(uuid.uuid5(NAMESPACE, f"decision:{hero.entity_id}"))
     entity_id = str(uuid.uuid5(NAMESPACE, f"entity:{hero.entity_id}"))
     alert_id = str(uuid.uuid5(NAMESPACE, f"alert:{hero.entity_id}"))
-    allergy_ref = f"allergies.csv:{clinic['record_id']}"
-    order_ref = f"MedicationRequest/{er['record_id']}-amoxicillin"
+    # the constructed overlay (Synthea data plan section 4) is written first; the scenario cites its ids
+    overlay = write_overlay(out, hero.entity_id, er, clinic, natural_allergies=clinic.get("allergies"))
+    allergy_ref, order_ref = overlay.allergy_resource_id, overlay.order_resource_id
 
     scenario["placeholder"] = False
     scenario["watermark"] = (f"engine export by data/hero_select.py: {'PROVISIONAL' if provisional else 'FINAL'} hero "
@@ -187,7 +189,7 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
     alert.update(id=alert_id, entityId=entity_id)
     alert["allergyRef"].update(sourceRecordId=clinic_id, resourceId=allergy_ref)
     alert["orderRef"].update(sourceRecordId=er_id, resourceId=order_ref)
-    alert["cardText"] = (alert["cardText"].replace("allergies.csv row PLACEHOLDER", f"allergies.csv row {clinic['record_id']}")
+    alert["cardText"] = (alert["cardText"].replace("allergies.csv row PLACEHOLDER", f"allergies.csv row {overlay.clinic_patient_id}")
                          .replace("MedicationRequest/PLACEHOLDER", order_ref))
     scenario["thresholds"].update(thresholdsId=thresholds_id, cLow=c_low, cHigh=c_high,
                                   tLowDisplay=round(display_p(c_low, {}), 6), tHighDisplay=round(display_p(c_high, {}), 6),
@@ -221,7 +223,8 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
         "exportedWhatIfKeys": {b.value: _whatif_key(b, hero) for b in WhatIfButton},
         "criteria": hero.criteria, "criteriaLevel": hero.level, "criteriaRequired": list(hero.required),
         "weights": dict(result.weights),
-        "constructedOverlay": {"allergyRef": allergy_ref, "orderRef": order_ref, "isConstructed": True},
+        "constructedOverlay": {"allergyRef": allergy_ref, "orderRef": order_ref, "isConstructed": True,
+                               "manifest": "scenario_manifest.json", "provenance": PROVENANCE_SENTENCE},
     }, indent=2, ensure_ascii=False) + "\n")
     (out / "frontdesk_intake.json").write_text(json.dumps({
         "scenarioContextId": "hero-er-arrival", **intake,

@@ -25,6 +25,27 @@ jobs:
   lint-and-tests:
     name: mirror, ruff, openapi snapshot, pytest
     runs-on: ubuntu-24.04
+    # A fresh database server per job. Nothing here is named `checkmate` (the dev database): every lane's
+    # test conftest refuses a name without "test", and each lane gets its own database so one lane's
+    # committed rows never reach another lane's empty-table assumptions.
+    services:
+      db:
+        image: timescale/timescaledb-ha:pg18@sha256:75b1a432956ae6efc31551413ba51b6601ec0910dbad123a64617face989dc7c
+        env:
+          POSTGRES_USER: checkmate
+          POSTGRES_PASSWORD: checkmate
+          POSTGRES_DB: checkmate_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U checkmate -d checkmate_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql://checkmate:checkmate@127.0.0.1:5432/checkmate_test
+      # each lane's conftest default database; created and migrated below
+      TEST_DATABASES: checkmate_test_w1 checkmate_test_w3a checkmate_test_w3b
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: CLAUDE.md and AGENTS.md are byte-identical
@@ -39,6 +60,18 @@ jobs:
         run: uv run ruff check .
       - name: openapi.json snapshot is current
         run: uv run python -m contracts.build_openapi --check
+      - name: Create the per-lane test databases and migrate every test database before the suite
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          uv run python -c 'import sys, psycopg
+          with psycopg.connect("postgresql://checkmate:checkmate@127.0.0.1:5432/checkmate_test", autocommit=True) as conn:
+              for name in sys.argv[1:]:
+                  assert "test" in name, name
+                  conn.execute(f"CREATE DATABASE {name}")' $TEST_DATABASES
+          for db in checkmate_test $TEST_DATABASES; do
+            DATABASE_URL="postgresql://checkmate:checkmate@127.0.0.1:5432/${db}" uv run python -m contracts.migrations.apply
+          done
       - name: pytest (contracts, backend, harness, invariants, data)
         run: uv run pytest -q
 

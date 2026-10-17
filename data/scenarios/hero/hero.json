@@ -300,8 +300,10 @@
     "zip_match": 0.8
   },
   "constructedOverlay": {
-    "allergyRef": "allergies.csv:E0001-CLINIC_CSV-1",
-    "orderRef": "MedicationRequest/E0001-ER_FHIR-0-amoxicillin",
-    "isConstructed": true
+    "allergyRef": "allergies.csv:fb9c4243-b5d8-5db3-a3af-0c23f444f2ac:7984:2024-03-02",
+    "orderRef": "MedicationRequest/4ff02cb8-2459-551b-aabc-1b1f9924075f",
+    "isConstructed": true,
+    "manifest": "scenario_manifest.json",
+    "provenance": "added by the ChartGuard team; not produced by Synthea"
   }
 }

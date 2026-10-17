@@ -24,7 +24,7 @@
     "note": "the frontdesk-hero scenario loads the Clinic CSV record and decoys, not the ER record"
   },
   "constructedOrder": {
-    "resourceId": "MedicationRequest/E0001-ER_FHIR-0-amoxicillin",
+    "resourceId": "MedicationRequest/4ff02cb8-2459-551b-aabc-1b1f9924075f",
     "attachedBy": "executor",
     "isConstructed": true
   }
