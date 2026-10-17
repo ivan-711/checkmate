@@ -224,8 +224,10 @@ def _raise_alert(conn: Connection, who: Actor, entity_id: UUID, flag: RuleFlag, 
            payload={
         "alertId": str(alert.id), "ruleId": RULE_ID, "ruleVersion": RULE_VERSION, "tier": alert.tier.value,
         "classId": term.class_id, "rxnavVersion": term.rxnav_version,
-        "revealedByMerge": alert.revealed_by_merge, "allergyRef": alert.allergy_ref.model_dump(by_alias=True, mode="json"),
-        "orderRef": alert.order_ref.model_dump(by_alias=True, mode="json"), "constructedScenario": alert.constructed_scenario,
+        # internal record UUIDs, never FHIR resource ids: those have no length bound and the writer
+        # refuses strings over 64 characters (ids and enums only); the full refs live on the alert row
+        "revealedByMerge": alert.revealed_by_merge, "allergyRecordId": str(alert.allergy_ref.source_record_id),
+        "orderRecordId": str(alert.order_ref.source_record_id), "constructedScenario": alert.constructed_scenario,
     })
     return alert
 
