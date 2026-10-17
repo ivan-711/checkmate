@@ -40,6 +40,7 @@ IMPLEMENTED = frozenset(
         ("GET", API_PREFIX + "/candidate-pairs/{pair_id}"),  # W3a
         ("POST", API_PREFIX + "/candidate-pairs/{pair_id}/reviews"),  # W3a (link seam: W3b)
         ("GET", API_PREFIX + "/metrics/tiles"),  # W3a
+    ("GET", API_PREFIX + "/threshold-sets/current"),  # W3a (stub added to the contract at 256ca4a)
     }
 )
 app = build_app(implemented=IMPLEMENTED)
