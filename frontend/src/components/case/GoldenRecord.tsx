@@ -30,6 +30,7 @@ function CrosswalkChip({
       className="rounded border border-border-strong bg-surface px-2 text-[14px] font-medium text-ink-2"
     >
       {sourceLabel(system, cards)}
+      <span className="sr-only">, source record {recordId}</span>
     </span>
   );
 }

@@ -6,6 +6,8 @@ import { useDataSource } from "@/data/DataSourceProvider";
 import type { Mode } from "@/data/source";
 import { formatCt } from "@/lib/display";
 
+const TILE_POLL_MS = 2_000; // UX spec 3.13: the FrontDesk tile refreshes every 2 s
+
 const SOURCE_BY_MODE: Record<Mode, string> = { REPLAY: "recorded log", LOCAL: "local TimescaleDB" };
 
 function countsByBucket(tile: Tile) {
@@ -22,7 +24,11 @@ function countsByBucket(tile: Tile) {
 /** The AGENT_GATE slot: allowed versus denied agent actions from agent_gate_5m. */
 export function AuditTile() {
   const source = useDataSource();
-  const tiles = useQuery({ queryKey: ["tiles"], queryFn: () => source.getTiles() });
+  const tiles = useQuery({
+    queryKey: ["tiles"],
+    queryFn: () => source.getTiles(),
+    refetchInterval: TILE_POLL_MS,
+  });
   const tile = tiles.data?.tiles.find((t) => t.id === "AGENT_GATE");
   const rows = tile ? countsByBucket(tile) : [];
   const allowed = rows.reduce((n, [, r]) => n + r.allowed, 0);

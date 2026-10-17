@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAnnounce } from "@/components/ui/LiveRegion";
 
 type Language = "en" | "es";
 
@@ -14,6 +15,8 @@ const COPY = {
     region: "Check-in conversation",
     empty: "Your conversation will appear here.",
     language: "Language",
+    pane: "Patient kiosk",
+    switched: "Language switched to English.",
   },
   es: {
     title: "Le damos la bienvenida. Registremos su llegada.",
@@ -24,6 +27,8 @@ const COPY = {
     region: "Conversación de registro",
     empty: "Su conversación aparecerá aquí.",
     language: "Idioma",
+    pane: "QUIOSCO DE PACIENTES",
+    switched: "Idioma cambiado a español.",
   },
 } as const satisfies Record<Language, Record<string, string>>;
 
@@ -34,15 +39,12 @@ const LANGUAGES: { value: Language; label: string }[] = [
 
 export function KioskPane() {
   const [language, setLanguage] = useState<Language>("en");
+  const announce = useAnnounce();
   const t = COPY[language];
   return (
     <section lang={language} aria-labelledby="kiosk-label" className="flex flex-col gap-4">
-      <h2
-        id="kiosk-label"
-        lang="en"
-        className="text-[16px] font-semibold uppercase tracking-wider text-ink-3"
-      >
-        Patient kiosk
+      <h2 id="kiosk-label" className="text-[16px] font-semibold uppercase tracking-wider text-ink-3">
+        {t.pane}
       </h2>
       <div className="flex min-h-[560px] flex-col gap-4 rounded-lg border border-border-subtle bg-kiosk p-6">
         <div className="flex items-center justify-between">
@@ -58,7 +60,10 @@ export function KioskPane() {
                 type="button"
                 lang={value}
                 aria-pressed={language === value}
-                onClick={() => setLanguage(value)}
+                onClick={() => {
+                  setLanguage(value);
+                  announce(COPY[value].switched);
+                }}
                 className={`h-10 rounded px-4 text-[16px] ${
                   language === value ? "bg-surface font-semibold text-ink-1 shadow-sm" : "text-ink-2"
                 }`}
