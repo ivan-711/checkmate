@@ -24,7 +24,8 @@ dev = [
 package = true
 
 [tool.setuptools]
-packages = ["contracts", "contracts.models", "contracts.migrations", "backend", "backend.app"]
+packages = ["contracts", "contracts.models", "contracts.migrations", "backend", "backend.app", "backend.api",
+            "backend.events", "backend.link", "backend.match", "backend.scenarios"]
 
 [build-system]
 requires = ["setuptools>=69"]
