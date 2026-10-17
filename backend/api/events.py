@@ -6,7 +6,7 @@ never skips or repeats a row even when several events share one timestamp.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Query
@@ -14,26 +14,47 @@ from sqlalchemy import text
 
 from backend.api.common import invalid_cursor, pack_cursor, unpack_cursor
 from backend.app.deps import EngineDep
+from backend.app.errors import ApiError
 from backend.app.openapi_meta import common_error_responses
-from contracts.models.common import Page
+from contracts.models.common import ErrorCode, Page
 from contracts.models.events import EventLogRow, Versions
 from contracts.version import API_PREFIX, LIST_LIMIT_DEFAULT, LIST_LIMIT_MAX
 
 
-def encode_event_cursor(ts: datetime, event_id: UUID) -> str:
-    return pack_cursor({"ts": ts.isoformat(), "id": str(event_id)})
+def as_utc(moment: datetime) -> datetime:
+    """A time without an offset is read as UTC, never as the database session's time zone."""
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
 
 
-def decode_event_cursor(cursor: str) -> tuple[datetime, UUID]:
+def encode_event_cursor(ts: datetime, event_id: UUID, since: datetime | None = None) -> str:
+    """The last row's sort key, plus the ``since`` filter the page was cut with, so a follow-up
+    request that sends only the cursor keeps the same filter."""
+    fields = {"ts": ts.isoformat(), "id": str(event_id)}
+    if since is not None:
+        fields["since"] = since.isoformat()
+    return pack_cursor(fields)
+
+
+def decode_event_cursor(cursor: str) -> tuple[datetime, UUID, datetime | None]:
     data = unpack_cursor(cursor)
     try:
         ts = datetime.fromisoformat(data["ts"])
         event_id = UUID(data["id"])
+        since = datetime.fromisoformat(data["since"]) if data.get("since") is not None else None
     except (ValueError, KeyError, TypeError, AttributeError):
         raise invalid_cursor() from None
-    if ts.tzinfo is None:  # event_log.ts is timestamptz; a naive time is not one of our cursors
+    # event_log.ts is timestamptz and the server writes offsets: a naive time is not one of our cursors
+    if ts.tzinfo is None or (since is not None and since.tzinfo is None):
         raise invalid_cursor()
-    return ts, event_id
+    return ts, event_id, since
+
+
+def effective_since(requested: datetime | None, from_cursor: datetime | None) -> datetime | None:
+    """The cursor carries the filter it was issued under; a different ``since`` beside it is a client error."""
+    requested = as_utc(requested) if requested is not None else None
+    if requested is not None and requested != from_cursor:
+        raise ApiError(ErrorCode.VALIDATION_ERROR, "since differs from the filter the cursor was issued for")
+    return from_cursor if from_cursor is not None else requested
 
 
 router = APIRouter(prefix=API_PREFIX, tags=["core"])
@@ -43,11 +64,15 @@ EVENT_COLUMNS = (
     "band, outcome, latency_ms, mode, versions, payload, intake_session_id, tool_call_id, tool_name, gate_outcome, "
     "reason_code, evidence_ids, evidence_snapshot, client_request_id, effect_status"
 )
-_FIRST_PAGE = text(f"SELECT {EVENT_COLUMNS} FROM event_log ORDER BY ts DESC, event_id DESC LIMIT :limit_plus_one")
-_NEXT_PAGE = text(
-    f"SELECT {EVENT_COLUMNS} FROM event_log WHERE (ts, event_id) < (:after_ts, :after_id) "
-    "ORDER BY ts DESC, event_id DESC LIMIT :limit_plus_one"
-)
+# Closed set of filter fragments; the request supplies values only.
+_SINCE = "ts >= :since"
+_AFTER = "(ts, event_id) < (:after_ts, :after_id)"
+
+
+def page_query(with_since: bool, with_cursor: bool):
+    clauses = [c for c, on in ((_SINCE, with_since), (_AFTER, with_cursor)) if on]
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    return text(f"SELECT {EVENT_COLUMNS} FROM event_log{where} ORDER BY ts DESC, event_id DESC LIMIT :limit_plus_one")
 
 
 # The contract's Versions keys, in both spellings a writer may store (camelCase alias or snake_case).
@@ -75,18 +100,24 @@ def event_from_row(row) -> EventLogRow:
     response_model=Page[EventLogRow],
     responses=common_error_responses(),
     description="Lane W3a (additive, G16 step 7). The append-only event feed, newest first; bounded list "
-    "with an opaque keyset cursor over (ts, eventId).",
+    "with an opaque keyset cursor over (ts, eventId). `since` keeps only rows with ts at or "
+    "after it, so a caller can count one run's events on a reused database.",
 )
 def list_events(
     engine: EngineDep,
+    since: datetime | None = None,
     limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX),
     cursor: str | None = None,
 ) -> Page[EventLogRow]:
     params: dict = {"limit_plus_one": limit + 1}
+    cursor_since = None
     if cursor:
-        params["after_ts"], params["after_id"] = decode_event_cursor(cursor)
+        params["after_ts"], params["after_id"], cursor_since = decode_event_cursor(cursor)
+    since = effective_since(since, cursor_since) if cursor else (as_utc(since) if since is not None else None)
+    if since is not None:
+        params["since"] = since
     with engine.connect() as conn:
-        rows = conn.execute(_NEXT_PAGE if cursor else _FIRST_PAGE, params).all()
+        rows = conn.execute(page_query(since is not None, bool(cursor)), params).all()
     page = rows[:limit]
-    next_cursor = encode_event_cursor(page[-1].ts, page[-1].event_id) if len(rows) > limit else None
+    next_cursor = encode_event_cursor(page[-1].ts, page[-1].event_id, since) if len(rows) > limit else None
     return Page[EventLogRow](items=[event_from_row(r) for r in page], next_cursor=next_cursor)

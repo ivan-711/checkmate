@@ -148,3 +148,69 @@ def test_a_row_with_extra_version_keys_and_null_evidence_ids_is_served(client, s
     assert row["evidenceIds"] == []
     assert row["versions"]["scorerVersion"] == "handset-0"
     assert "ruleId" not in row["versions"] and "classTable" not in row["versions"]
+
+
+def _ids(page: dict) -> list[str]:
+    return [e["eventId"] for e in page["items"]]
+
+
+def test_since_keeps_only_rows_at_or_after_it(client):
+    from datetime import timedelta
+
+    since = datetime.now(UTC)
+    with engine.begin() as conn:
+        before = _insert_at(conn, since - timedelta(microseconds=1), 1)
+        at = _insert_at(conn, since, 1)
+        after = _insert_at(conn, since + timedelta(milliseconds=1), 1)
+    r = client.get(f"{API}/events", params={"since": since.isoformat(), "limit": 200})
+    assert r.status_code == 200, r.text
+    served = _ids(r.json())
+    assert served == after + at, "newest first, the row exactly at since included"
+    assert before[0] not in served
+    assert r.json()["nextCursor"] is None
+
+
+def test_a_cursor_from_a_since_page_keeps_the_filter(client):
+    from datetime import timedelta
+
+    since = datetime.now(UTC)
+    with engine.begin() as conn:
+        _insert_at(conn, since - timedelta(seconds=1), 2)
+        inside = [_insert_at(conn, since + timedelta(milliseconds=n), 1)[0] for n in (3, 2, 1)]
+    page1 = client.get(f"{API}/events", params={"since": since.isoformat(), "limit": 2}).json()
+    assert _ids(page1) == inside[:2]
+    page2 = client.get(f"{API}/events", params={"cursor": page1["nextCursor"], "limit": 2}).json()
+    assert _ids(page2) == inside[2:], "the cursor alone carries the since filter"
+    assert page2["nextCursor"] is None
+    same = client.get(
+        f"{API}/events", params={"cursor": page1["nextCursor"], "since": since.isoformat(), "limit": 2}
+    ).json()
+    assert _ids(same) == inside[2:]
+
+
+def test_since_that_disagrees_with_its_cursor_is_422(client):
+    from datetime import timedelta
+
+    since = datetime.now(UTC)
+    with engine.begin() as conn:
+        _insert_at(conn, since + timedelta(milliseconds=1), 2)
+    page1 = client.get(f"{API}/events", params={"since": since.isoformat(), "limit": 1}).json()
+    other = (since - timedelta(hours=1)).isoformat()
+    r = client.get(f"{API}/events", params={"cursor": page1["nextCursor"], "since": other})
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_unparsable_since_is_a_422_envelope(client):
+    r = client.get(f"{API}/events", params={"since": "yesterday-ish"})
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert r.headers["X-Request-Id"]
+
+
+def test_since_without_an_offset_is_read_as_utc(client):
+    since = datetime.now(UTC)
+    with engine.begin() as conn:
+        at = _insert_at(conn, since, 1)
+    naive = since.replace(tzinfo=None).isoformat()
+    assert _ids(client.get(f"{API}/events", params={"since": naive}).json()) == at

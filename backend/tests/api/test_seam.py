@@ -93,7 +93,10 @@ def test_routes_run_against_w2_core_by_attribute_only(client):
     a, b = (NormalizedRecord.model_validate(r) for r in records[:2])
     keys = core.block_keys(a)
     assert all(hasattr(k, "key_type") and hasattr(k, "key_value") for k in keys)
-    thresholds = seam.Thresholds(threshold_set_id="provisional-0", c_low=0.0, c_high=2.0)
+    current = client.get(f"{API}/threshold-sets/current").json()  # whatever row is current, never a literal
+    thresholds = seam.Thresholds(
+        threshold_set_id=current["thresholdsId"], c_low=current["cLow"], c_high=current["cHigh"]
+    )
     result = core.match(a, b, thresholds)
     Band(result.band)
     EvidenceSnapshot.model_validate(result.evidence.model_dump(mode="json"))
