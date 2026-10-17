@@ -103,6 +103,13 @@ def build_app(implemented: frozenset[Route] = frozenset()) -> FastAPI:
     async def create_session(body: CreateSessionRequest):
         return not_implemented("W1/W3a")
 
+    @app.get(p + "/sessions/current", response_model=SessionResponse, tags=["core"],
+             responses=_err(ErrorCode.NOT_FOUND) | common_errors,
+             description="Lane W3a (additive). The current demo session, so a reloaded page rebinds the hero "
+                         "without a reset; 404 before the first reset.")
+    async def get_current_session():
+        return not_implemented("W3a")
+
     @app.post(p + "/match-runs", response_model=MatchRunResponse, status_code=201, tags=["core"],
               responses=common_errors,
               description='Lane W2/W3a. UX "Resolve identity": block, score, band. Returns counts and the first 50 queued pair ids.')
