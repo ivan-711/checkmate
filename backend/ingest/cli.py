@@ -2,24 +2,30 @@
 
 Parses the Synthea Nov 2021 sample under data/raw (run ``uv run python data/download.py`` first),
 runs the corruption generator, writes every generated record through the store and prints the
-counts the build brief asks for. The blocking reduction ratio is W2's; until W2 merges the line
-reads "reduction: pending W2".
+counts the build brief asks for, including backend.core's blocking reduction ratio and the blocking
+recall on the hidden truth pairs. Reloading the same seed adds nothing and re-derives any
+normalized row or block key an older normalizer wrote.
 """
+
 from __future__ import annotations
 
 import argparse
 import os
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import psycopg
+from psycopg.rows import dict_row
 
+from backend.core.block import BlockingResult, candidate_pairs
+from backend.core.normalize import coerce_normalized
 from backend.ingest.blocking import KEY_TYPES
-from backend.ingest.corruptor import build_corpus, write_outputs
+from backend.ingest.corruptor import LABEL_NOT_SAME, LABEL_SAME, CorpusOutput, build_corpus, write_outputs
 from backend.ingest.csvio import read_csv_dir
 from backend.ingest.fhir import iter_bundle_paths, load_bundle
-from backend.ingest.store import ingest, pair_candidates_by_key_type
+from backend.ingest.store import IngestResult, ingest, pair_candidates_by_key_type
 
 DEFAULT_RAW_DIR = Path("data/raw")
 DEFAULT_OUT_DIR = Path("eval/runs")
@@ -55,6 +61,18 @@ def load_sample(raw_dir: Path, limit: int | None = None, skipped: list[str] | No
     return bundles, csv_patients
 
 
+class ForeignRecords(RuntimeError):
+    """The database holds records that are not part of this corpus (another seed or a scenario)."""
+
+
+@dataclass(frozen=True)
+class LoadSummary:
+    result: IngestResult
+    key_pair_counts: dict[str, int]
+    blocking: BlockingResult
+    records_in_db: int
+
+
 def foreign_records(conn: psycopg.Connection, corpus) -> int:
     """Rows already in source_record that are not part of this corpus. Loading on top of another
     corpus or seed would mix truth tables and pair counts, so the CLI refuses before writing."""
@@ -63,26 +81,73 @@ def foreign_records(conn: psycopg.Connection, corpus) -> int:
     return sum(1 for row in rows if tuple(row) not in expected)
 
 
+def match_run_blocking(conn: psycopg.Connection, corpus: CorpusOutput) -> BlockingResult:
+    """backend.core's S3 over this corpus's stored normalized rows, hot-block cap on.
+
+    The load refuses a database holding other records and re-derives every row and key it skips, so
+    these are the pairs a match run over this database expands from its block_key rows.
+    """
+    ids = [rec.draft.id for rec in corpus.records]
+    with conn.cursor(row_factory=dict_row) as cur:
+        rows = cur.execute("SELECT * FROM normalized_record WHERE record_id = ANY(%s)", (ids,)).fetchall()
+    return candidate_pairs({str(row["record_id"]): coerce_normalized(row) for row in rows})
+
+
+def truth_pairs_blocked(result: BlockingResult, corpus: CorpusOutput, label: str) -> tuple[int, int]:
+    """How many of the hidden truth pairs with ``label`` reach the scorer (blocking recall)."""
+    candidates = {(pair.record_a_id, pair.record_b_id) for pair in result.pairs}
+    truth = [tuple(sorted((p["record_a_id"], p["record_b_id"]))) for p in corpus.pairs if p["label"] == label]
+    return sum(pair in candidates for pair in truth), len(truth)
+
+
+def load_corpus(conn: psycopg.Connection, corpus: CorpusOutput, out_dir: Path) -> LoadSummary:
+    """Write the hidden truth files and every record, then measure blocking over what was stored."""
+    foreign = foreign_records(conn, corpus)
+    if foreign:
+        raise ForeignRecords(
+            f"database already holds {foreign} record(s) from another corpus or seed; use a fresh database"
+        )
+    write_outputs(corpus, out_dir)
+    result = ingest(conn, (rec.draft for rec in corpus.records))
+    return LoadSummary(
+        result=result,
+        key_pair_counts=pair_candidates_by_key_type(conn),
+        blocking=match_run_blocking(conn, corpus),
+        records_in_db=conn.execute("SELECT count(*) FROM source_record").fetchone()[0],
+    )
+
+
 def cmd_load(args: argparse.Namespace) -> int:
     started = time.monotonic()
     skipped: list[str] = []
     bundles, csv_patients = load_sample(args.raw, args.limit, skipped)
     corpus = build_corpus(args.seed, bundles, csv_patients)
     with psycopg.connect(args.database_url) as conn:
-        foreign = foreign_records(conn, corpus)
-        if foreign:
-            raise SystemExit(f"database already holds {foreign} record(s) from another corpus or seed; use a fresh database")
-        write_outputs(corpus, args.out / f"corruptor-{args.seed}")
-        result = ingest(conn, (rec.draft for rec in corpus.records))
-        counts = pair_candidates_by_key_type(conn)
-        total_records = conn.execute("SELECT count(*) FROM source_record").fetchone()[0]
+        try:
+            summary = load_corpus(conn, corpus, args.out / f"corruptor-{args.seed}")
+        except ForeignRecords as exc:
+            raise SystemExit(str(exc)) from None
+    result, blocking = summary.result, summary.blocking
     print(f"bundles skipped as malformed: {len(skipped)}" + (f" ({', '.join(skipped)})" if skipped else ""))
     print(f"entities: {corpus.run['entities']}")
-    print(f"records: generated={corpus.run['records']} inserted={result.records_inserted} skipped={result.records_skipped} in_db={total_records}")
-    print(f"pairs: same={corpus.run['pairs_same']} not_same={corpus.run['pairs_not_same']} grafts={corpus.run['grafts']}")
+    print(
+        f"records: generated={corpus.run['records']} inserted={result.records_inserted} "
+        f"skipped={result.records_skipped} rederived={result.records_rederived} in_db={summary.records_in_db}"
+    )
+    print(
+        f"pairs: same={corpus.run['pairs_same']} not_same={corpus.run['pairs_not_same']} grafts={corpus.run['grafts']}"
+    )
     for key_type in KEY_TYPES:
-        print(f"pair candidates [{key_type}]: {counts.get(key_type, 0)}")
-    print("reduction: pending W2")
+        print(f"pair candidates [{key_type}]: {summary.key_pair_counts.get(key_type, 0)}")
+    bound = "<=" if blocking.pairs_skipped_is_upper_bound else ""
+    print(
+        f"candidate pairs: {blocking.n_candidate_pairs} of {blocking.n_total_pairs}  "
+        f"reduction: {blocking.reduction_ratio:.4f}  oversized blocks: {len(blocking.oversized_blocks)} "
+        f"(pairs skipped: {bound}{blocking.pairs_skipped_oversized})"
+    )
+    same_hit, same_n = truth_pairs_blocked(blocking, corpus, LABEL_SAME)
+    not_hit, not_n = truth_pairs_blocked(blocking, corpus, LABEL_NOT_SAME)
+    print(f"blocking recall: SAME {same_hit}/{same_n}  NOT_SAME (hard negatives reaching the scorer) {not_hit}/{not_n}")
     print("records per family: " + ", ".join(f"{f}={n}" for f, n in corpus.run["family_counts"].items()))
     print(f"heldout families: {', '.join(corpus.heldout_families)}")
     print(f"truth table sha256: {corpus.sha256['truth']}  ({corpus.files['truth']})")
