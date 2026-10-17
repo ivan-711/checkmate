@@ -791,7 +791,7 @@
         "type": "object"
       },
       "EventType": {
-        "description": "The TEXT + CHECK list in migration 0001. Migration 0002 widens it after 16:00.",
+        "description": "The TEXT + CHECK list in migration 0001. Migration 0003_frontdesk_steps widens it after 16:00.",
         "enum": [
           "RECORD_INGESTED",
           "MATCH_RUN_COMPLETED",
@@ -3058,7 +3058,7 @@
   "paths": {
     "/api/v1/alerts": {
       "get": {
-        "description": "Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity; bounded list.",
+        "description": "Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity (unknown entityId is a 404) and one status; bounded list.",
         "operationId": "list_alerts_api_v1_alerts_get",
         "parameters": [
           {
@@ -3076,6 +3076,22 @@
                 }
               ],
               "title": "Entityid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AlertStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
             }
           },
           {
@@ -3117,6 +3133,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
           },
           "422": {
             "content": {
