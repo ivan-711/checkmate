@@ -44,6 +44,8 @@ jobs:
           --health-retries 30
     env:
       DATABASE_URL: postgresql://checkmate:checkmate@127.0.0.1:5432/checkmate_test
+      # on main the regression cases must run through W2's engine; elsewhere they skip with the reason
+      CHECKMATE_REQUIRE_ENGINE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
       # each lane's conftest default database; created and migrated below
       TEST_DATABASES: checkmate_test_w1 checkmate_test_w3a checkmate_test_w3b
     steps:
@@ -157,7 +159,7 @@ jobs:
           retention-days: 7
 
   fixture-check:
-    name: hero selector regenerates scenario.json; fixture_check
+    name: hero selector regenerates the export through the product; fixture_check
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -166,7 +168,28 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
       - run: uv sync --frozen
-      - name: Regenerate data/scenarios/hero and diff (architecture section 18, replay integrity)
+      - name: W2's engine present? (the product steps fail on main without it)
+        id: engine
+        run: |
+          if uv run python -c "import backend.core.api" 2>/dev/null; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          elif [ "${GITHUB_EVENT_NAME}" = push ] && [ "${GITHUB_REF}" = refs/heads/main ]; then
+            echo "::error::backend.core (W2's engine) is absent on main: the evaluation cannot measure the product"; exit 1
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::backend.core (W2's engine) is absent on this branch: product steps skipped here; they fail on main"
+          fi
+      - name: Synthea sample cache
+        if: steps.engine.outputs.present == 'true'
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: data/raw
+          key: synthea-nov2021-${{ hashFiles('data/HASHES.json') }}
+      - name: Download and hash-check the Synthea sample (data/HASHES.json)
+        if: steps.engine.outputs.present == 'true'
+        run: uv run python data/download.py --dest data/raw
+      - name: Regenerate data/scenarios/hero with W2's engine on W1's corpus and diff (architecture section 18)
+        if: steps.engine.outputs.present == 'true'
         run: |
           set -euo pipefail
           uv run python -m data.hero_select --allow-partial
@@ -318,7 +341,27 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
       - run: uv sync --frozen
-      - name: Run the fast harness (P0 families, one seed, development components only)
+      - name: W2's engine present? (the product steps fail on main without it)
+        id: engine
+        run: |
+          if uv run python -c "import backend.core.api" 2>/dev/null; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          elif [ "${GITHUB_EVENT_NAME}" = push ] && [ "${GITHUB_REF}" = refs/heads/main ]; then
+            echo "::error::backend.core (W2's engine) is absent on main: the evaluation cannot measure the product"; exit 1
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::backend.core (W2's engine) is absent on this branch: product steps skipped here; they fail on main"
+          fi
+      - name: Synthea sample cache
+        if: steps.engine.outputs.present == 'true'
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: data/raw
+          key: synthea-nov2021-${{ hashFiles('data/HASHES.json') }}
+      - name: Download and hash-check the Synthea sample (data/HASHES.json)
+        if: steps.engine.outputs.present == 'true'
+        run: uv run python data/download.py --dest data/raw
+      - name: Run the fast harness on the product (W1's corpus, W2's engine; P0 families, one seed, development only)
         id: harness
         env:
           GIT_SHA: ${{ github.sha }}
