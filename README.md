@@ -29,7 +29,7 @@ make up
 
 `make up` builds and starts the database and the API (`Makefile`, `docker-compose.yml`); the API container applies the migrations before it starts (`backend/Dockerfile`), so the API can take a few seconds to answer after `make up` returns. Then open http://127.0.0.1:8000/api/v1/health and expect `"db":"UP"` (`backend/app/main.py`, `contracts/models/health.py`).
 
-`POST /api/v1/sessions` with `{"scenarioId": "hero"}` starts a demo session (`backend/api/sessions.py`). Under `make up` it loads the placeholder fixture hero from `contracts/fixtures/scenario.json`: `CHECKMATE_HERO_SOURCE` defaults to `fixture` and `docker-compose.yml` does not set it (`backend/scenarios/loader.py`). The `corpus` source also needs the hero export under `data/scenarios/hero/`, which is not on `main` yet.
+`POST /api/v1/sessions` with `{"scenarioId": "hero"}` starts a demo session (`backend/api/sessions.py`). Under `make up` it loads the placeholder fixture hero from `contracts/fixtures/scenario.json`: `CHECKMATE_HERO_SOURCE` defaults to `fixture` and `docker-compose.yml` does not set it (`backend/scenarios/loader.py`). The `corpus` source (`CHECKMATE_HERO_SOURCE=corpus`) rebuilds the corpus from the Synthea sample in `data/raw` and takes the hero from W5's export in `data/scenarios/hero/`: `hero.json` names the hero's two corpus records, and the constructed allergy and order overlay is applied to those two records.
 
 To load the synthetic corpus into the compose database (requires `uv`):
 
@@ -89,11 +89,11 @@ flowchart LR
 | `contracts/` | lead session | The frozen contract, tag `contracts-v1`, plus additive routes (`contracts/README.md`) |
 | `backend/` | W1, W2, W3a, W3b and wave 2 | API routes (`backend/api/`), matching core (`backend/core/`), links, golden record, timeline and rule (`backend/link/`, `backend/golden/`, `backend/rule/`), event writer (`backend/events/`), loader (`backend/ingest/`), scenario loading (`backend/scenarios/`), tests (`backend/tests/`) |
 | `frontend/` | W4 and wave 2 UI lanes | Empty until W4 merges |
-| `eval/` | W5, Q2, Q5 | Empty until W5 merges |
-| `data/` | W1, W5 | `data/download.py` and `data/HASHES.json`; raw data stays gitignored |
+| `eval/` | W5, Q2, Q5 | Evaluation harness (`eval/harness/`), protected expectations (`eval/expectations/`), the G16 acceptance script (`eval/acceptance/`), tests (`eval/tests/`, `eval/tests_r5/`) |
+| `data/` | W1, W5 | `data/download.py` and `data/HASHES.json`; hero selector and export (`data/hero_select.py`, `data/hero_export.py`, `data/hero_overlay.py`), `data/fixture_check.py`, and the exported hero in `data/scenarios/hero/`; raw data stays gitignored |
 | `docs/` | D1, D2, D3 | `docs/LICENSES.md`, `docs/devpost-outline.md` |
 | `tools/` | Q15 | Empty |
-| `.github/` | W5 | Empty until W5 merges |
+| `.github/` | W5 | CI workflow `.github/workflows/ci.yml`: lint and tests, protected paths, contract test, fixture check, frontend build, secret scan, acceptance run, harness on `main` |
 
 ## Data provenance
 
