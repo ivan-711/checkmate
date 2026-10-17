@@ -12,6 +12,7 @@ from backend.link.service import (
     AlreadyLinked,
     CannotLinkConflict,
     LinkError,
+    alerts_for_entity,
     apply_approve,
     apply_reject,
     apply_revoke,
@@ -398,3 +399,16 @@ def test_insufficient_evidence_reject_of_already_linked_records_is_not_refused(c
     apply_reject(conn, shortcut, rejected)  # no suppression is written, so nothing can poison the entity
     assert rows_touching(conn, "not_a_match", [a, b, c]) == 0
     assert read_entity(conn, entity.id).version == entity.version
+
+
+def test_alerts_for_entity_returns_the_current_alerts_and_leaves_retracted_ones_out(conn):
+    """W3a's same-state Approve branch answers with these, so a second Approve shows the same card."""
+    clinic, er = hero_records(conn)
+    pair, decision = linked_pair(conn, clinic, er)
+    entity, alerts = apply_approve(conn, pair, decision)
+    assert [a.id for a in alerts_for_entity(conn, entity.id)] == [a.id for a in alerts]
+    result = apply_split(
+        conn, entity.id, [er], actor="registrar:Registrar A", reason_code=ReasonCode.INSUFFICIENT_EVIDENCE
+    )
+    assert result.retracted_alert_ids == [alerts[0].id]
+    assert alerts_for_entity(conn, entity.id) == [], "a retracted flag is history, not a current alert"
