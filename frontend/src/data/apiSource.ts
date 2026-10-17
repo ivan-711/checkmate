@@ -37,19 +37,28 @@ export class ApiSource implements DataSource {
   readonly mode = "LOCAL" as const;
   readonly canRestore = false; // the contract has no restore route
   private readonly client: ReturnType<typeof createClient<paths>>;
+  // The last session this tab saw: used only while GET /sessions/current is a 501 stub.
   private session: SessionResponse | null = null;
+  private pendingSession: Promise<SessionResponse | null> | null = null;
 
   /** `baseUrl` stays "" in the browser (same origin); tests pass an absolute origin. */
   constructor(baseUrl = "") {
     this.client = createClient<paths>({ baseUrl });
   }
 
-  /** This tab's session, or the API's current one after a reload; null before any reset
-   * (404) or while the route is still a stub (501). */
-  async getSession(): Promise<SessionResponse | null> {
-    if (this.session) return this.session;
+  /** The API's current session, re-read on every call so a reset made in another tab is
+   * followed; callers asking at the same time share one request. null before any reset (404). */
+  getSession(): Promise<SessionResponse | null> {
+    this.pendingSession ??= this.readCurrentSession().finally(() => {
+      this.pendingSession = null;
+    });
+    return this.pendingSession;
+  }
+
+  private async readCurrentSession(): Promise<SessionResponse | null> {
     const res = await this.client.GET("/api/v1/sessions/current");
-    if (res.response.status === 404 || res.response.status === 501) return null;
+    if (res.response.status === 404) return null;
+    if (res.response.status === 501) return this.session; // route not implemented: this tab's memory
     if (!res.data) fail(res.error);
     this.session = res.data;
     return res.data;
@@ -126,15 +135,23 @@ export class ApiSource implements DataSource {
     throw new DataError("NOT_IMPLEMENTED", "Undo is not available from the API yet.");
   }
 
-  /** The pair whose records are exactly the session's first and second source, found through
-   * the recordId filter and its cursor; null when it is not queued (never another pair). */
+  /** The match-run pair whose records are exactly the session's first and second source, found
+   * through the recordId filter and its cursor; null when it is not queued (never another pair).
+   * Running out of pages is reported as a reset prompt rather than "not queued". */
   private async heroPair(recordIds: string[]): Promise<PairSummary | null> {
     const [first, second] = recordIds;
     if (!first || !second) return null;
     let cursor: string | null | undefined;
     for (let page = 0; page < HERO_PAGES_MAX; page++) {
       const res = await this.client.GET("/api/v1/candidate-pairs", {
-        params: { query: { recordId: first, limit: LIST_LIMIT_MAX, ...(cursor ? { cursor } : {}) } },
+        params: {
+          query: {
+            recordId: first,
+            origin: "MATCH_RUN",
+            limit: LIST_LIMIT_MAX,
+            ...(cursor ? { cursor } : {}),
+          },
+        },
       });
       if (!res.data) fail(res.error);
       const hero = res.data.items.find(
@@ -146,7 +163,7 @@ export class ApiSource implements DataSource {
       cursor = res.data.nextCursor;
       if (!cursor) return null;
     }
-    return null;
+    throw new DataError("NO_SESSION", NO_SESSION_MESSAGE);
   }
 
   /** The entity and alerts of a LINKED pair, read from the API so a reload shows the same state.

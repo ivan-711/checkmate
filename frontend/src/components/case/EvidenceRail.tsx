@@ -1,10 +1,11 @@
+import { useState } from "react";
 import type { CandidatePairDetail } from "@/api/types";
 import { BandChip } from "@/components/ui/BandChip";
 import { rankContributions } from "@/lib/display";
 
 const TOP_CONTRIBUTIONS = 5;
-// UX 3.1: on a short laptop screen (1366x650) the rail shows the top 4, so the review step's
-// submit button stays above the fold.
+// UX 3.1: on a short laptop screen (1366x650) the rail shows the top 4 with "Show all", so the
+// review step's submit button stays above the fold. The breakpoint lives in globals.css.
 const SHORT_SCREEN_ROWS = 4;
 
 function signed(logit: number): string {
@@ -14,6 +15,7 @@ function signed(logit: number): string {
 export function EvidenceRail({ detail }: { detail: CandidatePairDetail }) {
   const { decision } = detail.pair;
   const ranked = rankContributions(detail.contributions).slice(0, TOP_CONTRIBUTIONS);
+  const [showAll, setShowAll] = useState(false);
   const scale = Math.max(...ranked.map((c) => Math.abs(c.logit)), Number.EPSILON);
 
   return (
@@ -36,14 +38,25 @@ export function EvidenceRail({ detail }: { detail: CandidatePairDetail }) {
         </p>
       </div>
       <div>
-        <p className="mb-1 text-[14px] text-ink-3">Evidence weight (log-odds): against ← 0 → for</p>
+        <div className="mb-1 flex items-baseline justify-between gap-2 text-[14px]">
+          <p className="text-ink-3">Evidence weight (log-odds): against ← 0 → for</p>
+          {!showAll && ranked.length > SHORT_SCREEN_ROWS && (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="short-screen-only font-semibold text-accent underline underline-offset-2"
+            >
+              Show all ({ranked.length})
+            </button>
+          )}
+        </div>
         <ul aria-label="Top evidence" className="space-y-0.5">
           {ranked.map((c, i) => (
             <li
               key={c.feature}
               data-testid="evidence-feature-row"
               className={`grid grid-cols-[10rem_1fr_4rem] items-center gap-2 text-[16px] ${
-                i >= SHORT_SCREEN_ROWS ? "[@media(max-height:700px)]:hidden" : ""
+                i >= SHORT_SCREEN_ROWS && !showAll ? "short-screen-hidden" : ""
               }`}
             >
               <span>{c.label}</span>

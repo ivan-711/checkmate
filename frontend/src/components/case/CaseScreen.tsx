@@ -30,7 +30,12 @@ export function CaseScreen() {
   const announce = useAnnounce();
   const queryClient = useQueryClient();
   const [justApproved, setJustApproved] = useState(false);
-  const caseQuery = useQuery({ queryKey: ["case"], queryFn: () => source.getCase() });
+  const caseQuery = useQuery({
+    queryKey: ["case"],
+    queryFn: () => source.getCase(),
+    // "No session" is an answer, not a failure: show the reset prompt at once instead of retrying.
+    retry: (failures, error) => !(error instanceof DataError && error.code === "NO_SESSION") && failures < 1,
+  });
   const entity = caseQuery.data?.outcome?.entity ?? null;
   const linked = caseQuery.data?.detail?.pair.decision.status === "LINKED" && entity !== null;
   const timeline = useQuery({

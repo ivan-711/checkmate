@@ -165,3 +165,18 @@ body {
     }
   }
 }
+
+/* Short laptop screens (1366x650): the evidence rail shows its top rows and a "Show all" control,
+   so the review step's submit button stays above the fold (UX 3.1). Unlayered, so it wins over
+   the display utilities on the same elements. */
+.short-screen-only {
+  display: none;
+}
+@media (max-height: 700px) {
+  .short-screen-hidden {
+    display: none;
+  }
+  .short-screen-only {
+    display: inline;
+  }
+}

@@ -128,6 +128,17 @@ for (const { width, height } of [
   });
 }
 
+test("a short screen shows the top 4 evidence rows with Show all for the rest", async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 650 });
+  await resolved(page);
+  const rows = page.getByTestId("evidence-feature-row");
+  await expect(rows.filter({ visible: true })).toHaveCount(4);
+  await page.getByRole("button", { name: "Show all (5)" }).click();
+  await expect(rows.filter({ visible: true })).toHaveCount(5);
+  await page.setViewportSize({ width: 1440, height: 800 });
+  await expect(page.getByRole("button", { name: /Show all/ })).toBeHidden();
+});
+
 test("reset returns to the separate records and Undo reset brings the link back", async ({ page }) => {
   await page.goto("/");
   await page.getByTestId("resolve-button").click();
