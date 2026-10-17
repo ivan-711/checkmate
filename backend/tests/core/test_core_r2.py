@@ -142,7 +142,7 @@ def test_weights_reject_a_platt_map_that_would_make_p_decrease_in_the_raw_score(
 
 
 def test_weights_json_on_disk_equals_in_code_handset_weights_field_by_field():
-    loaded = load_weights("handset-0")
+    loaded = load_weights("handset-1")
     assert loaded == HANDSET_WEIGHTS
     assert loaded.intercept == HANDSET_WEIGHTS.intercept
     assert dict(loaded.weights) == dict(HANDSET_WEIGHTS.weights)

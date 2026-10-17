@@ -86,7 +86,7 @@ def test_match_returns_the_full_shape_and_accepts_contract_dicts():
     assert set(d) >= {"raw_score", "p", "band", "contributions", "negative_rules_fired", "features", "missing"}
     assert result.features["dob_day_month_swap"] == 1.0 and result.features["dob_exact"] == 0.0
     assert result.band is Band.AUTO_LINK and result.is_calibrated is False
-    assert result.scorer_version == "handset-0" and result.thresholds_id == "demo-handset-0"
+    assert result.scorer_version == "handset-1" and result.thresholds_id == "demo-handset-0"
     snap = evidence_snapshot(result, HANDSET_WEIGHTS, DEMO_THRESHOLDS, policy_version="frontdesk-gate/1")
     assert isinstance(snap, EvidenceSnapshot)
     assert snap.raw_score == result.raw_score and snap.c_high == DEMO_THRESHOLDS.c_high

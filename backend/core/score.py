@@ -20,7 +20,9 @@ from contracts.models.common import Contribution
 
 ALL_WEIGHT_NAMES: tuple[str, ...] = FEATURE_NAMES + MISSING_NAMES
 WEIGHTS_DIR = Path(__file__).resolve().parent / "weights"
-HANDSET_SCORER_VERSION = "handset-0"
+# handset-1 replaced handset-0 when the capped nickname credit and the punctuation fold changed some
+# scores; evidence snapshots and the harness record this string, so the name must change with them.
+HANDSET_SCORER_VERSION = "handset-1"
 
 
 @dataclass(frozen=True)
@@ -158,7 +160,7 @@ def score_pair(fv: FeatureVector, weights: Weights) -> ScoreResult:
 # an identical full record scores +5.5; a day/month swap (4.7) or a one-digit day edit (4.3)
 # stays AUTO_LINK; any year change (3.5 or lower) drops to REVIEW, which is the CHANGE_BIRTH_YEAR
 # band-changer; siblings sharing surname, address and phone never reach AUTO_LINK. The trained
-# scorer replaces these and they are never called calibrated. backend/core/weights/handset-0.json
+# scorer replaces these and they are never called calibrated. backend/core/weights/handset-1.json
 # is this object on disk; a test keeps the two equal.
 HANDSET_WEIGHTS = Weights(
     scorer_version=HANDSET_SCORER_VERSION,

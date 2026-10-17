@@ -61,7 +61,7 @@ def to_threshold_set(thresholds: ThresholdsLike) -> ThresholdSet:
 
 
 class Core:
-    """``MatchCore`` over a weights object; ``handset-0`` until a trained set replaces it."""
+    """``MatchCore`` over a weights object; ``handset-1`` until a trained set replaces it."""
 
     def __init__(self, weights: Weights = HANDSET_WEIGHTS) -> None:
         self.weights = weights

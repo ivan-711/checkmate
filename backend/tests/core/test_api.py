@@ -57,7 +57,7 @@ def test_core_scores_a_handset_pair_exactly_like_match():
     assert via_core.logit == direct.raw_score
     assert via_core.band is direct.band is Band.AUTO_LINK
     assert via_core.p == direct.p
-    assert CORE.scorer_version == "handset-0"
+    assert CORE.scorer_version == HANDSET_WEIGHTS.scorer_version == "handset-1"
 
 
 def test_core_evidence_is_the_frozen_contract_snapshot():
@@ -66,7 +66,7 @@ def test_core_evidence_is_the_frozen_contract_snapshot():
     assert via_core.evidence.raw_score == via_core.logit
     assert via_core.evidence.threshold_set_id == DEMO_THRESHOLDS.thresholds_id
     assert via_core.evidence.c_high == DEMO_THRESHOLDS.c_high
-    assert via_core.evidence.scorer_version == "handset-0"
+    assert via_core.evidence.scorer_version == HANDSET_WEIGHTS.scorer_version
 
 
 def test_core_block_keys_match_the_blocking_stage_and_carry_the_seam_fields():
