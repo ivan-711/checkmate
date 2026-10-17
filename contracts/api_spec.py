@@ -15,6 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from contracts.models.alerts import SafetyAlert
 from contracts.models.common import (
     ERROR_STATUS,
     Band,
@@ -25,12 +26,13 @@ from contracts.models.common import (
     Page,
     PairOrigin,
 )
-from contracts.models.entities import Entity
+from contracts.models.entities import Entity, HistoryEvent, TimelineEvent
 from contracts.models.health import Health
 from contracts.models.intake import CreateIntakeSessionRequest, IntakeSession, IntakeTurn, TurnRequest
 from contracts.models.pairs import CandidatePair, CandidatePairDetail
 from contracts.models.reviews import ReviewRequest, ReviewResponse
 from contracts.models.sessions import CreateSessionRequest, MatchRunResponse, SessionResponse
+from contracts.models.thresholds import ThresholdSet
 from contracts.models.tiles import TilesResponse
 from contracts.models.whatifs import WhatIfRequest, WhatIfResponse
 from contracts.version import API_PREFIX, CONTRACT_VERSION, LIST_LIMIT_DEFAULT, LIST_LIMIT_MAX
@@ -125,7 +127,9 @@ def build_app(implemented: frozenset[Route] = frozenset()) -> FastAPI:
               responses=_err(ErrorCode.NOT_FOUND, ErrorCode.CANNOT_LINK_CONFLICT, ErrorCode.DECISION_NOT_PENDING,
                              ErrorCode.IDEMPOTENCY_MISMATCH) | common_errors,
               description="Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. "
-                          "Idempotency-Key required; only PROPOSED moves; same-state request returns 200 with no new version.")
+                          "Idempotency-Key required. PROPOSED or REJECTED may move to LINKED or REJECTED (a second review supersedes the first, "
+                          "so the demo can reject and then approve; history keeps both). LINKED only accepts the same-state APPROVE, which "
+                          "returns 200 with the current decision and no new version; any other request on a non-pending state is 409 DECISION_NOT_PENDING.")
     async def create_review(pair_id: UUID, body: ReviewRequest, idempotency_key: IdempotencyKey):
         return not_implemented("W3a")
 
@@ -140,6 +144,33 @@ def build_app(implemented: frozenset[Route] = frozenset()) -> FastAPI:
              description="Lane W3b. Read-time golden record with crosswalks.")
     async def get_entity(entity_id: UUID):
         return not_implemented("W3b")
+
+    # Additive routes (reversible forks, flagged 14:15): models existed at the freeze; stubs added so the
+    # generated frontend client sees them. Lanes W3a/W3b implement them.
+    @app.get(p + "/entities/{entity_id}/timeline", response_model=Page[TimelineEvent], tags=["core"],
+             responses=_err(ErrorCode.NOT_FOUND) | common_errors,
+             description="Lane W3b (additive). Timeline across the entity's sources; bounded list.")
+    async def get_entity_timeline(entity_id: UUID, limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX),
+                                  cursor: str | None = None):
+        return not_implemented("W3b")
+
+    @app.get(p + "/entities/{entity_id}/history", response_model=Page[HistoryEvent], tags=["core"],
+             responses=_err(ErrorCode.NOT_FOUND) | common_errors,
+             description="Lane Q8 (additive). Identity history events for the entity; bounded list.")
+    async def get_entity_history(entity_id: UUID, limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX),
+                                 cursor: str | None = None):
+        return not_implemented("Q8")
+
+    @app.get(p + "/alerts", response_model=Page[SafetyAlert], tags=["core"], responses=common_errors,
+             description="Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity; bounded list.")
+    async def list_alerts(entity_id: Annotated[UUID | None, Query(alias="entityId")] = None,
+                          limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX), cursor: str | None = None):
+        return not_implemented("W3b")
+
+    @app.get(p + "/threshold-sets/current", response_model=ThresholdSet, tags=["core"], responses=common_errors,
+             description="Lane W3a (additive). The current raw-score cutoffs; Platt values display-only.")
+    async def get_current_thresholds():
+        return not_implemented("W3a")
 
     @app.get(p + "/metrics/tiles", response_model=TilesResponse, tags=["core"], responses=common_errors,
              description="Lane W3a (AGENT_GATE tile: Q1.3). Continuous-aggregate tiles for a window.")
