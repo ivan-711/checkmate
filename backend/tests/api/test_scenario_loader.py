@@ -133,3 +133,55 @@ def test_corpus_mode_honors_a_changed_overlay_dir(corpus_mode, monkeypatch, tmp_
     monkeypatch.setenv("CHECKMATE_HERO_OVERLAY_DIR", str(other))
     loader.load_scenario("hero")
     assert corpus_mode.overlay_seen == [corpus_mode.overlay_dir, other]
+
+
+def test_corpus_mode_refuses_an_overlay_record_that_collides_with_the_corpus(corpus_mode, monkeypatch):
+    """ON CONFLICT DO NOTHING would keep the corpus row and silently drop the overlay's is_constructed."""
+    clash = Draft("ER_FHIR", "corpus-er-1", {"given": "Hero", "family": "Case"}, is_constructed=True)
+    monkeypatch.setattr(loader, "_w1_overlay_drafts", lambda overlay_dir: [clash])
+    with pytest.raises(ValueError, match="corpus-er-1"):
+        loader.load_scenario("hero")
+
+
+W1_FIXTURES = loader.REPO_ROOT / "backend" / "tests" / "ingest" / "fixtures"
+
+
+@pytest.fixture
+def w1_raw_and_overlay(tmp_path, monkeypatch):
+    """W1's committed fixtures laid out as a raw sample (fhir/ + csv/) and a one-bundle overlay."""
+    import shutil
+
+    pytest.importorskip("backend.ingest.cli")
+    raw, overlay = tmp_path / "raw", tmp_path / "overlay"
+    (raw / "fhir").mkdir(parents=True)
+    (overlay / "fhir").mkdir(parents=True)
+    shutil.copytree(W1_FIXTURES / "csv", raw / "csv")
+    for name in ("bundle_a.json", "bundle_b.json"):
+        shutil.copy(W1_FIXTURES / name, raw / "fhir" / name)
+    shutil.copy(W1_FIXTURES / "bundle_a.json", overlay / "fhir" / "hero.json")
+    monkeypatch.setenv("CHECKMATE_HERO_SOURCE", "corpus")
+    monkeypatch.setenv("CHECKMATE_RAW_DIR", str(raw))
+    monkeypatch.setenv("CHECKMATE_HERO_OVERLAY_DIR", str(overlay))
+    loader._corpus_cards.cache_clear()
+    yield
+    loader._corpus_cards.cache_clear()
+
+
+def test_corpus_mode_end_to_end_on_real_w1(client, w1_raw_and_overlay, db_conn):
+    """Real W1 loaders, corruptor and normalizer; only the input files are small."""
+    first = client.post(f"{API}/sessions", json={"scenarioId": "hero"})
+    assert first.status_code == 201, first.text
+    cards = first.json()["sources"]
+    constructed = [c for c in cards if c["record"]["isConstructed"]]
+    assert len(constructed) == 1, "exactly the one overlay bundle is constructed"
+    assert constructed[0]["record"]["sourceSystem"] == "ER_FHIR"
+    assert len(cards) > 1, "the corpus records load beside the overlay"
+    stored = dict(db_conn.execute(text("SELECT id::text, is_constructed FROM source_record")).all())
+    assert stored == {c["record"]["id"]: c["record"]["isConstructed"] for c in cards}
+    assert {c["displayLabel"] for c in cards} <= {"ER FHIR", "Clinic CSV"}
+    loader._corpus_cards.cache_clear()
+    second = client.post(f"{API}/sessions", json={"scenarioId": "hero"}).json()
+    assert sorted(c["record"]["id"] for c in second["sources"]) == sorted(c["record"]["id"] for c in cards), (
+        "loading twice gives the same records"
+    )
+    assert client.post(f"{API}/match-runs").status_code == 201

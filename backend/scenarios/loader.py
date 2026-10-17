@@ -141,7 +141,21 @@ def _corpus_cards(seed: int, raw_dir: Path, overlay_dir: Path) -> tuple[SourceCa
     The overlay dir is part of the key so pointing the env var elsewhere is never silently ignored."""
     ingested_at = datetime.now(UTC)
     drafts = _w1_corpus_drafts(seed, raw_dir) + _w1_overlay_drafts(overlay_dir)
+    _refuse_duplicate_ids(drafts)
     return tuple(_card_from_draft(d, ingested_at) for d in drafts)
+
+
+def _refuse_duplicate_ids(drafts: list) -> None:
+    """Two drafts with one (source system, local id) would insert as one row (ON CONFLICT DO NOTHING):
+    an overlay record colliding with a corpus record would silently lose its is_constructed label."""
+    seen: set = set()
+    duplicates = []
+    for draft in drafts:
+        if draft.id in seen:
+            duplicates.append(f"{draft.source_system}/{draft.source_local_id}")
+        seen.add(draft.id)
+    if duplicates:
+        raise ValueError(f"scenario records share an id: {', '.join(sorted(duplicates))}")
 
 
 def _all_cards() -> list[SourceCard]:
