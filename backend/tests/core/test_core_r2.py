@@ -858,17 +858,12 @@ def test_gate_cases_stay_review_or_higher_under_the_provisional_1_row(edit_a, ed
     assert result.band is not Band.KEEP_SEPARATE, (result.logit, result.band)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="cross-lane: W1 writes block_key rows with backend.ingest.blocking's vocabulary; for the lead",
-)
 def test_ingest_block_keys_and_core_block_keys_share_a_vocabulary():
-    """W1's ingest writes ``block_key`` rows from ``backend.ingest.blocking`` (``dob_exact``,
-    ``metaphone_surname_birth_year`` ``KRS:1990``, ``zip5_initial`` ``02139:m``); W3a's seam keys
-    intakes and scenario cards with ``CORE.block_keys`` (``DOB_EXACT``, ``DMETA_FAMILY_BIRTH_YEAR``
-    ``KRS|1990``, ``ZIP5_FIRST_INITIAL`` ``02139|m``). Both land in one table keyed by
-    (key_type, key_value), so an intake never shares a block with an ingested record: the gate's
-    lookup misses it (fail open toward a new chart) and match runs never pair the two."""
+    """W1's ingest and W3a's seam both write ``block_key`` rows, one table keyed by (key_type,
+    key_value). Before issue #10 ingest used its own vocabulary (``dob_exact``, ``KRS:1990``,
+    ``02139:m``) while the seam uses ``CORE.block_keys`` (``DOB_EXACT``, ``KRS|1990``, ``02139|m``),
+    so an intake never shared a block with an ingested record and the gate's lookup failed open
+    toward a new chart. Ingest now writes core's keys; this test keeps the two vocabularies one."""
     from backend.ingest.blocking import block_keys as ingest_block_keys
     from backend.ingest.normalize import Identity, normalize_identity
 

@@ -4,6 +4,7 @@ The Nov 2021 sample's headers are UPPERCASE (``FIRST``, ``LAST``, ``BIRTHDATE``,
 Title case the data plan assumed, so lookups here are case-insensitive. The same reader accepts
 the clinic rows the corruptor renders (same columns, optional ``PHONE``, DOB as MM/DD/YYYY).
 """
+
 from __future__ import annotations
 
 import csv
@@ -11,7 +12,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from backend.ingest.normalize import Identity, strip_synthea_digits
+from backend.core.normalize import strip_synthea_digits
+from backend.ingest.normalize import Identity
 
 CSV_FILES = ("patients", "allergies", "medications", "encounters")
 PATIENT_COLUMN = "patient"
