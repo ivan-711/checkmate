@@ -93,6 +93,41 @@ test("reject without a reason asks for one and records nothing", async ({ page }
   await expect(page.getByText(/Rejected by/)).toHaveCount(0);
 });
 
+test("Cancel returns focus to the button that opened the step", async ({ page }) => {
+  await resolved(page);
+  for (const id of ["reject-button", "approve-button"]) {
+    await page.getByTestId(id).click();
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByTestId(id)).toBeFocused();
+  }
+});
+
+test("a recorded reject moves focus to the decision line", async ({ page }) => {
+  await resolved(page);
+  await review(page, "reject", "INSUFFICIENT_EVIDENCE");
+  await expect(page.getByText(/^Rejected by/)).toBeFocused();
+});
+
+for (const { width, height } of [
+  { width: 1440, height: 800 },
+  { width: 1366, height: 650 },
+]) {
+  test(`both confirm steps fit above the fold at ${width}x${height}`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await resolved(page);
+    for (const id of ["reject-button", "approve-button"]) {
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const opener = await page.getByTestId(id).boundingBox();
+      expect(opener!.y + opener!.height, `${id} bottom`).toBeLessThanOrEqual(height);
+      await page.getByTestId(id).click();
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const submit = await page.getByTestId("review-submit-button").boundingBox();
+      expect(submit!.y + submit!.height, `submit bottom after ${id}`).toBeLessThanOrEqual(height);
+      await page.getByRole("button", { name: "Cancel" }).click();
+    }
+  });
+}
+
 test("reset returns to the separate records and Undo reset brings the link back", async ({ page }) => {
   await page.goto("/");
   await page.getByTestId("resolve-button").click();
@@ -134,7 +169,8 @@ test("FrontDesk shell: empty chat pane, ES/EN switch and the agent gate tile", a
 
   const tile = page.getByRole("region", { name: "Agent actions per 5 minutes" });
   await expect(tile.getByText("No agent actions yet.")).toBeVisible();
-  await expect(tile.getByText(/agent_gate_5m · continuous aggregate · recorded log/)).toBeVisible();
+  // The caption names the aggregate only; it never changes with the data source's mode.
+  await expect(tile.getByText("agent_gate_5m · continuous aggregate", { exact: true })).toBeVisible();
 });
 
 for (const scheme of ["light", "dark"] as const) {

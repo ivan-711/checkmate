@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { scenario } from "./scenario";
 import { ApiSource } from "./apiSource";
-import { DataError } from "./source";
+import { EVENT_FEED_ROWS } from "./source";
 
 interface Call {
   method: string;
@@ -43,7 +43,6 @@ function stubFetch(handlers: Record<string, Handler>): Call[] {
 
 const ORIGIN = "http://ui";
 const hero = scenario.pair;
-const heroIds = { recordAId: hero.pair.recordAId, recordBId: hero.pair.recordBId };
 const twin = {
   ...hero.pair,
   id: "00000000-0000-4000-8000-000000000030",
@@ -73,29 +72,79 @@ describe("ApiSource", () => {
     expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(["POST /api/v1/match-runs"]);
   });
 
-  it("binds the hero pair from the session's records, not the first queued pair", async () => {
+  it("binds the hero by the session's first record and the other record, following nextCursor", async () => {
+    const [first, second] = scenario.session.sources.map((c) => c.record.id);
+    const other = { ...twin, recordAId: first, recordBId: "r-someone-else" };
     const calls = stubFetch({
       "POST /api/v1/sessions": () => ({ status: 201, body: scenario.session }),
-      "GET /api/v1/candidate-pairs": () => ({
-        body: { items: [twin, { ...hero.pair, ...heroIds }], nextCursor: null },
-      }),
+      "GET /api/v1/candidate-pairs": (c) =>
+        c.query.get("cursor")
+          ? { body: { items: [{ ...hero.pair, recordAId: second, recordBId: first }], nextCursor: null } }
+          : { body: { items: [other], nextCursor: "page-2" } },
       [`GET /api/v1/candidate-pairs/${hero.pair.id}`]: () => ({ body: hero }),
     });
     const s = new ApiSource(ORIGIN);
     await s.reset();
-    const { detail, outcome, resolved } = await s.getCase();
+    const { detail, resolved } = await s.getCase();
     expect(detail!.pair.id).toBe(hero.pair.id);
-    expect(outcome).toBeNull();
     expect(resolved).toBe(true);
+    const lists = calls.filter((c) => c.path === "/api/v1/candidate-pairs");
+    expect(lists.map((c) => c.query.get("recordId"))).toEqual([first, first]);
     expect(calls.find((c) => c.path === "/api/v1/sessions")?.body).toEqual({ scenarioId: "hero" });
-    expect(calls.some((c) => c.path.endsWith(twin.id))).toBe(false);
+    expect(calls.some((c) => c.path.endsWith(other.id))).toBe(false);
   });
 
-  it("refuses to guess between several queued pairs before a reset", async () => {
-    stubFetch({
-      "GET /api/v1/candidate-pairs": () => ({ body: { items: [twin, hero.pair], nextCursor: null } }),
+  it("never shows a different pair as the hero when the session's pair is not queued", async () => {
+    const [first] = scenario.session.sources.map((c) => c.record.id);
+    const calls = stubFetch({
+      "POST /api/v1/sessions": () => ({ status: 201, body: scenario.session }),
+      "GET /api/v1/candidate-pairs": () => ({
+        body: { items: [{ ...twin, recordAId: first }, twin], nextCursor: null },
+      }),
     });
-    await expect(new ApiSource(ORIGIN).getCase()).rejects.toBeInstanceOf(DataError);
+    const s = new ApiSource(ORIGIN);
+    await s.reset();
+    const { detail, resolved, sources } = await s.getCase();
+    expect(detail).toBeNull();
+    expect(resolved).toBe(false);
+    expect(sources).toEqual(scenario.session.sources);
+    expect(calls.some((c) => c.path.startsWith("/api/v1/candidate-pairs/"))).toBe(false);
+  });
+
+  it("takes the cards only from the session's sources, in the session's order", async () => {
+    const swapped = { ...hero, recordA: hero.recordB, recordB: hero.recordA };
+    stubFetch({
+      "POST /api/v1/sessions": () => ({ status: 201, body: scenario.session }),
+      "GET /api/v1/candidate-pairs": () => ({ body: { items: [hero.pair], nextCursor: null } }),
+      [`GET /api/v1/candidate-pairs/${hero.pair.id}`]: () => ({ body: swapped }),
+    });
+    const s = new ApiSource(ORIGIN);
+    await s.reset();
+    expect((await s.getCase()).sources).toEqual(scenario.session.sources);
+  });
+
+  it("on page load rebinds the hero from GET /sessions/current", async () => {
+    const calls = stubFetch({
+      "GET /api/v1/sessions/current": () => ({ body: scenario.session }),
+      "GET /api/v1/candidate-pairs": () => ({ body: { items: [hero.pair], nextCursor: null } }),
+      [`GET /api/v1/candidate-pairs/${hero.pair.id}`]: () => ({ body: hero }),
+    });
+    const s = new ApiSource(ORIGIN);
+    expect((await s.getSession())?.id).toBe(scenario.session.id);
+    expect((await s.getCase()).detail!.pair.id).toBe(hero.pair.id);
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it.each([404, 501])("asks for a reset when GET /sessions/current answers %i", async (status) => {
+    stubFetch({
+      "GET /api/v1/sessions/current": () => ({
+        status,
+        body: { error: { code: "NOT_FOUND", message: "none" } },
+      }),
+    });
+    const s = new ApiSource(ORIGIN);
+    expect(await s.getSession()).toBeNull();
+    await expect(s.getCase()).rejects.toMatchObject({ code: "NO_SESSION" });
   });
 
   it("sends the review with the caller's Idempotency-Key and the action discriminator", async () => {
@@ -130,6 +179,7 @@ describe("ApiSource", () => {
     const linked = { ...hero, pair: { ...hero.pair, decision: { ...hero.pair.decision, status: "LINKED" } } };
     const entityId = hero.mergePreview.entityIdIfApproved!;
     stubFetch({
+      "GET /api/v1/sessions/current": () => ({ body: scenario.session }),
       "GET /api/v1/candidate-pairs": () => ({ body: { items: [hero.pair], nextCursor: null } }),
       [`GET /api/v1/candidate-pairs/${hero.pair.id}`]: () => ({ body: linked }),
       [`GET /api/v1/entities/${entityId}`]: () => ({ body: scenario.entityIfApproved }),
@@ -140,12 +190,28 @@ describe("ApiSource", () => {
         },
       }),
     });
-    const { outcome } = await new ApiSource(ORIGIN).getCase();
+    const { outcome, alertsKnown } = await new ApiSource(ORIGIN).getCase();
     expect(outcome?.entity?.id).toBe(scenario.entityIfApproved.id);
     expect(outcome?.alerts).toHaveLength(1);
+    expect(alertsKnown).toBe(true);
   });
 
-  it("reads the whole event feed through nextCursor and the timeline through the entity route", async () => {
+  it.each([501, 500])("says nothing about the rule when the alerts read answers %i", async (status) => {
+    const linked = { ...hero, pair: { ...hero.pair, decision: { ...hero.pair.decision, status: "LINKED" } } };
+    const entityId = hero.mergePreview.entityIdIfApproved!;
+    stubFetch({
+      "GET /api/v1/sessions/current": () => ({ body: scenario.session }),
+      "GET /api/v1/candidate-pairs": () => ({ body: { items: [hero.pair], nextCursor: null } }),
+      [`GET /api/v1/candidate-pairs/${hero.pair.id}`]: () => ({ body: linked }),
+      [`GET /api/v1/entities/${entityId}`]: () => ({ body: scenario.entityIfApproved }),
+      "GET /api/v1/alerts": () => ({ status, body: { error: { code: "INTERNAL", message: "down" } } }),
+    });
+    const { outcome, alertsKnown } = await new ApiSource(ORIGIN).getCase();
+    expect(outcome?.entity?.id).toBe(scenario.entityIfApproved.id);
+    expect(alertsKnown).toBe(false);
+  });
+
+  it("reads one page of the event feed, never the whole log, and the timeline through the entity route", async () => {
     const row = (eventType: string) => ({
       ts: "2026-10-17T20:00:00Z",
       eventId: crypto.randomUUID(),
@@ -157,10 +223,9 @@ describe("ApiSource", () => {
       payload: {},
     });
     const calls = stubFetch({
-      "GET /api/v1/events": (c) =>
-        c.query.get("cursor")
-          ? { body: { items: [row("DEMO_RESET")], nextCursor: null } }
-          : { body: { items: [row("LINK_APPROVED")], nextCursor: "c1" } },
+      "GET /api/v1/events": () => ({
+        body: { items: [row("LINK_APPROVED"), row("DEMO_RESET")], nextCursor: "c1" },
+      }),
       [`GET /api/v1/entities/${scenario.entityIfApproved.id}/timeline`]: () => ({
         body: { items: scenario.timelineIfApproved, nextCursor: null },
       }),
@@ -168,9 +233,9 @@ describe("ApiSource", () => {
     const s = new ApiSource(ORIGIN);
     const events = await s.getEvents();
     expect(events.map((e) => e.eventType)).toEqual(["LINK_APPROVED", "DEMO_RESET"]);
-    expect(calls.filter((c) => c.path === "/api/v1/events").map((c) => c.query.get("limit"))).toEqual([
-      "200",
-      "200",
+    const eventCalls = calls.filter((c) => c.path === "/api/v1/events");
+    expect(eventCalls.map((c) => [c.query.get("limit"), c.query.get("cursor")])).toEqual([
+      [String(EVENT_FEED_ROWS), null],
     ]);
     expect(await s.getTimeline(scenario.entityIfApproved.id)).toHaveLength(
       scenario.timelineIfApproved.length,

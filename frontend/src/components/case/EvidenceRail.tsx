@@ -3,6 +3,9 @@ import { BandChip } from "@/components/ui/BandChip";
 import { rankContributions } from "@/lib/display";
 
 const TOP_CONTRIBUTIONS = 5;
+// UX 3.1: on a short laptop screen (1366x650) the rail shows the top 4, so the review step's
+// submit button stays above the fold.
+const SHORT_SCREEN_ROWS = 4;
 
 function signed(logit: number): string {
   return `${logit >= 0 ? "+" : "-"}${Math.abs(logit).toFixed(2)}`;
@@ -35,11 +38,13 @@ export function EvidenceRail({ detail }: { detail: CandidatePairDetail }) {
       <div>
         <p className="mb-1 text-[14px] text-ink-3">Evidence weight (log-odds): against ← 0 → for</p>
         <ul aria-label="Top evidence" className="space-y-0.5">
-          {ranked.map((c) => (
+          {ranked.map((c, i) => (
             <li
               key={c.feature}
               data-testid="evidence-feature-row"
-              className="grid grid-cols-[10rem_1fr_4rem] items-center gap-2 text-[16px]"
+              className={`grid grid-cols-[10rem_1fr_4rem] items-center gap-2 text-[16px] ${
+                i >= SHORT_SCREEN_ROWS ? "[@media(max-height:700px)]:hidden" : ""
+              }`}
             >
               <span>{c.label}</span>
               {c.missing ? (
@@ -68,9 +73,6 @@ export function EvidenceRail({ detail }: { detail: CandidatePairDetail }) {
           ))}
         </ul>
       </div>
-      <p className="font-mono text-[14px] text-ink-3">
-        scorer {decision.scorerVersion} · thresholds {decision.thresholdSetId}
-      </p>
     </section>
   );
 }

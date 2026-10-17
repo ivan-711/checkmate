@@ -10,6 +10,9 @@ import type {
   TimelineEvent,
 } from "@/api/types";
 
+/** Rows the event feed shows; the API is asked for exactly one page of this size. */
+export const EVENT_FEED_ROWS = 12;
+
 /** REPLAY when reading the fixture; LOCAL when calling the API on this laptop. */
 export type Mode = "REPLAY" | "LOCAL";
 
@@ -20,8 +23,10 @@ export interface CaseData {
   detail: CandidatePairDetail | null;
   /** The response that produced the current decision, when this source knows it. */
   outcome: ReviewResponse | null;
-  /** False after a reset until Resolve identity has run; the pair panel waits for it. */
+  /** False after a reset until Resolve identity has queued the session's pair. */
   resolved: boolean;
+  /** False when the alerts read failed or is not available, so the screen makes no rule claim. */
+  alertsKnown: boolean;
 }
 
 /** One data layer, two adapters. The UI branches on `mode` only for the badge. */
@@ -39,7 +44,7 @@ export interface DataSource {
   getTimeline(entityId: string): Promise<TimelineEvent[] | null>;
   /** null when this source has no alerts read for the entity. */
   getAlerts(entityId: string): Promise<SafetyAlert[] | null>;
-  /** The append-only event feed, newest first. */
+  /** The newest EVENT_FEED_ROWS rows of the append-only event feed, newest first. */
   getEvents(): Promise<EventLogRow[]>;
   getTiles(): Promise<TilesResponse>;
   reset(): Promise<SessionResponse>;
