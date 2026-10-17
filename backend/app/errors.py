@@ -1,5 +1,6 @@
 """The one application error: a code from the contract plus a message, rendered by the
 envelope handler registered in ``backend.app.main``."""
+
 from __future__ import annotations
 
 from contracts.models.common import ErrorCode

@@ -1,4 +1,5 @@
 """The review state machine, idempotency and the events it writes (architecture §5, §7)."""
+
 from __future__ import annotations
 
 import uuid
@@ -12,15 +13,20 @@ from contracts.models.reviews import ReviewResponse
 
 
 def _versions(conn, pair_id: str) -> list[tuple[int, str]]:
-    rows = conn.execute(text("SELECT version, status FROM match_decision WHERE pair_id = :p ORDER BY version"),
-                        {"p": pair_id}).all()
+    rows = conn.execute(
+        text("SELECT version, status FROM match_decision WHERE pair_id = :p ORDER BY version"), {"p": pair_id}
+    ).all()
     return [(r.version, r.status) for r in rows]
 
 
 def _not_a_match_rows(conn, pair_id: str) -> int:
-    return conn.execute(text(
-        "SELECT count(*) FROM not_a_match n JOIN candidate_pair cp ON cp.record_a_id = n.record_a_id "
-        "AND cp.record_b_id = n.record_b_id WHERE cp.id = :p"), {"p": pair_id}).scalar_one()
+    return conn.execute(
+        text(
+            "SELECT count(*) FROM not_a_match n JOIN candidate_pair cp ON cp.record_a_id = n.record_a_id "
+            "AND cp.record_b_id = n.record_b_id WHERE cp.id = :p"
+        ),
+        {"p": pair_id},
+    ).scalar_one()
 
 
 def test_approve_moves_proposed_to_linked_and_writes_link_approved(client, pair_id, db_conn):
@@ -34,8 +40,13 @@ def test_approve_moves_proposed_to_linked_and_writes_link_approved(client, pair_
     assert body.entity is not None
     assert _versions(db_conn, pair_id) == [(1, "PROPOSED"), (2, "LINKED")]
     assert count_events(db_conn, "LINK_APPROVED", pair_id=pair_id) == 1
-    row = db_conn.execute(text("SELECT request_id, outcome, latency_ms, actor_type, payload FROM event_log "
-                               "WHERE event_type = 'LINK_APPROVED' AND pair_id = :p"), {"p": pair_id}).one()
+    row = db_conn.execute(
+        text(
+            "SELECT request_id, outcome, latency_ms, actor_type, payload FROM event_log "
+            "WHERE event_type = 'LINK_APPROVED' AND pair_id = :p"
+        ),
+        {"p": pair_id},
+    ).one()
     assert row.request_id == r.headers["X-Request-Id"]
     assert row.outcome == "APPROVED"
     assert row.latency_ms is not None
@@ -51,8 +62,9 @@ def test_reject_moves_proposed_to_rejected_with_reason_and_note(client, pair_id,
     assert body.decision.note == "needs the phone number"
     assert body.entity is None
     assert count_events(db_conn, "LINK_REJECTED", pair_id=pair_id) == 1
-    payload = db_conn.execute(text("SELECT payload::text FROM event_log WHERE event_type = 'LINK_REJECTED' "
-                                   "AND pair_id = :p"), {"p": pair_id}).scalar_one()
+    payload = db_conn.execute(
+        text("SELECT payload::text FROM event_log WHERE event_type = 'LINK_REJECTED' AND pair_id = :p"), {"p": pair_id}
+    ).scalar_one()
     assert "needs the phone number" not in payload, "note text never reaches the event log"
 
 
@@ -81,6 +93,8 @@ def test_approve_on_linked_returns_200_with_no_new_version_and_no_event(client, 
     r = review(client, pair_id, approve_body("Registrar B"))  # a different key, a different registrar
     assert r.status_code == 200, r.text
     assert r.json()["decision"]["id"] == first.json()["decision"]["id"]
+    assert r.json()["entity"] is not None, "same-state APPROVE still answers with the linked entity"
+    assert r.json()["entity"]["id"] == first.json()["entity"]["id"]
     assert _versions(db_conn, pair_id) == [(1, "PROPOSED"), (2, "LINKED")]
     assert count_events(db_conn, "LINK_APPROVED", pair_id=pair_id) == events
 

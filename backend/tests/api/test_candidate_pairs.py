@@ -1,4 +1,5 @@
 """GET /candidate-pairs (bounded, keyset cursor, filters) and GET /candidate-pairs/{id}."""
+
 from __future__ import annotations
 
 import uuid

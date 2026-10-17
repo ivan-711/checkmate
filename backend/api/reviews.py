@@ -12,6 +12,7 @@ State machine (``transition``):
                                              (reject then approve is on the demo path)
   anything else                           -> 409 DECISION_NOT_PENDING
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -46,7 +47,9 @@ OUTCOME = {ReviewAction.APPROVE: "APPROVED", ReviewAction.REJECT: "REJECTED"}
 EVENT = {ReviewAction.APPROVE: EventType.LINK_APPROVED, ReviewAction.REJECT: EventType.LINK_REJECTED}
 NEW_STATUS = {ReviewAction.APPROVE: DecisionStatus.LINKED, ReviewAction.REJECT: DecisionStatus.REJECTED}
 
-_STORED = text("SELECT request_sha256, status_code, response FROM idempotency_record WHERE scope = :scope AND key = :key")
+_STORED = text(
+    "SELECT request_sha256, status_code, response FROM idempotency_record WHERE scope = :scope AND key = :key"
+)
 _CLAIM = text(
     "INSERT INTO idempotency_record (scope, key, request_sha256, status_code, response) "
     "VALUES (:scope, :key, :sha, 0, CAST('{}' AS jsonb))"
@@ -75,8 +78,9 @@ class Transition(StrEnum):
     NOT_PENDING = "NOT_PENDING"
 
 
-def transition(current_status: DecisionStatus, current_reason: ReasonCode | None, action: ReviewAction,
-               reason: ReasonCode | None) -> Transition:
+def transition(
+    current_status: DecisionStatus, current_reason: ReasonCode | None, action: ReviewAction, reason: ReasonCode | None
+) -> Transition:
     if current_status == DecisionStatus.PROPOSED:
         return Transition.EFFECT
     if current_status == DecisionStatus.LINKED:
@@ -115,11 +119,19 @@ def apply_effect(conn: Connection, pair: Row, current: Row, body, action: Review
     decision_id = uuid.uuid4()
     reason = body.reason_code if action == ReviewAction.REJECT else None
     actor = registrar_actor(body.actor)
-    conn.execute(_INSERT_DECISION, {
-        "id": decision_id, "version": current.version + 1, "status": NEW_STATUS[action].value, "actor": actor,
-        "actor_type": ActorType.REGISTRAR.value, "reason_code": reason.value if reason else None, "note": body.note,
-        "from_id": current.id,
-    })
+    conn.execute(
+        _INSERT_DECISION,
+        {
+            "id": decision_id,
+            "version": current.version + 1,
+            "status": NEW_STATUS[action].value,
+            "actor": actor,
+            "actor_type": ActorType.REGISTRAR.value,
+            "reason_code": reason.value if reason else None,
+            "note": body.note,
+            "from_id": current.id,
+        },
+    )
     records = {"a": pair.record_a_id, "b": pair.record_b_id}
     entity, alerts = None, []
     if action == ReviewAction.APPROVE:
@@ -131,12 +143,23 @@ def apply_effect(conn: Connection, pair: Row, current: Row, body, action: Review
             conn.execute(_INSERT_NOT_A_MATCH, {**records, "decision_id": decision_id, "actor": actor})
         link.apply_reject(conn, pair.id, decision_id)
     write_event(
-        conn, event_type=EVENT[action], actor=actor, actor_type=ActorType.REGISTRAR, pair_id=pair.id,
-        decision_id=decision_id, entity_id=entity.id if entity else None, band=Band(current.band),
-        outcome=OUTCOME[action], reason_code=reason.value if reason else None,
+        conn,
+        event_type=EVENT[action],
+        actor=actor,
+        actor_type=ActorType.REGISTRAR,
+        pair_id=pair.id,
+        decision_id=decision_id,
+        entity_id=entity.id if entity else None,
+        band=Band(current.band),
+        outcome=OUTCOME[action],
+        reason_code=reason.value if reason else None,
         versions=Versions(scorer_version=current.scorer_version, threshold_set_id=current.threshold_set_id),
-        payload={"version": current.version + 1, "superseded_status": current.status,
-                 "has_note": body.note is not None, "alerts": len(alerts)},
+        payload={
+            "version": current.version + 1,
+            "superseded_status": current.status,
+            "has_note": body.note is not None,
+            "alerts": len(alerts),
+        },
     )
     decision = decision_from_row(current_decision_row(conn, pair.id))
     return ReviewResponse(decision=decision, entity=entity, alerts=alerts)
@@ -156,13 +179,18 @@ def _review(conn: Connection, scope: str, key: str, sha: str, pair_id: UUID, bod
         raise ApiError(ErrorCode.NOT_FOUND, "candidate pair not found")
     action = ReviewAction(body.action)
     reason = body.reason_code if action == ReviewAction.REJECT else None
-    step = transition(DecisionStatus(current.status), ReasonCode(current.reason_code) if current.reason_code else None,
-                      action, reason)
+    step = transition(
+        DecisionStatus(current.status), ReasonCode(current.reason_code) if current.reason_code else None, action, reason
+    )
     if step == Transition.NOT_PENDING:
-        raise ApiError(ErrorCode.DECISION_NOT_PENDING, f"decision is {current.status}, not PROPOSED",
-                       {"status": current.status, "version": current.version})
+        raise ApiError(
+            ErrorCode.DECISION_NOT_PENDING,
+            f"decision is {current.status}, not PROPOSED",
+            {"status": current.status, "version": current.version},
+        )
     if step == Transition.SAME_STATE:
-        status_code, response = 200, ReviewResponse(decision=decision_from_row(current))
+        entity = link.entity_for_pair(conn, pair_id) if current.status == DecisionStatus.LINKED else None
+        status_code, response = 200, ReviewResponse(decision=decision_from_row(current), entity=entity)
     else:
         status_code, response = 201, apply_effect(conn, pair, current, body, action)
     content = response.model_dump(by_alias=True, mode="json")
@@ -170,13 +198,21 @@ def _review(conn: Connection, scope: str, key: str, sha: str, pair_id: UUID, bod
     return JSONResponse(status_code=status_code, content=content)
 
 
-@router.post("/candidate-pairs/{pair_id}/reviews", response_model=ReviewResponse, status_code=201,
-             responses=error_responses(ErrorCode.NOT_FOUND, ErrorCode.CANNOT_LINK_CONFLICT, ErrorCode.DECISION_NOT_PENDING,
-                                       ErrorCode.IDEMPOTENCY_MISMATCH) | common_error_responses(),
-             description="Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. "
-                         "Idempotency-Key required; only PROPOSED moves; same-state request returns 200 with no new version.")
-def create_review(pair_id: UUID, body: ReviewRequest, idempotency_key: IdempotencyKey,
-                  engine: EngineDep):
+@router.post(
+    "/candidate-pairs/{pair_id}/reviews",
+    response_model=ReviewResponse,
+    status_code=201,
+    responses=error_responses(
+        ErrorCode.NOT_FOUND,
+        ErrorCode.CANNOT_LINK_CONFLICT,
+        ErrorCode.DECISION_NOT_PENDING,
+        ErrorCode.IDEMPOTENCY_MISMATCH,
+    )
+    | common_error_responses(),
+    description="Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. "
+    "Idempotency-Key required; only PROPOSED moves; same-state request returns 200 with no new version.",
+)
+def create_review(pair_id: UUID, body: ReviewRequest, idempotency_key: IdempotencyKey, engine: EngineDep):
     scope = f"{ROUTE_TEMPLATE} {pair_id}"
     sha = request_sha256(body)
     try:

@@ -7,6 +7,7 @@ the evidence view are coded against:
     apply_approve(conn, pair_id, decision_id) -> (Entity, list[SafetyAlert])
     apply_reject(conn, pair_id, decision_id) -> None
     preview_approve(conn, pair_id) -> MergePreview
+    entity_for_pair(conn, pair_id) -> Entity | None     (the entity a LINKED pair belongs to)
 
 All three run inside the caller's transaction on ``conn`` (a SQLAlchemy Connection); the
 pair row is already locked ``FOR UPDATE`` by the route. Events the seam writes
@@ -16,6 +17,7 @@ connection; the request context is bound, so no ``ctx`` argument is needed.
 The stand-in writes no entity rows and raises no alerts: it returns a single-member entity
 whose id is derived from the pair id, so repeated calls are stable.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -41,7 +43,9 @@ def _standin_entity(conn: Connection, pair_id: UUID) -> Entity:
     return Entity(
         id=uuid.uuid5(_STANDIN_NAMESPACE, str(pair_id)),
         version=1,
-        members=[EntityMember(source_record_id=row.id, source_system=row.source_system, is_constructed=row.is_constructed)],
+        members=[
+            EntityMember(source_record_id=row.id, source_system=row.source_system, is_constructed=row.is_constructed)
+        ],
         golden=[],
     )
 
@@ -55,8 +59,14 @@ def apply_reject(conn: Connection, pair_id: UUID, decision_id: UUID) -> None:
     """STAND-IN (W3b replaces): nothing to unlink before any entity exists."""
 
 
+def entity_for_pair(conn: Connection, pair_id: UUID) -> Entity | None:
+    """STAND-IN (W3b replaces with an entity_member lookup): the entity a LINKED pair belongs to."""
+    return _standin_entity(conn, pair_id)
+
+
 def preview_approve(conn: Connection, pair_id: UUID) -> MergePreview:
     """STAND-IN (W3b replaces): the entity the approve would produce and whether the rule would fire."""
     entity = _standin_entity(conn, pair_id)
-    return MergePreview(entity_id_if_approved=entity.id, member_count_if_approved=len(entity.members),
-                        alert_would_fire=False)
+    return MergePreview(
+        entity_id_if_approved=entity.id, member_count_if_approved=len(entity.members), alert_would_fire=False
+    )

@@ -1,8 +1,9 @@
 """Tiles from the continuous aggregates, the current threshold set, and a contract check that
 every response body validates against the frozen Pydantic models."""
+
 from __future__ import annotations
 
-from backend.tests.api.conftest import API, approve_body, review
+from backend.tests.api.conftest import API, approve_body, engine, review
 from contracts.models.common import ErrorEnvelope, Page
 from contracts.models.health import Health
 from contracts.models.pairs import CandidatePair, CandidatePairDetail
@@ -34,6 +35,32 @@ def test_tiles_return_rows_from_the_aggregates_after_a_review(client, match_run,
     gate = _tile(r.json(), "AGENT_GATE")
     assert gate["aggregate"] == "agent_gate_5m"
     assert gate["windowMinutes"] == 60
+
+
+def test_tiles_window_is_aligned_to_bucket_boundaries(client, session, db_conn):
+    """Codex finding 7: a review whose bucket started before the raw cutoff is still in the window.
+    An event sits exactly on its 5-minute bucket start, 1 minute ago or less; window_minutes=1
+    must still show it, which only an aligned cutoff does."""
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import text
+
+    now = datetime.now(UTC)
+    bucket_start = (now - timedelta(minutes=1)).replace(second=0, microsecond=0)
+    bucket_start -= timedelta(minutes=bucket_start.minute % 5)
+    marker = "registrar:window-edge"
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO event_log (ts, event_id, event_type, entry_point, actor, actor_type, outcome, latency_ms, mode) "
+                "VALUES (:ts, gen_random_uuid(), 'LINK_APPROVED', 'API', :actor, 'REGISTRAR', 'APPROVED', 3, 'REPLAY')"
+            ),
+            {"ts": bucket_start, "actor": marker},
+        )
+    r = client.get(f"{API}/metrics/tiles", params={"window_minutes": 1})
+    human = _tile(r.json(), "HUMAN_REVIEW")
+    buckets = [b for b in human["buckets"] if b["bucket"].startswith(bucket_start.strftime("%Y-%m-%dT%H:%M"))]
+    assert buckets, f"bucket {bucket_start.isoformat()} missing from a 1-minute window at {now.isoformat()}"
 
 
 def test_tiles_window_is_bounded(client):

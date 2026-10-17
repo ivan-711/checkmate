@@ -4,6 +4,7 @@ Set ``CHECKMATE_TEST_DATABASE_URL`` to override the default. The database name m
 contain ``test``; the dev database ``checkmate`` is refused so a reset in a test can never
 truncate demo state.
 """
+
 from __future__ import annotations
 
 import os

@@ -6,6 +6,7 @@ tested before the real features and scorer merge. Shapes are the real ones (the 
 Jaro-Winkler, weights are hand-set, and only two negative rules are implemented.
 Nothing here is calibrated or evaluated. ``scorer_version`` says so.
 """
+
 from __future__ import annotations
 
 import math

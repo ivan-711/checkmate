@@ -1,4 +1,5 @@
 """FastAPI dependencies that hand routers the one engine and the settings from app state."""
+
 from __future__ import annotations
 
 from typing import Annotated

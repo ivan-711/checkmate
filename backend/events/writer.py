@@ -7,6 +7,7 @@ change it describes, so an event never exists without its effect and vice versa.
 never free text (notes), full records or keys. A string longer than ``MAX_PAYLOAD_STRING``
 is refused so a note cannot slip in by accident.
 """
+
 from __future__ import annotations
 
 import json
@@ -73,24 +74,27 @@ def write_event(
     payload = payload or {}
     _check_structured(payload)
     event_id = uuid.uuid4()
-    conn.execute(_INSERT, {
-        "ts": datetime.now(UTC),
-        "event_id": event_id,
-        "event_type": event_type.value,
-        "request_id": ctx.request_id,
-        "run_id": run_id,
-        "entry_point": ctx.entry_point.value,
-        "entity_id": entity_id,
-        "pair_id": pair_id,
-        "decision_id": decision_id,
-        "actor": actor,
-        "actor_type": actor_type.value,
-        "band": band.value if band else None,
-        "outcome": outcome,
-        "latency_ms": ctx.elapsed_ms(),
-        "mode": ctx.mode.value,
-        "versions": json.dumps((versions or Versions()).model_dump(by_alias=True, exclude_none=True)),
-        "payload": json.dumps(payload, default=str),
-        "reason_code": reason_code,
-    })
+    conn.execute(
+        _INSERT,
+        {
+            "ts": datetime.now(UTC),
+            "event_id": event_id,
+            "event_type": event_type.value,
+            "request_id": ctx.request_id,
+            "run_id": run_id,
+            "entry_point": ctx.entry_point.value,
+            "entity_id": entity_id,
+            "pair_id": pair_id,
+            "decision_id": decision_id,
+            "actor": actor,
+            "actor_type": actor_type.value,
+            "band": band.value if band else None,
+            "outcome": outcome,
+            "latency_ms": ctx.elapsed_ms(),
+            "mode": ctx.mode.value,
+            "versions": json.dumps((versions or Versions()).model_dump(by_alias=True, exclude_none=True)),
+            "payload": json.dumps(payload, default=str),
+            "reason_code": reason_code,
+        },
+    )
     return event_id

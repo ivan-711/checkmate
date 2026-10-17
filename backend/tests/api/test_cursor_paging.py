@@ -1,4 +1,5 @@
 """Keyset paging over a queue of several pairs: pages are disjoint, ordered and complete."""
+
 from __future__ import annotations
 
 import uuid
@@ -15,12 +16,14 @@ def _variants(card: SourceCard, n: int) -> list[SourceCard]:
     for i in range(n):
         rid = uuid.uuid4()
         record = card.record.model_copy(update={"id": rid, "source_local_id": f"VARIANT-{i}-{rid.hex[:6]}"})
-        normalized = card.normalized.model_copy(update={
-            "record_id": rid,
-            "given_name": f"{card.normalized.given_name}{'x' * i}",
-            "given_name_folded": f"{card.normalized.given_name_folded}{'x' * i}",
-            "phone_e164": None if i % 2 else card.normalized.phone_e164,
-        })
+        normalized = card.normalized.model_copy(
+            update={
+                "record_id": rid,
+                "given_name": f"{card.normalized.given_name}{'x' * i}",
+                "given_name_folded": f"{card.normalized.given_name_folded}{'x' * i}",
+                "phone_e164": None if i % 2 else card.normalized.phone_e164,
+            }
+        )
         out.append(SourceCard(record=record, normalized=normalized, display_label=card.display_label))
     return out
 

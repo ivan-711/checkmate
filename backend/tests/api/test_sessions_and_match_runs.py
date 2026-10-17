@@ -1,4 +1,5 @@
 """POST /sessions (reset) and POST /match-runs: idempotent by natural keys, events per action."""
+
 from __future__ import annotations
 
 from sqlalchemy import text
@@ -18,8 +19,11 @@ def test_reset_loads_scenario_and_writes_demo_reset(client, db_conn):
     assert r.headers["X-Request-Id"]
     assert count_events(db_conn, "DEMO_RESET") == before + 1
     row = db_conn.execute(
-        text("SELECT request_id, actor_type, entry_point, latency_ms FROM event_log "
-             "WHERE event_type = 'DEMO_RESET' ORDER BY ts DESC LIMIT 1")).one()
+        text(
+            "SELECT request_id, actor_type, entry_point, latency_ms FROM event_log "
+            "WHERE event_type = 'DEMO_RESET' ORDER BY ts DESC LIMIT 1"
+        )
+    ).one()
     assert row.request_id == r.headers["X-Request-Id"]
     assert row.actor_type == "SYSTEM"
     assert row.entry_point == "API"
@@ -56,13 +60,25 @@ def test_match_run_scores_pairs_and_writes_events(client, session, db_conn):
     assert len(body.queued_pair_ids) == min(body.candidate_pairs, 50)
     assert count_events(db_conn, "MATCH_RUN_COMPLETED", run_id=str(body.run_id)) == 1
     assert count_events(db_conn, "PAIR_SCORED", run_id=str(body.run_id)) == body.candidate_pairs
-    decision = db_conn.execute(text(
-        "SELECT version, status, actor, actor_type, evidence_snapshot FROM match_decision WHERE pair_id = :p"),
-        {"p": str(body.queued_pair_ids[0])}).one()
+    decision = db_conn.execute(
+        text("SELECT version, status, actor, actor_type, evidence_snapshot FROM match_decision WHERE pair_id = :p"),
+        {"p": str(body.queued_pair_ids[0])},
+    ).one()
     assert (decision.version, decision.status, decision.actor_type) == (1, "PROPOSED", "SYSTEM")
     snap = decision.evidence_snapshot
-    for key in ("features", "missing_flags", "weights", "intercept", "contributions", "raw_score",
-                "c_low", "c_high", "negative_rules_fired", "scorer_version", "threshold_set_id"):
+    for key in (
+        "features",
+        "missing_flags",
+        "weights",
+        "intercept",
+        "contributions",
+        "raw_score",
+        "c_low",
+        "c_high",
+        "negative_rules_fired",
+        "scorer_version",
+        "threshold_set_id",
+    ):
         assert key in snap, key
 
 

@@ -7,6 +7,7 @@ in ``backend/match/standin.py`` and logs that it did. The API never imports feat
 scorer code directly; it only sees ``EvidenceSnapshot`` (the frozen contract model), the
 band and the display-only ``p``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,10 +20,13 @@ from contracts.models.records import NormalizedRecord
 
 log = logging.getLogger("checkmate.match")
 
+# The only absences that mean "W2 has not merged yet"; anything else is a real failure.
+W2_MODULES = frozenset({"backend.core", "backend.core.api"})
+
 
 @dataclass(frozen=True)
 class BlockKey:
-    key_type: str   # one per architecture §3 blocking key; stored in block_key.key_type
+    key_type: str  # one per architecture §3 blocking key; stored in block_key.key_type
     key_value: str
 
 
@@ -63,7 +67,9 @@ class MatchCore(Protocol):
 def resolve_core() -> MatchCore:
     try:
         from backend.core.api import CORE  # W2's instance; absent until lane W2 merges
-    except ImportError:
+    except ModuleNotFoundError as exc:
+        if exc.name not in W2_MODULES:
+            raise  # a dependency missing inside W2's code: never substitute different scoring
         from backend.match.standin import StandInCore
 
         log.warning("backend.core.api not found: using the W3a stand-in scorer (replace when W2 merges)")

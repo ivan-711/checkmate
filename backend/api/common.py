@@ -1,5 +1,6 @@
 """Row-to-model helpers shared by the W3a routers. Identifiers here are closed maps in code;
 every value is a bound parameter."""
+
 from __future__ import annotations
 
 import base64
@@ -51,8 +52,15 @@ def display_label(source_system: str) -> str:
 
 def current_thresholds(conn: Connection) -> Thresholds:
     row = conn.execute(_THRESHOLDS).one()
-    return Thresholds(threshold_set_id=row.thresholds_id, c_low=row.c_low, c_high=row.c_high, platt_a=row.platt_a,
-                      platt_b=row.platt_b, t_low_display=row.t_low_display, t_high_display=row.t_high_display)
+    return Thresholds(
+        threshold_set_id=row.thresholds_id,
+        c_low=row.c_low,
+        c_high=row.c_high,
+        platt_a=row.platt_a,
+        platt_b=row.platt_b,
+        t_low_display=row.t_low_display,
+        t_high_display=row.t_high_display,
+    )
 
 
 def current_threshold_row(conn: Connection) -> Row | None:
@@ -65,23 +73,49 @@ def current_decision_row(conn: Connection, pair_id: UUID) -> Row | None:
 
 def decision_from_row(row: Row, snapshot: dict | None = None) -> MatchDecision:
     return MatchDecision(
-        id=row.id, pair_id=row.pair_id, version=row.version, logit=row.logit, p=row.p, band=row.band,
-        negative_rules_fired=list(row.negative_rules_fired or []), status=row.status, actor=row.actor,
-        actor_type=row.actor_type, reason_code=row.reason_code, note=row.note, decided_at=row.decided_at,
-        scorer_version=row.scorer_version, threshold_set_id=row.threshold_set_id,
+        id=row.id,
+        pair_id=row.pair_id,
+        version=row.version,
+        logit=row.logit,
+        p=row.p,
+        band=row.band,
+        negative_rules_fired=list(row.negative_rules_fired or []),
+        status=row.status,
+        actor=row.actor,
+        actor_type=row.actor_type,
+        reason_code=row.reason_code,
+        note=row.note,
+        decided_at=row.decided_at,
+        scorer_version=row.scorer_version,
+        threshold_set_id=row.threshold_set_id,
         evidence_snapshot=None if snapshot is None else EvidenceSnapshot.model_validate(snapshot),
     )
 
 
 def source_card(conn: Connection, record_id: UUID, include_raw: bool = False) -> SourceCard:
     r = conn.execute(_SOURCE_CARD, {"record_id": record_id}).one()
-    record = SourceRecord(id=r.id, source_system=r.source_system, source_local_id=r.source_local_id, kind=r.kind,
-                          payload_sha256=r.payload_sha256, is_constructed=r.is_constructed, ingested_at=r.ingested_at,
-                          raw_payload=r.raw_payload if include_raw else None)
-    normalized = NormalizedRecord(record_id=r.id, given_name=r.given_name, family_name=r.family_name,
-                                  given_name_folded=r.given_name_folded, family_name_folded=r.family_name_folded,
-                                  birth_date=r.birth_date, sex=r.sex, phone_e164=r.phone_e164,
-                                  address_line=r.address_line, zip5=r.zip5)
+    record = SourceRecord(
+        id=r.id,
+        source_system=r.source_system,
+        source_local_id=r.source_local_id,
+        kind=r.kind,
+        payload_sha256=r.payload_sha256,
+        is_constructed=r.is_constructed,
+        ingested_at=r.ingested_at,
+        raw_payload=r.raw_payload if include_raw else None,
+    )
+    normalized = NormalizedRecord(
+        record_id=r.id,
+        given_name=r.given_name,
+        family_name=r.family_name,
+        given_name_folded=r.given_name_folded,
+        family_name_folded=r.family_name_folded,
+        birth_date=r.birth_date,
+        sex=r.sex,
+        phone_e164=r.phone_e164,
+        address_line=r.address_line,
+        zip5=r.zip5,
+    )
     return SourceCard(record=record, normalized=normalized, display_label=display_label(r.source_system))
 
 

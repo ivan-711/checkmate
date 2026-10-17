@@ -6,6 +6,7 @@ inside the request) can stamp ``request_id`` and ``latency_ms`` without threadin
 request object through every call. Starlette copies context variables into the thread
 that runs a sync endpoint, so the variable is visible there too.
 """
+
 from __future__ import annotations
 
 import time

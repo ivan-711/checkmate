@@ -1,5 +1,6 @@
 """GET /candidate-pairs (the review queue, bounded, keyset cursor) and GET /candidate-pairs/{id}
 (the evidence view). Architecture §5: ordered by |p-0.5|; limit default 50, max 200, clamped."""
+
 from __future__ import annotations
 
 from uuid import UUID
@@ -42,8 +43,13 @@ _HISTORY = text(
 
 def pair_from_row(row: Row, decision: MatchDecision) -> CandidatePair:
     return CandidatePair(
-        id=row.cp_id, record_a_id=row.record_a_id, record_b_id=row.record_b_id, block_keys=list(row.block_keys or []),
-        origin=row.origin, intake_session_id=row.intake_session_id, decision=decision,
+        id=row.cp_id,
+        record_a_id=row.record_a_id,
+        record_b_id=row.record_b_id,
+        block_keys=list(row.block_keys or []),
+        origin=row.origin,
+        intake_session_id=row.intake_session_id,
+        decision=decision,
         auto_eligible=decision.band == Band.AUTO_LINK,
     )
 
@@ -57,13 +63,19 @@ def list_query(filters: dict[str, str], after: tuple[float, UUID] | None, limit:
         clauses.append("(abs(d.p - 0.5), cp.id) > (CAST(:after_distance AS double precision), CAST(:after_id AS uuid))")
         params["after_distance"], params["after_id"] = after
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-    sql = (f"SELECT {PAIR_COLUMNS}, {DECISION_COLUMNS}, abs(d.p - 0.5) AS distance {_CURRENT_JOIN}{where} "
-           "ORDER BY distance, cp.id LIMIT :limit_plus_one")
+    sql = (
+        f"SELECT {PAIR_COLUMNS}, {DECISION_COLUMNS}, abs(d.p - 0.5) AS distance {_CURRENT_JOIN}{where} "
+        "ORDER BY distance, cp.id LIMIT :limit_plus_one"
+    )
     return sql, params
 
 
-@router.get("/candidate-pairs", response_model=Page[CandidatePair], responses=common_error_responses(),
-            description="Lane W3a. Review queue ordered by |p-0.5|. Bounded list.")
+@router.get(
+    "/candidate-pairs",
+    response_model=Page[CandidatePair],
+    responses=common_error_responses(),
+    description="Lane W3a. Review queue ordered by |p-0.5|. Bounded list.",
+)
 def list_candidate_pairs(
     engine: EngineDep,
     band: Band | None = None,
@@ -100,9 +112,12 @@ def load_detail(conn: Connection, pair_id: UUID) -> CandidatePairDetail:
     )
 
 
-@router.get("/candidate-pairs/{pair_id}", response_model=CandidatePairDetail,
-            responses=error_responses(ErrorCode.NOT_FOUND) | common_error_responses(),
-            description="Lane W3a. Evidence view: records, contributions, decision history, merge preview.")
+@router.get(
+    "/candidate-pairs/{pair_id}",
+    response_model=CandidatePairDetail,
+    responses=error_responses(ErrorCode.NOT_FOUND) | common_error_responses(),
+    description="Lane W3a. Evidence view: records, contributions, decision history, merge preview.",
+)
 def get_candidate_pair(pair_id: UUID, engine: EngineDep) -> CandidatePairDetail:
     with engine.connect() as conn:
         if current_decision_row(conn, pair_id) is None:

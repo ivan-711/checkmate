@@ -1,5 +1,6 @@
 """Response metadata for real routes, mirroring the frozen stubs in contracts/api_spec.py so
 the served /openapi.json documents the same error statuses as the committed snapshot."""
+
 from __future__ import annotations
 
 from contracts.api_spec import _err

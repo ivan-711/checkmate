@@ -10,6 +10,7 @@ Until then the known scenarios are read from the frozen fixture shapes in
 source card; ``frontdesk-hero`` loads all but the ER FHIR record, because the intake
 plays the ER registration (architecture §9.1).
 """
+
 from __future__ import annotations
 
 import json
