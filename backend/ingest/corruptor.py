@@ -13,6 +13,7 @@ sides of a negative pair, so "looks mangled" never separates matches from negati
 Randomness is stdlib ``random.Random`` seeded per entity from sha256(f"{seed}:{entity}"), so
 one entity's stream never depends on another's and the truth table is a function of the seed.
 """
+
 from __future__ import annotations
 
 import csv
@@ -36,8 +37,36 @@ from backend.ingest.records import SOURCE_CLINIC_CSV, SOURCE_ER_FHIR, SourceReco
 # the pool the held-out draw samples from.
 CORE_TRUE_MATCH = ("T1", "T3", "D1", "D3", "L1", "L3", "L7", "S1", "S3", "S5", "S6", "C1")
 CORE_HARD_NEGATIVE = ("N1", "N3")
-P1_FAMILIES = ("T2", "T4", "T5", "T6", "T7", "S2", "S4", "S7", "S8", "M1", "D2", "D4", "D5", "L2", "L4", "L5", "L6",
-               "C2", "C3", "C4", "C5", "N2", "N4", "N5", "N6", "N7", "N8", "N9")
+P1_FAMILIES = (
+    "T2",
+    "T4",
+    "T5",
+    "T6",
+    "T7",
+    "S2",
+    "S4",
+    "S7",
+    "S8",
+    "M1",
+    "D2",
+    "D4",
+    "D5",
+    "L2",
+    "L4",
+    "L5",
+    "L6",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "N2",
+    "N4",
+    "N5",
+    "N6",
+    "N7",
+    "N8",
+    "N9",
+)
 HELDOUT_COUNT = 5
 HELDOUT_SPANISH_STRATUM = ("S4", "S7", "S8")
 HELDOUT_NEGATIVE_STRATUM = ("N2", "N4", "N5", "N6", "N7", "N8", "N9")
@@ -49,8 +78,20 @@ LABEL_SAME = "SAME"
 LABEL_NOT_SAME = "NOT_SAME"
 
 # Family weights for the per-record draw; design choices, not observed rates.
-FAMILY_WEIGHTS = {"T1": 2.0, "T3": 1.5, "D1": 1.5, "D3": 1.5, "L1": 2.0, "L3": 1.5, "L7": 1.5,
-                  "S1": 1.0, "S3": 1.5, "S5": 1.5, "S6": 1.0, "C1": 1.5}
+FAMILY_WEIGHTS = {
+    "T1": 2.0,
+    "T3": 1.5,
+    "D1": 1.5,
+    "D3": 1.5,
+    "L1": 2.0,
+    "L3": 1.5,
+    "L7": 1.5,
+    "S1": 1.0,
+    "S3": 1.5,
+    "S5": 1.5,
+    "S6": 1.0,
+    "C1": 1.5,
+}
 C1_POOL = ("T1", "T3", "D1", "D3", "L1", "L3", "L7")
 C1_EDIT_COUNT_WEIGHTS = ((2, 0.7), (3, 0.3))
 MAX_FAMILY_DRAWS = 6  # resample a no-op family this many times before emitting an exact copy
@@ -78,21 +119,86 @@ ENTITY_NAMESPACE = UUID("9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d")
 
 # Generator-side nickname table. The scoring feature's table (W2) is written separately on purpose.
 GENERATOR_NICKNAMES = {
-    "Robert": ("Bob", "Rob"), "William": ("Bill", "Will"), "Richard": ("Rick", "Dick"), "James": ("Jim",),
-    "John": ("Jack", "Johnny"), "Michael": ("Mike",), "Thomas": ("Tom",), "Charles": ("Chuck", "Charlie"),
-    "Joseph": ("Joe",), "Daniel": ("Dan",), "Christopher": ("Chris",), "Matthew": ("Matt",), "Anthony": ("Tony",),
-    "Edward": ("Ed", "Eddie"), "Steven": ("Steve",), "Kenneth": ("Ken",), "Andrew": ("Andy",), "Joshua": ("Josh",),
-    "Timothy": ("Tim",), "Jeffrey": ("Jeff",), "Elizabeth": ("Liz", "Beth"), "Katherine": ("Kate", "Kathy"),
-    "Margaret": ("Peggy", "Maggie"), "Jennifer": ("Jen",), "Patricia": ("Pat", "Patty"), "Susan": ("Sue",),
-    "Deborah": ("Debbie",), "Rebecca": ("Becky",), "Samantha": ("Sam",), "Jessica": ("Jess",), "Dorothy": ("Dot",),
-    "Barbara": ("Barb",), "Nicholas": ("Nick",), "Benjamin": ("Ben",), "Alexander": ("Alex",), "Jonathan": ("Jon",),
-    "Victoria": ("Vicky",), "Abigail": ("Abby",), "Catherine": ("Cathy",), "Theodore": ("Ted",), "Raymond": ("Ray",),
-    "Donald": ("Don",), "Ronald": ("Ron",), "Lawrence": ("Larry",), "Frederick": ("Fred",), "Gregory": ("Greg",),
+    "Robert": ("Bob", "Rob"),
+    "William": ("Bill", "Will"),
+    "Richard": ("Rick", "Dick"),
+    "James": ("Jim",),
+    "John": ("Jack", "Johnny"),
+    "Michael": ("Mike",),
+    "Thomas": ("Tom",),
+    "Charles": ("Chuck", "Charlie"),
+    "Joseph": ("Joe",),
+    "Daniel": ("Dan",),
+    "Christopher": ("Chris",),
+    "Matthew": ("Matt",),
+    "Anthony": ("Tony",),
+    "Edward": ("Ed", "Eddie"),
+    "Steven": ("Steve",),
+    "Kenneth": ("Ken",),
+    "Andrew": ("Andy",),
+    "Joshua": ("Josh",),
+    "Timothy": ("Tim",),
+    "Jeffrey": ("Jeff",),
+    "Elizabeth": ("Liz", "Beth"),
+    "Katherine": ("Kate", "Kathy"),
+    "Margaret": ("Peggy", "Maggie"),
+    "Jennifer": ("Jen",),
+    "Patricia": ("Pat", "Patty"),
+    "Susan": ("Sue",),
+    "Deborah": ("Debbie",),
+    "Rebecca": ("Becky",),
+    "Samantha": ("Sam",),
+    "Jessica": ("Jess",),
+    "Dorothy": ("Dot",),
+    "Barbara": ("Barb",),
+    "Nicholas": ("Nick",),
+    "Benjamin": ("Ben",),
+    "Alexander": ("Alex",),
+    "Jonathan": ("Jon",),
+    "Victoria": ("Vicky",),
+    "Abigail": ("Abby",),
+    "Catherine": ("Cathy",),
+    "Theodore": ("Ted",),
+    "Raymond": ("Ray",),
+    "Donald": ("Don",),
+    "Ronald": ("Ron",),
+    "Lawrence": ("Larry",),
+    "Frederick": ("Fred",),
+    "Gregory": ("Greg",),
 }
-STREET_NAMES = ("Maple", "Oak", "Elm", "Cedar", "Pine", "Birch", "Walnut", "Chestnut", "Spruce", "Willow", "Main", "Park")
+STREET_NAMES = (
+    "Maple",
+    "Oak",
+    "Elm",
+    "Cedar",
+    "Pine",
+    "Birch",
+    "Walnut",
+    "Chestnut",
+    "Spruce",
+    "Willow",
+    "Main",
+    "Park",
+)
 STREET_TYPES = ("St", "Ave", "Rd", "Ln", "Dr", "Ct")
 # Other Massachusetts ZIPs for L1 moves across ZIP; the sample is Massachusetts-only.
-OTHER_ZIPS = ("01002", "01040", "01201", "01420", "01545", "01602", "01702", "01803", "01905", "02021", "02118", "02301", "02460", "02571", "02740")
+OTHER_ZIPS = (
+    "01002",
+    "01040",
+    "01201",
+    "01420",
+    "01545",
+    "01602",
+    "01702",
+    "01803",
+    "01905",
+    "02021",
+    "02118",
+    "02301",
+    "02460",
+    "02571",
+    "02740",
+)
 # Generator-side surname particles for S3 ("de la Cruz López" keeps "de la Cruz"). Kept apart from
 # backend.core's particle set on purpose: the evaluation plan wants generator and scorer tables
 # written separately, so a scorer change can never silently reshape the corpus it is judged on.
@@ -216,6 +322,7 @@ def spanish_base_identity(identity: Identity) -> Identity:
 
 # ---- true-match edits: each returns (identity, Edit) or None when the edit would be a no-op ----
 
+
 def edit_t1(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | None:
     name = identity.family
     if not name or len(name) < 3:
@@ -228,11 +335,11 @@ def edit_t1(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | N
     if op == "insert":
         after = name[:pos] + letter + name[pos:]
     elif op == "delete":
-        after = name[:pos] + name[pos + 1:]
+        after = name[:pos] + name[pos + 1 :]
     else:
         if name[pos].lower() == letter.lower():
             return None
-        after = name[:pos] + letter + name[pos + 1:]
+        after = name[:pos] + letter + name[pos + 1 :]
     return replace(identity, family=after), Edit("T1", "family", name, after)
 
 
@@ -338,14 +445,28 @@ def edit_c1(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | N
         applied.append(edit)
     if len(applied) < 2:
         return None
-    summary = Edit("C1", "+".join(e.family for e in applied),
-                   " | ".join(f"{e.field}={e.before}" for e in applied), " | ".join(f"{e.field}={e.after}" for e in applied))
+    summary = Edit(
+        "C1",
+        "+".join(e.family for e in applied),
+        " | ".join(f"{e.field}={e.before}" for e in applied),
+        " | ".join(f"{e.field}={e.after}" for e in applied),
+    )
     return current, summary
 
 
 EDITS: dict[str, Callable[[Identity, random.Random], tuple[Identity, Edit] | None]] = {
-    "T1": edit_t1, "T3": edit_t3, "D1": edit_d1, "D3": edit_d3, "L1": edit_l1, "L3": edit_l3, "L7": edit_l7,
-    "S1": edit_s1, "S3": edit_s3, "S5": edit_s5, "S6": edit_s6, "C1": edit_c1,
+    "T1": edit_t1,
+    "T3": edit_t3,
+    "D1": edit_d1,
+    "D3": edit_d3,
+    "L1": edit_l1,
+    "L3": edit_l3,
+    "L7": edit_l7,
+    "S1": edit_s1,
+    "S3": edit_s3,
+    "S5": edit_s5,
+    "S6": edit_s6,
+    "C1": edit_c1,
 }
 
 
@@ -367,12 +488,19 @@ def corrupt(identity: Identity, rng: random.Random, spanish: bool) -> tuple[Iden
 
 # ---- hard negatives: grafts ----
 
+
 def graft(donor: Identity, recipient: Identity, family: str, rng: random.Random) -> Identity:
     """N1 siblings share surname, address and phone with a birth year within 3 and another given
     name; N3 parent/child share the full name and address with DOBs at least 18 years apart."""
     donor_dob = parse_date(donor.birth_date) or FALLBACK_DONOR_DOB
-    shared = replace(recipient, family=donor.family, address_line=donor.address_line, city=donor.city,
-                     state=donor.state, postal_code=donor.postal_code)
+    shared = replace(
+        recipient,
+        family=donor.family,
+        address_line=donor.address_line,
+        city=donor.city,
+        state=donor.state,
+        postal_code=donor.postal_code,
+    )
     if family == "N1":
         gap = rng.choice([g for g in range(-SIBLING_MAX_YEAR_GAP, SIBLING_MAX_YEAR_GAP + 1) if g != 0])
         given = recipient.given
@@ -385,8 +513,15 @@ def graft(donor: Identity, recipient: Identity, family: str, rng: random.Random)
         dob = _shift_years(donor_dob, years if child_is_recipient else -years)
         suffix = "Jr." if child_is_recipient and rng.random() < P_CHILD_HAS_SUFFIX else recipient.suffix
         phone = donor.phone if rng.random() < P_HOUSEHOLD_PHONE else recipient.phone
-        return replace(shared, given=donor.given, middle=donor.middle, sex=donor.sex, suffix=suffix, phone=phone,
-                       birth_date=dob.isoformat())
+        return replace(
+            shared,
+            given=donor.given,
+            middle=donor.middle,
+            sex=donor.sex,
+            suffix=suffix,
+            phone=phone,
+            birth_date=dob.isoformat(),
+        )
     raise ValueError(f"unknown hard-negative family {family}")
 
 
@@ -395,11 +530,12 @@ def plan_grafts(seed: int, entity_ids: list[str]) -> list[GraftSpec]:
     ids = sorted(entity_ids)
     rng.shuffle(ids)
     count = min(int(len(ids) * HARD_NEGATIVE_FRACTION), len(ids) // 2)
-    recipients, donors = ids[:count], ids[count:2 * count]
+    recipients, donors = ids[:count], ids[count : 2 * count]
     return [GraftSpec(rng.choice(CORE_HARD_NEGATIVE), donor, recipient) for donor, recipient in zip(donors, recipients)]
 
 
 # ---- splits: components first, assignment by hash, then generation ----
+
 
 def components(entity_ids: list[str], grafts: list[GraftSpec]) -> dict[str, str]:
     """Union-find over graft edges; a component is named by its smallest person id."""
@@ -444,13 +580,18 @@ def assign_splits(component_of: dict[str, str], language_of: dict[str, str]) -> 
 def draw_heldout_families(seed: int) -> list[str]:
     """Five P1 families drawn by seed: one Spanish (S4/S7/S8), one hard negative, one D or L, two more."""
     rng = rng_for(seed, "heldout")
-    chosen = [rng.choice(HELDOUT_SPANISH_STRATUM), rng.choice(HELDOUT_NEGATIVE_STRATUM), rng.choice(HELDOUT_DOB_ADDRESS_STRATUM)]
+    chosen = [
+        rng.choice(HELDOUT_SPANISH_STRATUM),
+        rng.choice(HELDOUT_NEGATIVE_STRATUM),
+        rng.choice(HELDOUT_DOB_ADDRESS_STRATUM),
+    ]
     remaining = [f for f in P1_FAMILIES if f not in chosen]
     chosen.extend(rng.sample(remaining, HELDOUT_COUNT - len(chosen)))
     return chosen
 
 
 # ---- generation ----
+
 
 def corpus_fingerprint(seed: int, entity_ids: list[str]) -> str:
     """Seed plus the entity set: grafts depend on which entities exist, so a corpus built from a
@@ -489,6 +630,7 @@ def partition_fhir(bundle: FhirPatientBundle, owners: list[int], rng: random.Ran
 
 def partition_csv(patient: CsvPatient, owners: list[int], rng: random.Random) -> dict[int, CsvPatient]:
     """Encounter rows are dealt out; allergy and medication rows follow their ENCOUNTER column."""
+
     def column(row: dict, name: str) -> str | None:
         return next((v for k, v in row.items() if k and k.upper() == name), None)
 
@@ -502,7 +644,9 @@ def partition_csv(patient: CsvPatient, owners: list[int], rng: random.Random) ->
     return {o: replace(patient, **share) for o, share in shares.items()}
 
 
-def render_record(entity: Entity, identity: Identity, index: int, source: str, include_phone: bool, share, fingerprint: str) -> SourceRecordDraft:
+def render_record(
+    entity: Entity, identity: Identity, index: int, source: str, include_phone: bool, share, fingerprint: str
+) -> SourceRecordDraft:
     local_id = _local_id(fingerprint, entity.synthea_id, index, source)
     if source == SOURCE_ER_FHIR:
         return fhir_draft(identity, share, local_id)
@@ -529,16 +673,29 @@ def generate_entity(seed: int, fingerprint: str, entity: Entity) -> list[Generat
     records: list[GeneratedRecord] = []
     for index, source in enumerate(systems):
         p_corrupt = P_FHIR_BASE_CORRUPTED if index == 0 else P_OTHER_RECORD_CORRUPTED
-        identity, family, edits = (corrupt(entity.identity, rng, spanish) if rng.random() < p_corrupt
-                                   else (entity.identity, NO_EDIT, []))
+        identity, family, edits = (
+            corrupt(entity.identity, rng, spanish) if rng.random() < p_corrupt else (entity.identity, NO_EDIT, [])
+        )
         include_phone = rng.random() < P_CLINIC_HAS_PHONE
         draft = render_record(entity, identity, index, source, include_phone, shares[index], fingerprint)
-        records.append(GeneratedRecord(draft, entity_id_for(entity.synthea_id), entity.synthea_id, family, edits,
-                                       index, include_phone, shares[index]))
+        records.append(
+            GeneratedRecord(
+                draft,
+                entity_id_for(entity.synthea_id),
+                entity.synthea_id,
+                family,
+                edits,
+                index,
+                include_phone,
+                shares[index],
+            )
+        )
     return records
 
 
-def enforce_family_floor(seed: int, fingerprint: str, entities: dict[str, Entity], records: list[GeneratedRecord]) -> None:
+def enforce_family_floor(
+    seed: int, fingerprint: str, entities: dict[str, Entity], records: list[GeneratedRecord]
+) -> None:
     """Weighted draws starve rare families (T3 needs a table name, S1 an accent, S6 a María). Walk the
     records in a fixed order and re-corrupt uncorrupted or over-represented ones with each family
     below FAMILY_FLOOR, as far as entities exist that the edit applies to. Deterministic by seed."""
@@ -557,7 +714,9 @@ def enforce_family_floor(seed: int, fingerprint: str, entities: dict[str, Entity
             identity, edit = outcome
             counts[rec.family] -= 1
             counts[family] += 1
-            rec.draft = render_record(entity, identity, rec.index, rec.draft.source_system, rec.include_phone, rec.share, fingerprint)
+            rec.draft = render_record(
+                entity, identity, rec.index, rec.draft.source_system, rec.include_phone, rec.share, fingerprint
+            )
             rec.family, rec.edits = family, [edit]
 
 
@@ -580,7 +739,9 @@ def build_corpus(seed: int, bundles: dict[str, FhirPatientBundle], csv_patients:
     ids = sorted(entities)
     grafts = plan_grafts(seed, ids)
     component_of = components(ids, grafts)
-    language_of = {comp: ("es" if is_spanish(entities[comp].bundle.identity) else "other") for comp in set(component_of.values())}
+    language_of = {
+        comp: ("es" if is_spanish(entities[comp].bundle.identity) else "other") for comp in set(component_of.values())
+    }
     splits = assign_splits(component_of, language_of)
     apply_grafts(seed, entities, grafts)
 
@@ -602,36 +763,70 @@ def build_corpus(seed: int, bundles: dict[str, FhirPatientBundle], csv_patients:
         for i in range(len(recs)):
             for j in range(i + 1, len(recs)):
                 a, b = recs[i], recs[j]
-                pairs.append({"pair_id": pair_id_for(str(a.draft.id), str(b.draft.id)), "record_a_id": str(a.draft.id),
-                              "record_b_id": str(b.draft.id), "label": LABEL_SAME, "family": "+".join(sorted((a.family, b.family))),
-                              "partition": partition(pid)})
+                pairs.append(
+                    {
+                        "pair_id": pair_id_for(str(a.draft.id), str(b.draft.id)),
+                        "record_a_id": str(a.draft.id),
+                        "record_b_id": str(b.draft.id),
+                        "label": LABEL_SAME,
+                        "family": "+".join(sorted((a.family, b.family))),
+                        "partition": partition(pid),
+                    }
+                )
     for spec in grafts:
         for a in by_entity[spec.donor_id]:
             for b in by_entity[spec.recipient_id]:
-                pairs.append({"pair_id": pair_id_for(str(a.draft.id), str(b.draft.id)), "record_a_id": str(a.draft.id),
-                              "record_b_id": str(b.draft.id), "label": LABEL_NOT_SAME, "family": spec.family,
-                              "partition": partition(spec.recipient_id)})
+                pairs.append(
+                    {
+                        "pair_id": pair_id_for(str(a.draft.id), str(b.draft.id)),
+                        "record_a_id": str(a.draft.id),
+                        "record_b_id": str(b.draft.id),
+                        "label": LABEL_NOT_SAME,
+                        "family": spec.family,
+                        "partition": partition(spec.recipient_id),
+                    }
+                )
     pairs.sort(key=lambda p: p["pair_id"])
 
-    truth_rows = [{
-        "entity_id": rec.entity_id, "record_id": str(rec.draft.id), "source_system": rec.draft.source_system,
-        "synthea_patient_id": rec.synthea_id, "component_id": component_of[rec.synthea_id],
-        "partition": partition(rec.synthea_id), "fold": splits[component_of[rec.synthea_id]]["fold"], "family": rec.family,
-    } for rec in records]
+    truth_rows = [
+        {
+            "entity_id": rec.entity_id,
+            "record_id": str(rec.draft.id),
+            "source_system": rec.draft.source_system,
+            "synthea_patient_id": rec.synthea_id,
+            "component_id": component_of[rec.synthea_id],
+            "partition": partition(rec.synthea_id),
+            "fold": splits[component_of[rec.synthea_id]]["fold"],
+            "family": rec.family,
+        }
+        for rec in records
+    ]
 
     heldout = draw_heldout_families(seed)
     run = {
-        "seed": seed, "corpus_fingerprint": fingerprint, "entities": len(ids), "records": len(records), "pairs_same": sum(p["label"] == LABEL_SAME for p in pairs),
-        "pairs_not_same": sum(p["label"] == LABEL_NOT_SAME for p in pairs), "grafts": len(grafts),
+        "seed": seed,
+        "corpus_fingerprint": fingerprint,
+        "entities": len(ids),
+        "records": len(records),
+        "pairs_same": sum(p["label"] == LABEL_SAME for p in pairs),
+        "pairs_not_same": sum(p["label"] == LABEL_NOT_SAME for p in pairs),
+        "grafts": len(grafts),
         "spanish_entities": sum(1 for e in entities.values() if is_spanish(e.bundle.identity)),
-        "components": len(splits), "largest_component": max(len(s["members"]) for s in splits.values()),
-        "partitions": {name: sum(1 for s in splits.values() if s["partition"] == name) for name in ("showcase", "development", "test")},
-        "families_core": list(CORE_TRUE_MATCH + CORE_HARD_NEGATIVE), "heldout_families": heldout,
+        "components": len(splits),
+        "largest_component": max(len(s["members"]) for s in splits.values()),
+        "partitions": {
+            name: sum(1 for s in splits.values() if s["partition"] == name)
+            for name in ("showcase", "development", "test")
+        },
+        "families_core": list(CORE_TRUE_MATCH + CORE_HARD_NEGATIVE),
+        "heldout_families": heldout,
         "heldout_note": "drawn from the P1 rows by seed; their generators land by 19:00, so they are held out from training by name",
         "family_counts": dict(sorted(Counter(rec.family for rec in records).items())),
         "family_floor": FAMILY_FLOOR,
-        "family_applicable_entities": {f: sum(1 for e in entities.values() if EDITS[f](e.identity, rng_for(seed, "probe", f)) is not None)
-                                       for f in CORE_TRUE_MATCH},
+        "family_applicable_entities": {
+            f: sum(1 for e in entities.values() if EDITS[f](e.identity, rng_for(seed, "probe", f)) is not None)
+            for f in CORE_TRUE_MATCH
+        },
     }
     return CorpusOutput(records, pairs, truth_rows, splits, grafts, heldout, run)
 
@@ -646,15 +841,28 @@ def write_outputs(corpus: CorpusOutput, out_dir: Path) -> CorpusOutput:
         writer.writerows(corpus.truth_rows)
     pairs = out_dir / "pairs.csv"
     with pairs.open("w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=["pair_id", "record_a_id", "record_b_id", "label", "family", "partition"])
+        writer = csv.DictWriter(
+            fh, fieldnames=["pair_id", "record_a_id", "record_b_id", "label", "family", "partition"]
+        )
         writer.writeheader()
         writer.writerows(corpus.pairs)
     labels = out_dir / "labels.jsonl"
     with labels.open("w", encoding="utf-8") as fh:
         for rec in corpus.records:
             for edit in rec.edits:
-                fh.write(json.dumps({"record_id": str(rec.draft.id), "family": edit.family, "field": edit.field,
-                                     "before": edit.before, "after": edit.after}, ensure_ascii=False) + "\n")
+                fh.write(
+                    json.dumps(
+                        {
+                            "record_id": str(rec.draft.id),
+                            "family": edit.family,
+                            "field": edit.field,
+                            "before": edit.before,
+                            "after": edit.after,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
     splits = out_dir / "splits.json"
     splits.write_text(json.dumps(corpus.splits, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     run = out_dir / "run.json"

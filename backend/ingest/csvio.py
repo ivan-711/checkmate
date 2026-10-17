@@ -4,6 +4,7 @@ The Nov 2021 sample's headers are UPPERCASE (``FIRST``, ``LAST``, ``BIRTHDATE``,
 Title case the data plan assumed, so lookups here are case-insensitive. The same reader accepts
 the clinic rows the corruptor renders (same columns, optional ``PHONE``, DOB as MM/DD/YYYY).
 """
+
 from __future__ import annotations
 
 import csv

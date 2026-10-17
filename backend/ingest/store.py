@@ -4,6 +4,7 @@ Idempotent: a draft whose (source_system, source_local_id) already exists with t
 hash is skipped; the same local id with a different payload is an error, because raw payloads
 are immutable. Postgres is the source of truth; nothing here caches.
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -41,8 +42,18 @@ RETURNING id
 SELECT_EXISTING_HASH = "SELECT payload_sha256 FROM source_record WHERE source_system = %s AND source_local_id = %s"
 # The normalized_record columns, in one place: the statement and the values are both built from it.
 NORMALIZED_COLUMNS = (
-    "given_name", "family_name", "given_name_folded", "family_name_folded", "birth_date",
-    "birth_year", "birth_month", "birth_day", "sex", "phone_e164", "address_line", "zip5",
+    "given_name",
+    "family_name",
+    "given_name_folded",
+    "family_name_folded",
+    "birth_date",
+    "birth_year",
+    "birth_month",
+    "birth_day",
+    "sex",
+    "phone_e164",
+    "address_line",
+    "zip5",
 )
 INSERT_NORMALIZED = (
     f"INSERT INTO normalized_record (record_id, {', '.join(NORMALIZED_COLUMNS)}) "
@@ -54,12 +65,24 @@ INSERT_BLOCK_KEY = "INSERT INTO block_key (key_type, key_value, record_id) VALUE
 def _write_one(cur: psycopg.Cursor, draft: SourceRecordDraft, result: IngestResult) -> None:
     result.records_seen += 1
     sha = draft.sha256
-    cur.execute(INSERT_SOURCE, (draft.id, draft.source_system, draft.source_local_id, draft.kind.value,
-                                Jsonb(draft.raw_payload), sha, draft.is_constructed))
+    cur.execute(
+        INSERT_SOURCE,
+        (
+            draft.id,
+            draft.source_system,
+            draft.source_local_id,
+            draft.kind.value,
+            Jsonb(draft.raw_payload),
+            sha,
+            draft.is_constructed,
+        ),
+    )
     if cur.fetchone() is None:
         existing = cur.execute(SELECT_EXISTING_HASH, (draft.source_system, draft.source_local_id)).fetchone()
         if existing is None or existing[0] != sha:
-            raise ImmutablePayloadConflict(f"{draft.source_system}:{draft.source_local_id} already exists with a different payload")
+            raise ImmutablePayloadConflict(
+                f"{draft.source_system}:{draft.source_local_id} already exists with a different payload"
+            )
         result.records_skipped += 1
         return
     # core's normalized_record row; the keys come from that row exactly as the gate re-reads it
