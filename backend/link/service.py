@@ -20,10 +20,12 @@ from backend.golden.service import load_members, read_alerts, read_entity
 from backend.link.events import EventContext, write_event
 from backend.link.union_find import components
 from backend.rule.bl_amox_01 import RuleFlag, alert_key, evaluate, to_safety_alert
+from backend.rule.resources import parse_member
 from backend.rule.terminology import load_terminology
 from contracts.models.alerts import AlertStatus, SafetyAlert
 from contracts.models.common import ActorType, DecisionStatus, EventType, Mode, ReasonCode
 from contracts.models.entities import Entity
+from contracts.models.pairs import MergePreview
 from contracts.version import RULE_ID, RULE_VERSION
 
 # One fixed key for the whole link graph: every rebuild of the union-find serializes on it
@@ -347,3 +349,43 @@ def apply_split(conn: Connection, entity_id: UUID, source_record_ids: list[UUID]
             conn.execute(_INSERT_NOT_A_MATCH, {"a": a, "b": b, "decision_id": decision_id, "actor": actor})
         revoked.append(decision_id)
     return _regroup(conn, ctx, entity_id, pair_id=None, decision_id=None, revoked=revoked, linked_edges=remaining)
+
+
+# W3a seam additions (ported from W3a's stand-in; same signatures the pair and review routes call) --
+
+_PAIR_RECORDS = text("SELECT record_a_id, record_b_id FROM candidate_pair WHERE id = :pair_id")
+_RECORDS_BY_ID = text(
+    "SELECT id, source_system, source_local_id, kind, raw_payload, is_constructed, ingested_at "
+    "FROM source_record WHERE id = ANY(:ids) ORDER BY ingested_at, id"
+)
+
+
+def _pair_records(conn: Connection, pair_id: UUID) -> tuple[UUID, UUID]:
+    row = conn.execute(_PAIR_RECORDS, {"pair_id": pair_id}).mappings().one()
+    return row["record_a_id"], row["record_b_id"]
+
+
+def preview_approve(conn: Connection, pair_id: UUID) -> MergePreview:
+    """The entity an approve of this pair would produce and whether BL-AMOX-01 would fire over it.
+    Read-only: the would-be component is the current LINKED graph plus this pair's edge."""
+    a, b = _pair_records(conn, pair_id)
+    edges = [(x, y) for x, y, _ in _linked_edges(conn)] + [(a, b)]
+    component = set(components(edges, [a, b])[a])
+    membership = _membership(conn, component)
+    entity_id: UUID | None = None
+    if membership:  # the entity holding the earliest-ingested member keeps its id (ADR-002)
+        rank = {rid: i for i, rid in enumerate(_ingest_order(conn, component))}
+        entity_id = min(set(membership.values()), key=lambda e: min(rank[r] for r, ent in membership.items() if ent == e))
+    rows = conn.execute(_RECORDS_BY_ID, {"ids": list(component)}).mappings().all()
+    members = [parse_member(source_record_id=r["id"], source_system=r["source_system"], source_local_id=r["source_local_id"],
+                            kind=r["kind"], is_constructed=r["is_constructed"], ingested_at=r["ingested_at"],
+                            raw_payload=r["raw_payload"]) for r in rows]
+    return MergePreview(entity_id_if_approved=entity_id, member_count_if_approved=len(component),
+                        alert_would_fire=bool(evaluate(members)))
+
+
+def entity_for_pair(conn: Connection, pair_id: UUID) -> Entity | None:
+    """The entity a LINKED pair belongs to (entity_member lookup); None while its records are unlinked."""
+    a, _ = _pair_records(conn, pair_id)
+    membership = _membership(conn, {a})
+    return read_entity(conn, membership[a]) if membership else None

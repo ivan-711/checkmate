@@ -23,10 +23,11 @@ dev = [
 [tool.uv]
 package = true
 
-[tool.setuptools]
-packages = ["contracts", "contracts.models", "contracts.migrations", "backend", "backend.app", "backend.link", "backend.golden", "backend.rule"]
+[tool.setuptools.packages.find]
+include = ["contracts*", "backend*", "eval*", "data*"]
 
 [tool.setuptools.package-data]
+"backend.core" = ["weights/*.json"]
 "backend.rule" = ["cache/*.json", "cache/labels/*.json"]
 
 [build-system]
