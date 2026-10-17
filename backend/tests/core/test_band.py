@@ -111,3 +111,19 @@ def test_handset_demo_claims_hold():
         sibling = match(BASE, {**BASE, "given_name": given, "dob": dob}, HANDSET_WEIGHTS, DEMO_THRESHOLDS)
         # The weights alone keep a sibling out of AUTO_LINK; the rules are not what saves it.
         assert sibling.band_before_rules is not Band.AUTO_LINK
+
+
+def test_match_features_are_the_weighted_values_and_reproduce_the_raw_score():
+    from backend.core.band import features_of
+
+    willie = {**BASE, "given_name": "Willie"}
+    will = {**willie, "given_name": "Will"}
+    result = match(willie, will, HANDSET_WEIGHTS, DEMO_THRESHOLDS)
+    assert 0.0 < result.features["given_nickname"] < 1.0  # capped
+    assert features_of(willie, will).values["given_nickname"] == 1.0  # the raw feature, for ablations
+    rebuilt = (
+        HANDSET_WEIGHTS.intercept
+        + sum(HANDSET_WEIGHTS.weights[k] * (v or 0.0) for k, v in result.features.items())
+        + sum(HANDSET_WEIGHTS.weights[f"missing_{g}"] for g, flag in result.missing.items() if flag)
+    )
+    assert rebuilt == pytest.approx(result.raw_score, abs=1e-9)

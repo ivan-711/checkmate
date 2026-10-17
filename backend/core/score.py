@@ -90,6 +90,9 @@ class ScoreResult:
     p: float  # display-only
     contributions: tuple[Contribution, ...]
     scorer_version: str
+    # The values that were weighted: the features with given_nickname capped. These, not the raw
+    # features, go into the evidence snapshot, so features x weights reproduces the raw score.
+    weighted_features: dict[str, float | None] = field(default_factory=dict)
     is_calibrated: bool = False
     p_is_display_only: bool = True
 
@@ -153,6 +156,7 @@ def score_pair(fv: FeatureVector, weights: Weights) -> ScoreResult:
         p=display_probability(raw, weights),
         contributions=tuple(contributions),
         scorer_version=weights.scorer_version,
+        weighted_features={c.feature: c.value for c in contributions if c.feature in FEATURE_NAMES},
     )
 
 

@@ -6,6 +6,7 @@ lane/w2 at c5a09e3; each names the finding it reproduces.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import random
 import subprocess
@@ -48,6 +49,7 @@ from backend.core.train import (
     fit_weights,
     load_records_csv,
     load_truth_csv,
+    main,
 )
 from contracts.models.common import Band, NegativeRule
 from contracts.models.records import NormalizedRecord
@@ -754,3 +756,149 @@ def test_core_package_imports_nothing_from_the_seam_api_or_frontdesk():
         and any(m in line for m in ("backend.match", "backend.api", "backend.frontdesk", "backend.app"))
     ]
     assert offenders == []
+
+
+# --- third pass: lane/w2 at 40b5a7a (W1's truth table is on main) -----------------------------
+
+
+def _w1_shaped_truth(tmp_path, n_persons: int = 400):
+    """records.csv plus a truth.csv in W1's column layout (backend/ingest/corruptor.py on main):
+    ``fold`` (not ``cv_fold``) from int(sha256(component).hexdigest(), 16) % 5 for development
+    components, empty for test and showcase."""
+    import csv
+
+    records, truth = _realistic_corpus(11, n_persons=n_persons)
+    comps = sorted({t.component_id for t in truth.values()})
+    partition = {c: ("showcase" if i < 20 else "test" if i % 10 < 3 else "development") for i, c in enumerate(comps)}
+
+    def w1_fold(c):
+        return int(hashlib.sha256(c.encode()).hexdigest(), 16) % 5
+
+    truth_rows = [
+        {
+            "entity_id": t.entity_id,
+            "record_id": rid,
+            "component_id": t.component_id,
+            "partition": partition[t.component_id],
+            "fold": w1_fold(t.component_id) if partition[t.component_id] == "development" else "",
+        }
+        for rid, t in truth.items()
+    ]
+    record_rows = [{**rec.to_row_dict(), "record_id": rid} for rid, rec in records.items()]
+    rp, tp = tmp_path / "records.csv", tmp_path / "truth.csv"
+    for path, rows in ((rp, record_rows), (tp, truth_rows)):
+        with path.open("w", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=list(rows[0]))
+            writer.writeheader()
+            writer.writerows(rows)
+    dev_components = {c for c, p in partition.items() if p == "development"}
+    return rp, tp, truth_rows, dev_components
+
+
+def test_train_uses_the_fold_column_w1_writes(tmp_path):
+    """R2 third pass: W1's truth.csv names the splits fold ``fold``; ``load_truth_csv`` reads only
+    ``cv_fold``, so every row falls back to train.py's own hash (first 8 digest bytes, not W1's
+    whole digest) and about 4 in 5 development components land in a fold other than splits.json's
+    (evaluation plan section 3, step 2: one assignment, committed before generation)."""
+    from backend.core.train import fold_of
+
+    _, tp, truth_rows, _ = _w1_shaped_truth(tmp_path)
+    loaded = load_truth_csv(tp, partition="development")
+    wrong = [r["record_id"] for r in truth_rows if r["fold"] != "" and fold_of(loaded[r["record_id"]], 5) != r["fold"]]
+    assert wrong == [], f"{len(wrong)} development rows trained in a fold other than W1's"
+
+
+def test_train_cli_never_fits_on_test_or_showcase_rows(tmp_path):
+    """R2 third pass: without ``--partition`` the CLI loads every truth row, so test and showcase
+    components train the scorer and feed the out-of-fold scores thresholds are chosen on
+    (evaluation plan section 3, step 5: the build fails on such leakage). Either refuse or keep
+    development only."""
+    rp, tp, _, dev_components = _w1_shaped_truth(tmp_path)
+    out_dir = tmp_path / "w"
+    try:
+        main(["--records", str(rp), "--truth", str(tp), "--version", "r2-partition", "--out-dir", str(out_dir)])
+    except (SystemExit, ValueError):
+        return  # refusing is acceptable
+    trained = load_weights(out_dir / "r2-partition.json")
+    assert trained.trained_on["n_components"] == len(dev_components)
+
+
+def test_snapshot_features_times_weights_reproduce_the_raw_score():
+    """R2 third pass (should-fix): the nickname cap is applied in ``score_pair`` only, so the
+    snapshot's ``features["given_nickname"]`` stays 1.0 while its contribution carries the capped
+    value. Anyone re-deriving the score from the frozen features and weights gets 6.17 for
+    Willie/Will where the decision used 5.5."""
+    for given_b in ("Will", "Bob", "Willie"):
+        a, b = {**ROBERT, "given_name": "Willie"}, {**ROBERT, "given_name": given_b}
+        snap = CORE.match(_contract(a), _contract(b), SeamThresholdsRow("provisional-1", 0.0, 4.0)).evidence
+        recomputed = (
+            snap.intercept
+            + sum(snap.weights[name] * (value or 0.0) for name, value in snap.features.items())
+            + sum(snap.weights[f"missing_{g}"] for g, flag in snap.missing_flags.items() if flag)
+        )
+        assert recomputed == pytest.approx(snap.raw_score, abs=1e-9), given_b
+
+
+@pytest.mark.parametrize(
+    "edit_a,edit_b",
+    [
+        ({}, {"given_name": "Bob"}),
+        ({}, {"given_name": "Rob"}),
+        ({"given_name": "Francisco"}, {"given_name": "Paco"}),
+        ({}, {"given_name": "Bob", "phone": None, "address": None}),
+        ({}, {"given_name": "Rob", "phone": None, "address": None}),
+        ({"given_name": "Francisco"}, {"given_name": "Paco", "phone": None, "address": None}),
+        ({}, {"given_name": None}),
+    ],
+)
+def test_gate_cases_stay_review_or_higher_under_the_provisional_1_row(edit_a, edit_b):
+    """The current row on main (migration 0002: provisional-1, c_low 0.0, c_high 4.0, no Platt map)."""
+    row = SeamThresholdsRow("provisional-1", 0.0, 4.0)
+    result = CORE.match(_contract({**ROBERT, **edit_a}), _contract({**ROBERT, **edit_b}), row)
+    assert result.band is not Band.KEEP_SEPARATE, (result.logit, result.band)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="cross-lane: W1 writes block_key rows with backend.ingest.blocking's vocabulary; for the lead",
+)
+def test_ingest_block_keys_and_core_block_keys_share_a_vocabulary():
+    """W1's ingest writes ``block_key`` rows from ``backend.ingest.blocking`` (``dob_exact``,
+    ``metaphone_surname_birth_year`` ``KRS:1990``, ``zip5_initial`` ``02139:m``); W3a's seam keys
+    intakes and scenario cards with ``CORE.block_keys`` (``DOB_EXACT``, ``DMETA_FAMILY_BIRTH_YEAR``
+    ``KRS|1990``, ``ZIP5_FIRST_INITIAL`` ``02139|m``). Both land in one table keyed by
+    (key_type, key_value), so an intake never shares a block with an ingested record: the gate's
+    lookup misses it (fail open toward a new chart) and match runs never pair the two."""
+    from backend.ingest.blocking import block_keys as ingest_block_keys
+    from backend.ingest.normalize import Identity, normalize_identity
+
+    ingest = set(
+        ingest_block_keys(
+            normalize_identity(
+                Identity(
+                    given="María",
+                    family="García López",
+                    birth_date="1990-03-07",
+                    sex="female",
+                    phone="617-555-2368",
+                    postal_code="02139",
+                )
+            )
+        )
+    )
+    core = {
+        (k.key_type, k.key_value)
+        for k in CORE.block_keys(
+            _contract(
+                {
+                    "given_name": "María",
+                    "family_name": "García López",
+                    "dob": "1990-03-07",
+                    "sex": "F",
+                    "phone": "617-555-2368",
+                    "zip": "02139",
+                }
+            )
+        )
+    }
+    assert ingest <= core

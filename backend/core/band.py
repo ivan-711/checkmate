@@ -147,7 +147,7 @@ def match(record_a_norm: Any, record_b_norm: Any, weights: Weights, thresholds: 
         band=apply_negative_rules(before, fired),
         contributions=scored.contributions,
         negative_rules_fired=tuple(fired),
-        features=dict(fv.values),
+        features=dict(scored.weighted_features),  # capped nickname: what the decision weighted
         missing=dict(fv.missing),
         band_before_rules=before,
         scorer_version=weights.scorer_version,
