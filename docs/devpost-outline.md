@@ -1,6 +1,6 @@
 # Devpost outline
 
-Author: Gojo (docs) · 2026-10-17
+Author: Christian Flores (docs) · 2026-10-17
 
 The seven headings of the Devpost project story. Every number is a `{placeholder}` filled from a frozen run manifest or harness output, never typed by hand. A sentence whose number has no source stays out.
 

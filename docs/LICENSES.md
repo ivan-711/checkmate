@@ -1,6 +1,6 @@
 # License inventory
 
-Author: Gojo (docs) · 2026-10-17
+Author: Christian Flores (docs) · 2026-10-17
 
 Every third-party package in the repository's lock files, plus the container images and build tools installed outside them. For lock-file packages, the license is the SPDX expression (or, where a package publishes none, the license field and classifiers) in the PyPI metadata for the exact pinned version. The tables are maintained by hand: update them in the same pull request that changes a lock file, an image or a build step.
 
