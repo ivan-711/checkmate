@@ -57,6 +57,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "metaphone" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
     { name = "python-dotenv" },
@@ -75,6 +76,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "metaphone", specifier = "==0.6" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic", specifier = ">=2.9,<3" },
     { name = "python-dotenv", specifier = ">=1.0,<2" },
@@ -227,6 +229,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/19/74/a633ee74eb36c44aa
 wheels = [
     { url = "https://files.pythonhosted.org/packages/41/45/1a4ed80516f02155c51f51e8cedb3c1902296743db0bbc66608a0db2814f/jsonschema_specifications-2025.9.1-py3-none-any.whl", hash = "sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe", size = 18437, upload-time = "2025-09-08T01:34:57.871Z" },
 ]
+
+[[package]]
+name = "metaphone"
+version = "0.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d4/ae/c9e4d007e32a6469be212da11d0b8e104d643f6f247d771742caf6ac6bb8/Metaphone-0.6.tar.gz", hash = "sha256:ad0beadca66cb7ec6ede71ef72bb02da097c493ddf159930d6340bc83f53da27", size = 14075, upload-time = "2016-08-24T14:37:29.687Z" }
 
 [[package]]
 name = "opentelemetry-api"
