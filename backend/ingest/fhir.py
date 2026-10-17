@@ -116,6 +116,8 @@ def parse_bundle(bundle: dict) -> FhirPatientBundle:
     if len(by_type["Patient"]) != 1:
         raise ValueError(f"expected exactly one Patient in the bundle, found {len(by_type['Patient'])}")
     patient = by_type["Patient"][0]
+    if not patient.get("id"):
+        raise ValueError("Patient has no id")
     # Some orders use medicationReference instead of an inline code; keep the referenced resource.
     referenced = [
         medications_by_url[ref]

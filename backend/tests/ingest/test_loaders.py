@@ -136,3 +136,19 @@ def test_csv_variants_share_no_encounter_id_and_mixed_case_headers_cannot_leak(b
     assert row["LAST"] == "Nunes" and "Last" not in row and "Phone" not in row and "PHONE" not in row
     assert draft.identity.family == "Nunes" and draft.identity.phone is None
     assert "Núñez" not in json.dumps(draft.raw_payload, ensure_ascii=False)
+
+
+def test_load_sample_counts_skipped_bundles_and_keeps_the_good_ones(tmp_path):
+    from backend.ingest.cli import load_sample
+
+    fhir, csv_dir = tmp_path / "fhir", tmp_path / "csv"
+    fhir.mkdir(), csv_dir.mkdir()
+    for name in ("patients", "allergies", "medications", "encounters"):
+        (csv_dir / f"{name}.csv").write_text((FIXTURES / "csv" / f"{name}.csv").read_text())
+    (fhir / "a.json").write_text((FIXTURES / "bundle_a.json").read_text())
+    (fhir / "bad_json.json").write_text("{not json")
+    (fhir / "no_id.json").write_text(json.dumps({"entry": [{"resource": {"resourceType": "Patient"}}]}))
+    skipped: list[str] = []
+    bundles, csv_patients = load_sample(tmp_path, skipped=skipped)
+    assert set(bundles) == {PATIENT_A} and set(csv_patients) == {PATIENT_A}
+    assert sorted(skipped) == ["bad_json.json", "no_id.json"]

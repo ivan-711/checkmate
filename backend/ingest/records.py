@@ -38,7 +38,10 @@ FHIR_CLINICAL_LISTS = ("allergyIntolerances", "medicationRequests", "encounters"
 # Keys whose value is a reference-with-display to the patient (the only place the name echoes).
 PATIENT_REFERENCE_KEYS = ("subject", "patient")
 # Columns that are never part of a clinic export (identity documents and geocoding).
-CLINIC_DROPPED_COLUMNS = ("SSN", "DRIVERS", "PASSPORT", "LAT", "LON", "HEALTHCARE_EXPENSES", "HEALTHCARE_COVERAGE", "INCOME")
+# Columns that are never part of a clinic export: identity documents, geocoding, money, and the
+# location columns (COUNTY, FIPS, BIRTHPLACE) that would survive an address edit or removal.
+CLINIC_DROPPED_COLUMNS = ("SSN", "DRIVERS", "PASSPORT", "LAT", "LON", "COUNTY", "FIPS", "BIRTHPLACE",
+                          "HEALTHCARE_EXPENSES", "HEALTHCARE_COVERAGE", "INCOME")
 CSV_CLINICAL_LISTS = ("allergies", "medications", "encounters")
 CSV_ENCOUNTER_ID_COLUMNS = ("ID", "ENCOUNTER")
 CSV_SEX_CODES = {"male": "M", "female": "F"}

@@ -26,7 +26,7 @@ from datetime import date
 from pathlib import Path
 from uuid import UUID, uuid5
 
-from backend.ingest.blocking import swapped_day_month
+from backend.ingest.blocking import SURNAME_PARTICLES, swapped_day_month
 from backend.ingest.csvio import CsvPatient
 from backend.ingest.fhir import FhirPatientBundle
 from backend.ingest.normalize import Identity, parse_date, strip_accents
@@ -55,6 +55,7 @@ C1_POOL = ("T1", "T3", "D1", "D3", "L1", "L3", "L7")
 C1_EDIT_COUNT_WEIGHTS = ((2, 0.7), (3, 0.3))
 MAX_FAMILY_DRAWS = 6  # resample a no-op family this many times before emitting an exact copy
 FRAGMENT_COUNTS = ((1, 0.15), (2, 0.65), (3, 0.20))  # records per entity: singletons allowed
+FAMILY_FLOOR = 10  # every P0 true-match family gets at least this many records when enough entities qualify
 P_FHIR_BASE_CORRUPTED = 0.3
 P_OTHER_RECORD_CORRUPTED = 0.9
 P_CLINIC_HAS_PHONE = 0.6
@@ -127,6 +128,9 @@ class GeneratedRecord:
     synthea_id: str
     family: str
     edits: list[Edit]
+    index: int = 0
+    include_phone: bool = True
+    share: object = None  # the FhirPatientBundle or CsvPatient subset this fragment carries
 
 
 @dataclass
@@ -273,9 +277,11 @@ def edit_s1(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | N
 
 def edit_s3(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | None:
     tokens = (identity.family or "").split()
-    if len(tokens) < 2:
+    # the paternal surname is the leading particles plus the first real token ("de la Cruz" of "de la Cruz López")
+    end = next((i + 1 for i, t in enumerate(tokens) if t.lower() not in SURNAME_PARTICLES), len(tokens))
+    if end >= len(tokens):
         return None
-    after = tokens[0]
+    after = " ".join(tokens[:end])
     return replace(identity, family=after), Edit("S3", "family", identity.family, after)
 
 
@@ -437,6 +443,52 @@ def _local_id(fingerprint: str, synthea_id: str, index: int, source: str) -> str
     return f"{prefix}-{hashlib.sha256(f'{fingerprint}:{synthea_id}:{index}'.encode()).hexdigest()[:10].upper()}"
 
 
+def _reference_id(ref: dict | None) -> str | None:
+    reference = (ref or {}).get("reference") or ""
+    return reference.removeprefix("urn:uuid:") or None
+
+
+def partition_fhir(bundle: FhirPatientBundle, owners: list[int], rng: random.Random) -> dict[int, FhirPatientBundle]:
+    """Each encounter goes to one ER fragment; orders follow their encounter, referenced Medications
+    follow their order, allergies (no encounter in FHIR) are dealt out. One fragment gets everything."""
+    owner_of_encounter = {enc["id"]: rng.choice(owners) for enc in bundle.encounters}
+    shares = {o: {"allergies": [], "medication_requests": [], "encounters": [], "medications": []} for o in owners}
+    for enc in bundle.encounters:
+        shares[owner_of_encounter[enc["id"]]]["encounters"].append(enc)
+    medication_by_url = {f"urn:uuid:{m['id']}": m for m in bundle.medications}
+    for order in bundle.medication_requests:
+        owner = owner_of_encounter.get(_reference_id(order.get("encounter")), rng.choice(owners))
+        shares[owner]["medication_requests"].append(order)
+        medication = medication_by_url.get((order.get("medicationReference") or {}).get("reference"))
+        if medication is not None:
+            shares[owner]["medications"].append(medication)
+    for allergy in bundle.allergies:
+        shares[rng.choice(owners)]["allergies"].append(allergy)
+    return {o: replace(bundle, **share) for o, share in shares.items()}
+
+
+def partition_csv(patient: CsvPatient, owners: list[int], rng: random.Random) -> dict[int, CsvPatient]:
+    """Encounter rows are dealt out; allergy and medication rows follow their ENCOUNTER column."""
+    def column(row: dict, name: str) -> str | None:
+        return next((v for k, v in row.items() if k and k.upper() == name), None)
+
+    owner_of_encounter = {column(row, "ID"): rng.choice(owners) for row in patient.encounters}
+    shares = {o: {"allergies": [], "medications": [], "encounters": []} for o in owners}
+    for row in patient.encounters:
+        shares[owner_of_encounter[column(row, "ID")]]["encounters"].append(row)
+    for key in ("allergies", "medications"):
+        for row in getattr(patient, key):
+            shares[owner_of_encounter.get(column(row, "ENCOUNTER"), rng.choice(owners))][key].append(row)
+    return {o: replace(patient, **share) for o, share in shares.items()}
+
+
+def render_record(entity: Entity, identity: Identity, index: int, source: str, include_phone: bool, share, fingerprint: str) -> SourceRecordDraft:
+    local_id = _local_id(fingerprint, entity.synthea_id, index, source)
+    if source == SOURCE_ER_FHIR:
+        return fhir_draft(identity, share, local_id)
+    return csv_draft(identity, share, local_id, include_phone=include_phone)
+
+
 def generate_entity(seed: int, fingerprint: str, entity: Entity) -> list[GeneratedRecord]:
     rng = rng_for(seed, entity.synthea_id)
     spanish = is_spanish(entity.bundle.identity)
@@ -447,18 +499,46 @@ def generate_entity(seed: int, fingerprint: str, entity: Entity) -> list[Generat
     if n_rec >= 3:
         systems.append(rng.choice((SOURCE_ER_FHIR, SOURCE_CLINIC_CSV)) if entity.csv is not None else SOURCE_ER_FHIR)
 
+    # Coded clinical payload is partitioned across a person's fragments, never copied into each one.
+    er_owners = [i for i, s in enumerate(systems) if s == SOURCE_ER_FHIR]
+    cl_owners = [i for i, s in enumerate(systems) if s == SOURCE_CLINIC_CSV]
+    shares: dict[int, object] = dict(partition_fhir(entity.bundle, er_owners, rng))
+    if cl_owners:
+        shares.update(partition_csv(entity.csv, cl_owners, rng))
+
     records: list[GeneratedRecord] = []
     for index, source in enumerate(systems):
         p_corrupt = P_FHIR_BASE_CORRUPTED if index == 0 else P_OTHER_RECORD_CORRUPTED
         identity, family, edits = (corrupt(entity.identity, rng, spanish) if rng.random() < p_corrupt
                                    else (entity.identity, NO_EDIT, []))
-        local_id = _local_id(fingerprint, entity.synthea_id, index, source)
-        if source == SOURCE_ER_FHIR:
-            draft = fhir_draft(identity, entity.bundle, local_id)
-        else:
-            draft = csv_draft(identity, entity.csv, local_id, include_phone=rng.random() < P_CLINIC_HAS_PHONE)
-        records.append(GeneratedRecord(draft, entity_id_for(entity.synthea_id), entity.synthea_id, family, edits))
+        include_phone = rng.random() < P_CLINIC_HAS_PHONE
+        draft = render_record(entity, identity, index, source, include_phone, shares[index], fingerprint)
+        records.append(GeneratedRecord(draft, entity_id_for(entity.synthea_id), entity.synthea_id, family, edits,
+                                       index, include_phone, shares[index]))
     return records
+
+
+def enforce_family_floor(seed: int, fingerprint: str, entities: dict[str, Entity], records: list[GeneratedRecord]) -> None:
+    """Weighted draws starve rare families (T3 needs a table name, S1 an accent, S6 a María). Walk the
+    records in a fixed order and re-corrupt uncorrupted or over-represented ones with each family
+    below FAMILY_FLOOR, as far as entities exist that the edit applies to. Deterministic by seed."""
+    counts = Counter(rec.family for rec in records)
+    for family in CORE_TRUE_MATCH:
+        for position, rec in enumerate(records):
+            if counts[family] >= FAMILY_FLOOR:
+                break
+            donor_ok = rec.family == NO_EDIT or counts[rec.family] > FAMILY_FLOOR + 1
+            if not donor_ok or rec.family == family:
+                continue
+            entity = entities[rec.synthea_id]
+            outcome = EDITS[family](entity.identity, rng_for(seed, "floor", family, rec.synthea_id, str(rec.index)))
+            if outcome is None:
+                continue
+            identity, edit = outcome
+            counts[rec.family] -= 1
+            counts[family] += 1
+            rec.draft = render_record(entity, identity, rec.index, rec.draft.source_system, rec.include_phone, rec.share, fingerprint)
+            rec.family, rec.edits = family, [edit]
 
 
 def build_entities(bundles: dict[str, FhirPatientBundle], csv_patients: dict[str, CsvPatient]) -> dict[str, Entity]:
@@ -488,6 +568,7 @@ def build_corpus(seed: int, bundles: dict[str, FhirPatientBundle], csv_patients:
     records: list[GeneratedRecord] = []
     for pid in ids:
         records.extend(generate_entity(seed, fingerprint, entities[pid]))
+    enforce_family_floor(seed, fingerprint, entities, records)
 
     by_entity: dict[str, list[GeneratedRecord]] = {}
     for rec in records:
@@ -528,6 +609,9 @@ def build_corpus(seed: int, bundles: dict[str, FhirPatientBundle], csv_patients:
         "families_core": list(CORE_TRUE_MATCH + CORE_HARD_NEGATIVE), "heldout_families": heldout,
         "heldout_note": "drawn from the P1 rows by seed; their generators land by 19:00, so they are held out from training by name",
         "family_counts": dict(sorted(Counter(rec.family for rec in records).items())),
+        "family_floor": FAMILY_FLOOR,
+        "family_applicable_entities": {f: sum(1 for e in entities.values() if EDITS[f](e.identity, rng_for(seed, "probe", f)) is not None)
+                                       for f in CORE_TRUE_MATCH},
     }
     return CorpusOutput(records, pairs, truth_rows, splits, grafts, heldout, run)
 

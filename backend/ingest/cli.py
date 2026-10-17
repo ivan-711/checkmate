@@ -26,7 +26,13 @@ DEFAULT_OUT_DIR = Path("eval/runs")
 DEFAULT_DATABASE_URL = "postgresql://checkmate:checkmate@127.0.0.1:5432/checkmate"
 
 
-def load_sample(raw_dir: Path, limit: int | None = None):
+class DuplicatePatientId(RuntimeError):
+    """Two bundles claim one Synthea person id: the sample is corrupt, so stop rather than keep either."""
+
+
+def load_sample(raw_dir: Path, limit: int | None = None, skipped: list[str] | None = None):
+    """Parse the bundles and the CSV cohort. A malformed bundle (bad JSON, no Patient, Patient
+    without id) is skipped and its file name appended to ``skipped``; a duplicate id raises."""
     fhir_dir, csv_dir = raw_dir / "fhir", raw_dir / "csv"
     paths = iter_bundle_paths(fhir_dir)
     if not paths or not (csv_dir / "patients.csv").exists():
@@ -35,7 +41,15 @@ def load_sample(raw_dir: Path, limit: int | None = None):
         paths = paths[:limit]
     bundles = {}
     for path in paths:
-        bundle = load_bundle(path)
+        try:
+            bundle = load_bundle(path)
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:  # JSONDecodeError is a ValueError
+            print(f"warning: skipped {path.name}: {exc}", file=sys.stderr)
+            if skipped is not None:
+                skipped.append(path.name)
+            continue
+        if bundle.patient_id in bundles:
+            raise DuplicatePatientId(f"duplicate patient id {bundle.patient_id} in {path.name}")
         bundles[bundle.patient_id] = bundle
     csv_patients = read_csv_dir(csv_dir, patient_ids=set(bundles))
     return bundles, csv_patients
@@ -51,7 +65,8 @@ def foreign_records(conn: psycopg.Connection, corpus) -> int:
 
 def cmd_load(args: argparse.Namespace) -> int:
     started = time.monotonic()
-    bundles, csv_patients = load_sample(args.raw, args.limit)
+    skipped: list[str] = []
+    bundles, csv_patients = load_sample(args.raw, args.limit, skipped)
     corpus = build_corpus(args.seed, bundles, csv_patients)
     with psycopg.connect(args.database_url) as conn:
         foreign = foreign_records(conn, corpus)
@@ -61,12 +76,14 @@ def cmd_load(args: argparse.Namespace) -> int:
         result = ingest(conn, (rec.draft for rec in corpus.records))
         counts = pair_candidates_by_key_type(conn)
         total_records = conn.execute("SELECT count(*) FROM source_record").fetchone()[0]
+    print(f"bundles skipped as malformed: {len(skipped)}" + (f" ({', '.join(skipped)})" if skipped else ""))
     print(f"entities: {corpus.run['entities']}")
     print(f"records: generated={corpus.run['records']} inserted={result.records_inserted} skipped={result.records_skipped} in_db={total_records}")
     print(f"pairs: same={corpus.run['pairs_same']} not_same={corpus.run['pairs_not_same']} grafts={corpus.run['grafts']}")
     for key_type in KEY_TYPES:
         print(f"pair candidates [{key_type}]: {counts.get(key_type, 0)}")
     print("reduction: pending W2")
+    print("records per family: " + ", ".join(f"{f}={n}" for f, n in corpus.run["family_counts"].items()))
     print(f"heldout families: {', '.join(corpus.heldout_families)}")
     print(f"truth table sha256: {corpus.sha256['truth']}  ({corpus.files['truth']})")
     print(f"pairs table sha256: {corpus.sha256['pairs']}  ({corpus.files['pairs']})")

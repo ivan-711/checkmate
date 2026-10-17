@@ -155,7 +155,10 @@ def normalize_sex(sex: str | None) -> str | None:
 
 
 def is_placeholder_name(folded: str | None) -> bool:
-    return folded is None or folded in PLACEHOLDER_NAMES
+    """Per token, so 'baby boy' or 'unknown unknown' is a placeholder, while 'ana boy' is a name."""
+    if not folded:
+        return True
+    return folded in PLACEHOLDER_NAMES or all(token in PLACEHOLDER_NAMES for token in folded.split())
 
 
 def is_placeholder_dob(value: date | None) -> bool:

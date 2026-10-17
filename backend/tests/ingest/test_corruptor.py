@@ -188,3 +188,40 @@ def test_clinic_record_without_phone_has_no_phone_anywhere(bundles, csv_patients
     assert "Person seed" not in text and "birthsex" not in text and "us-core-race" not in text
     assert er.raw_payload["patient"]["extension"] == [{"url": "http://hl7.org/fhir/StructureDefinition/patient-mothersMaidenName", "valueString": "Isabela de Anda"}]
     assert er.identity.language == "es" and er.identity.mother_maiden == "Isabela de Anda"
+
+
+def test_clinical_payload_is_partitioned_across_fragments_not_copied(bundles, csv_patients):
+    a = bundles[PATIENT_A]
+    shares = c.partition_fhir(a, [0, 2], random.Random(4))
+    for key in ("encounters", "medication_requests", "allergies", "medications"):
+        owned = [r["id"] for s in shares.values() for r in getattr(s, key)]
+        assert sorted(owned) == sorted(r["id"] for r in getattr(a, key)), key  # every resource exactly once
+    order_owner = next(o for o, s in shares.items() if s.medication_requests)
+    assert shares[order_owner].encounters and shares[order_owner].medications  # the order follows its encounter and medication
+    csv_shares = c.partition_csv(csv_patients[PATIENT_A], [1, 2], random.Random(4))
+    rows = [r for s in csv_shares.values() for r in s.encounters]
+    assert len(rows) == len(csv_patients[PATIENT_A].encounters)
+    owner = next(o for o, s in csv_shares.items() if s.encounters)
+    assert csv_shares[owner].allergies and csv_shares[owner].medications  # rows follow their ENCOUNTER
+    assert c.partition_fhir(a, [0], random.Random(1))[0].encounters == a.encounters  # a single fragment keeps all
+
+
+def test_family_floor_is_met_where_entities_qualify_and_is_deterministic(bundles, csv_patients):
+    cloned_bundles, cloned_csv = _clone_cohort(bundles, csv_patients, 120)
+    corpus = c.build_corpus(3, cloned_bundles, cloned_csv)
+    counts, applicable = corpus.run["family_counts"], corpus.run["family_applicable_entities"]
+    for family in c.CORE_TRUE_MATCH:
+        if applicable[family] == 0:
+            assert counts.get(family, 0) == 0, family  # S6 on a cohort without a María
+        else:
+            assert counts.get(family, 0) >= min(c.FAMILY_FLOOR, applicable[family]), (family, counts)
+    again = c.build_corpus(3, cloned_bundles, cloned_csv)
+    assert again.run["family_counts"] == counts
+    assert [str(r.draft.id) for r in again.records] == [str(r.draft.id) for r in corpus.records]
+    assert all(r.draft.identity.family != c.NO_EDIT for r in corpus.records)
+
+
+def test_s3_keeps_particles_and_skips_single_surnames():
+    assert c.edit_s3(Identity(family="de la Cruz López"), rng())[0].family == "de la Cruz"
+    assert c.edit_s3(Identity(family="García de Anda"), rng())[0].family == "García"
+    assert c.edit_s3(Identity(family="de la Cruz"), rng()) is None
