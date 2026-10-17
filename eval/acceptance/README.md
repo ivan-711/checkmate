@@ -1,6 +1,6 @@
 # eval/acceptance/ — the G16 acceptance script
 
-Author: Gojo (evaluation harness, lane W5). Protected: lane agents never edit this directory once
+Author: Christian Flores (evaluation harness, lane W5). Protected: lane agents never edit this directory once
 W5 has written it (CLAUDE.md rule 5); a change is a fork for Ivan.
 
 `g16.spec.ts` is the Playwright script for the G16 demo path. It runs against the running UI on

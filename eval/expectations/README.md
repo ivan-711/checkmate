@@ -1,6 +1,6 @@
 # eval/expectations/ — protected expectations (eval plan section 9)
 
-Author: Gojo (evaluation harness, lane W5).
+Author: Christian Flores (evaluation harness, lane W5).
 
 Lane agents never edit this directory once W5 has written it (CLAUDE.md rule 5). A change here is a
 fork for Ivan: open a GitHub issue labeled `fork`, and the PR that applies it carries the `fork`
