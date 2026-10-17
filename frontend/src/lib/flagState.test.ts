@@ -7,6 +7,7 @@ import { flagState } from "./flagState";
 function caseWith(status: MatchDecision["status"], outcome: CaseData["outcome"]): CaseData {
   const base = scenario.pair;
   return {
+    sources: scenario.session.sources,
     detail: { ...base, pair: { ...base.pair, decision: { ...base.pair.decision, status } } },
     outcome,
     resolved: true,

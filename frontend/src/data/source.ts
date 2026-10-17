@@ -3,6 +3,7 @@ import type {
   EventLogRow,
   ReviewRequest,
   SafetyAlert,
+  SourceCard,
   ReviewResponse,
   SessionResponse,
   TilesResponse,
@@ -13,7 +14,10 @@ import type {
 export type Mode = "REPLAY" | "LOCAL";
 
 export interface CaseData {
-  detail: CandidatePairDetail;
+  /** The session's source cards; shown before Resolve has queued a pair. */
+  sources: SourceCard[];
+  /** null until Resolve identity has queued the hero pair. */
+  detail: CandidatePairDetail | null;
   /** The response that produced the current decision, when this source knows it. */
   outcome: ReviewResponse | null;
   /** False after a reset until Resolve identity has run; the pair panel waits for it. */

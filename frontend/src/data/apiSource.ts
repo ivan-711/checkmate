@@ -48,13 +48,18 @@ export class ApiSource implements DataSource {
   async getCase(): Promise<CaseData> {
     const pairs = await this.listPairs();
     const hero = this.heroPair(pairs);
-    if (!hero) throw new DataError("NOT_FOUND", "No candidate pair is queued. Run Resolve identity.");
+    if (!hero) {
+      // After a reset the queue is empty until Resolve identity runs; the cards still show.
+      if (!this.session) throw new DataError("NOT_FOUND", "No session in this tab yet. Press Reset demo.");
+      return { sources: this.session.sources, detail: null, outcome: null, resolved: false };
+    }
     const detail = await this.client.GET("/api/v1/candidate-pairs/{pair_id}", {
       params: { path: { pair_id: hero.id } },
     });
     if (!detail.data) fail(detail.error);
     const outcome = await this.outcomeFor(detail.data);
-    return { detail: detail.data, outcome, resolved: this.resolved || pairs.length > 0 };
+    const sources = this.session?.sources ?? [detail.data.recordA, detail.data.recordB];
+    return { sources, detail: detail.data, outcome, resolved: true };
   }
 
   async resolve(): Promise<void> {

@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { ReviewResponse } from "@/api/types";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { useDataSource } from "@/data/DataSourceProvider";
-import { differingFields } from "@/lib/display";
+import { differingFields, type CardField } from "@/lib/display";
 import { flagState } from "@/lib/flagState";
 import { EventFeed } from "./EventFeed";
 import { EvidenceRail } from "./EvidenceRail";
@@ -31,7 +31,7 @@ export function CaseScreen() {
   const [justApproved, setJustApproved] = useState(false);
   const caseQuery = useQuery({ queryKey: ["case"], queryFn: () => source.getCase() });
   const entity = caseQuery.data?.outcome?.entity ?? null;
-  const linked = caseQuery.data?.detail.pair.decision.status === "LINKED" && entity !== null;
+  const linked = caseQuery.data?.detail?.pair.decision.status === "LINKED" && entity !== null;
   const timeline = useQuery({
     queryKey: ["timeline", entity?.id],
     queryFn: () => source.getTimeline(entity!.id),
@@ -69,9 +69,10 @@ export function CaseScreen() {
     );
   }
 
-  const { detail, resolved } = caseQuery.data;
-  const cards = [detail.recordA, detail.recordB];
-  const differs = differingFields(detail.recordA.normalized, detail.recordB.normalized);
+  const { sources, detail, resolved } = caseQuery.data;
+  const cards = detail ? [detail.recordA, detail.recordB] : sources;
+  const differs =
+    cards.length === 2 ? differingFields(cards[0].normalized, cards[1].normalized) : new Set<CardField>();
 
   function onDecided(response: ReviewResponse) {
     setJustApproved(response.decision.status === "LINKED");
@@ -98,7 +99,9 @@ export function CaseScreen() {
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <h2 id="sources-heading" className="text-[18px] font-semibold uppercase tracking-wider">
                   Sources{" "}
-                  <span className="font-normal normal-case tracking-normal text-ink-2">2 systems</span>
+                  <span className="font-normal normal-case tracking-normal text-ink-2">
+                    {cards.length} systems
+                  </span>
                 </h2>
                 {resolveButton}
               </div>
@@ -116,7 +119,7 @@ export function CaseScreen() {
           <EventFeed />
         </div>
         <aside className="space-y-4">
-          {resolved || linked ? (
+          {detail && (resolved || linked) ? (
             <div
               data-testid="candidate-pair"
               className="space-y-4 rounded-lg border border-border-subtle bg-surface p-4"

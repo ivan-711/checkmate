@@ -53,7 +53,7 @@ export class FixtureSource implements DataSource {
     const { history, outcome, resolved } = this.current;
     const base = this.fixture.pair;
     const detail = { ...base, pair: { ...base.pair, decision: history[history.length - 1] }, history };
-    return { detail, outcome, resolved };
+    return { sources: this.current.session.sources, detail, outcome, resolved };
   }
 
   /** The fixture is already scored; Resolve only re-queues the pair and logs the run. */

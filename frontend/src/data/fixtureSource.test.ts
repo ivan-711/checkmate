@@ -21,8 +21,8 @@ describe("FixtureSource", () => {
     const s = source();
     const { detail, outcome } = await s.getCase();
     expect(s.mode).toBe("REPLAY");
-    expect(detail.pair.decision.status).toBe("PROPOSED");
-    expect(detail.recordA.displayLabel).toBe("ER FHIR");
+    expect(detail!.pair.decision.status).toBe("PROPOSED");
+    expect(detail!.recordA.displayLabel).toBe("ER FHIR");
     expect(outcome).toBeNull();
   });
 
@@ -50,8 +50,8 @@ describe("FixtureSource", () => {
     const res = await s.review(pairId, approve, "key-2");
     const { detail, outcome } = await s.getCase();
     expect(res.decision.version).toBe(3);
-    expect(detail.pair.decision.status).toBe("LINKED");
-    expect(detail.history?.map((d) => d.status)).toEqual(["PROPOSED", "REJECTED", "LINKED"]);
+    expect(detail!.pair.decision.status).toBe("LINKED");
+    expect(detail!.history?.map((d) => d.status)).toEqual(["PROPOSED", "REJECTED", "LINKED"]);
     expect(outcome?.entity?.id).toBe(scenario.entityIfApproved.id);
   });
 
@@ -60,14 +60,14 @@ describe("FixtureSource", () => {
     const first = await s.review(pairId, approve, "key-a");
     const again = await s.review(pairId, { ...approve, actor: "registrar:Registrar C" }, "key-b");
     expect(again.decision).toEqual(first.decision);
-    expect((await s.getCase()).detail.history).toHaveLength(2);
+    expect((await s.getCase()).detail!.history).toHaveLength(2);
   });
 
   it("refuses to reject a LINKED pair: DECISION_NOT_PENDING", async () => {
     const s = source();
     await s.review(pairId, approve, "key-a");
     await expect(s.review(pairId, reject, "key-b")).rejects.toMatchObject({ code: "DECISION_NOT_PENDING" });
-    expect((await s.getCase()).detail.pair.decision.status).toBe("LINKED");
+    expect((await s.getCase()).detail!.pair.decision.status).toBe("LINKED");
   });
 
   it("a second reject supersedes the first with its own reason", async () => {
@@ -83,7 +83,7 @@ describe("FixtureSource", () => {
     const first = await s.review(pairId, reject, "key-retry");
     const again = await s.review(pairId, reject, "key-retry");
     expect(again).toEqual(first);
-    expect((await s.getCase()).detail.history).toHaveLength(2);
+    expect((await s.getCase()).detail!.history).toHaveLength(2);
   });
 
   it("rejects a reused key with a different body", async () => {
@@ -112,7 +112,7 @@ describe("FixtureSource", () => {
     expect((await s.getCase()).outcome).toBeNull();
     expect(session.previousSessionId).toBeTruthy();
     await s.restore(session.previousSessionId!);
-    expect((await s.getCase()).detail.pair.decision.status).toBe("LINKED");
+    expect((await s.getCase()).detail!.pair.decision.status).toBe("LINKED");
   });
 
   it("refuses to restore a session it does not hold", async () => {
