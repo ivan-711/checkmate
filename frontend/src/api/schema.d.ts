@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/v1/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Alerts
+         * @description Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity; bounded list.
+         */
+        get: operations["list_alerts_api_v1_alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/candidate-pairs": {
         parameters: {
             query?: never;
@@ -55,7 +75,7 @@ export interface paths {
         put?: never;
         /**
          * Create Review
-         * @description Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. Idempotency-Key required; only PROPOSED moves; same-state request returns 200 with no new version.
+         * @description Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. Idempotency-Key required. PROPOSED or REJECTED may move to LINKED or REJECTED (a second review supersedes the first, so the demo can reject and then approve; history keeps both). LINKED only accepts the same-state APPROVE, which returns 200 with the current decision and no new version; any other request on a non-pending state is 409 DECISION_NOT_PENDING.
          */
         post: operations["create_review_api_v1_candidate_pairs__pair_id__reviews_post"];
         delete?: never;
@@ -96,6 +116,46 @@ export interface paths {
          * @description Lane W3b. Read-time golden record with crosswalks.
          */
         get: operations["get_entity_api_v1_entities__entity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entities/{entity_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Entity History
+         * @description Lane Q8 (additive). Identity history events for the entity; bounded list.
+         */
+        get: operations["get_entity_history_api_v1_entities__entity_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/entities/{entity_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Entity Timeline
+         * @description Lane W3b (additive). Timeline across the entity's sources; bounded list.
+         */
+        get: operations["get_entity_timeline_api_v1_entities__entity_id__timeline_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -238,6 +298,26 @@ export interface paths {
          * @description Lane W1/W3a. Reset: truncate state, load the scenario, append DEMO_RESET.
          */
         post: operations["create_session_api_v1_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/threshold-sets/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Current Thresholds
+         * @description Lane W3a (additive). The current raw-score cutoffs; Platt values display-only.
+         */
+        get: operations["get_current_thresholds_api_v1_threshold_sets_current_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -627,6 +707,26 @@ export interface components {
             /** Recall */
             recall?: number | null;
         };
+        /** HistoryEvent */
+        HistoryEvent: {
+            /** Actor */
+            actor: string;
+            /** Actortype */
+            actorType: string;
+            /** Decisionid */
+            decisionId?: string | null;
+            /** Eventtype */
+            eventType: string;
+            /** Pairid */
+            pairId?: string | null;
+            /** Summary */
+            summary: string;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+        };
         /** IntakeSession */
         IntakeSession: {
             agentMode: components["schemas"]["AgentMode"];
@@ -800,6 +900,27 @@ export interface components {
         Page_CandidatePair_: {
             /** Items */
             items: components["schemas"]["CandidatePair"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
+        /** Page[HistoryEvent] */
+        Page_HistoryEvent_: {
+            /** Items */
+            items: components["schemas"]["HistoryEvent"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
+        /** Page[SafetyAlert] */
+        Page_SafetyAlert_: {
+            /** Items */
+            items: components["schemas"]["SafetyAlert"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
+        /** Page[TimelineEvent] */
+        Page_TimelineEvent_: {
+            /** Items */
+            items: components["schemas"]["TimelineEvent"][];
             /** Nextcursor */
             nextCursor?: string | null;
         };
@@ -1035,6 +1156,33 @@ export interface components {
             /** Sourcesystem */
             sourceSystem: string;
         };
+        /** ThresholdSet */
+        ThresholdSet: {
+            /**
+             * Autolinkenabled
+             * @description always false in the demo (ADR-015)
+             * @default false
+             */
+            autoLinkEnabled: boolean;
+            /** Chigh */
+            cHigh: number;
+            /** Clow */
+            cLow: number;
+            /**
+             * Iscalibrated
+             * @description "calibrated" appears in the UI only when true
+             * @default false
+             */
+            isCalibrated: boolean;
+            /** Sourcerunid */
+            sourceRunId?: string | null;
+            /** Thighdisplay */
+            tHighDisplay?: number | null;
+            /** Tlowdisplay */
+            tLowDisplay?: number | null;
+            /** Thresholdsid */
+            thresholdsId: string;
+        };
         /** Tile */
         Tile: {
             /**
@@ -1090,6 +1238,48 @@ export interface components {
             /** Tiles */
             tiles: components["schemas"]["Tile"][];
         };
+        /** TimelineEvent */
+        TimelineEvent: {
+            /** Codes */
+            codes?: string[];
+            /** Display */
+            display: string;
+            /**
+             * Entityid
+             * Format: uuid
+             */
+            entityId: string;
+            /**
+             * Isconstructed
+             * @default false
+             */
+            isConstructed: boolean;
+            /**
+             * Occurredat
+             * Format: date-time
+             */
+            occurredAt: string;
+            /** Resourceid */
+            resourceId?: string | null;
+            /**
+             * Sourcerecordid
+             * Format: uuid
+             */
+            sourceRecordId: string;
+            /** Sourcesystem */
+            sourceSystem: string;
+            /**
+             * Type
+             * @description e.g. ENCOUNTER, ALLERGY, MEDICATION_ORDER
+             */
+            type: string;
+            verification: components["schemas"]["TimelineVerification"];
+        };
+        /**
+         * TimelineVerification
+         * @enum {string}
+         */
+        TimelineVerification: "CODED" | "CSV_DERIVED" | "AGENT_INTAKE_UNVERIFIED";
         /** ToolCallCandidate */
         ToolCallCandidate: {
             band: components["schemas"]["Band"];
@@ -1198,6 +1388,57 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_alerts_api_v1_alerts_get: {
+        parameters: {
+            query?: {
+                entityId?: string | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_SafetyAlert_"];
+                };
+            };
+            /** @description VALIDATION_ERROR */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description INTERNAL */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description NOT_IMPLEMENTED */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     list_candidate_pairs_api_v1_candidate_pairs_get: {
         parameters: {
             query?: {
@@ -1463,6 +1704,128 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Entity"];
+                };
+            };
+            /** @description NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description VALIDATION_ERROR */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description INTERNAL */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description NOT_IMPLEMENTED */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_entity_history_api_v1_entities__entity_id__history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_HistoryEvent_"];
+                };
+            };
+            /** @description NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description VALIDATION_ERROR */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description INTERNAL */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description NOT_IMPLEMENTED */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_entity_timeline_api_v1_entities__entity_id__timeline_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TimelineEvent_"];
                 };
             };
             /** @description NOT_FOUND */
@@ -1867,6 +2230,53 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description VALIDATION_ERROR */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description INTERNAL */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description NOT_IMPLEMENTED */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    get_current_thresholds_api_v1_threshold_sets_current_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThresholdSet"];
                 };
             };
             /** @description VALIDATION_ERROR */

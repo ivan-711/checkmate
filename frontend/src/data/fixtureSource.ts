@@ -4,8 +4,9 @@ import type {
   ReviewResponse,
   SessionResponse,
   TilesResponse,
+  TimelineEvent,
 } from "@/api/types";
-import type { ScenarioFixture, TimelineEvent } from "./scenario";
+import type { ScenarioFixture } from "./scenario";
 import { DataError, type CaseData, type DataSource } from "./source";
 
 interface SessionState {
@@ -89,10 +90,12 @@ export class FixtureSource implements DataSource {
     const { history, outcome } = this.current;
     const last = history[history.length - 1];
     const approving = body.action === "APPROVE";
-    if (outcome && last.status === (approving ? "LINKED" : "REJECTED")) return outcome;
-    // The lane brief asks that a second review supersede the first (reject, then approve),
-    // so a REJECTED decision may still move here. contracts-v1 documents "only PROPOSED
-    // moves"; the live API is the authority on that and its 409 is shown as an error.
+    // The review contract: PROPOSED or REJECTED may move (a second review supersedes the
+    // first, so the demo can reject and then approve); LINKED only takes a repeat approve.
+    if (last.status === "LINKED") {
+      if (approving && outcome) return outcome;
+      throw new DataError("DECISION_NOT_PENDING", "This pair is already linked.");
+    }
     const decision: MatchDecision = {
       ...last,
       id: crypto.randomUUID(),

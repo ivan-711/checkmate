@@ -4,8 +4,8 @@ import type {
   ReviewResponse,
   SessionResponse,
   TilesResponse,
+  TimelineEvent,
 } from "@/api/types";
-import type { TimelineEvent } from "./scenario";
 
 /** REPLAY when reading the fixture; LOCAL when calling the API on this laptop. */
 export type Mode = "REPLAY" | "LOCAL";

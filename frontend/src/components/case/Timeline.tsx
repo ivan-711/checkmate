@@ -1,6 +1,5 @@
-import type { SourceCard } from "@/api/types";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
-import type { TimelineEvent } from "@/data/scenario";
+import type { SourceCard, TimelineEvent } from "@/api/types";
 
 // Marker shape carries the event type alongside its text label, never color alone.
 const MARKERS: Record<string, string> = {

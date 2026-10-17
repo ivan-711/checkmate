@@ -21,4 +21,5 @@ export type SafetyAlert = Schemas["SafetyAlert"];
 export type SessionResponse = Schemas["SessionResponse"];
 export type Tile = Schemas["Tile"];
 export type TilesResponse = Schemas["TilesResponse"];
+export type TimelineEvent = Schemas["TimelineEvent"];
 export type ErrorEnvelope = Schemas["ErrorEnvelope"];

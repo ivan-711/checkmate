@@ -1,7 +1,6 @@
 import createClient from "openapi-fetch";
 import type { paths } from "@/api/schema";
-import type { ErrorEnvelope, ReviewRequest, ReviewResponse } from "@/api/types";
-import type { TimelineEvent } from "./scenario";
+import type { ErrorEnvelope, ReviewRequest, ReviewResponse, TimelineEvent } from "@/api/types";
 import { DataError, type CaseData, type DataSource } from "./source";
 
 const SCENARIO_ID = "hero";
@@ -15,10 +14,11 @@ function fail(error: unknown): never {
 /** Calls FastAPI through the same-origin /api/v1 rewrite in next.config.ts. */
 export class ApiSource implements DataSource {
   readonly mode = "LOCAL" as const;
-  readonly canRestore = false; // no restore route in contracts-v1
+  readonly canRestore = false; // the contract has no restore route
   private readonly client = createClient<paths>({ baseUrl: "" });
-  // contracts-v1 has no alerts read endpoint, so the outcome of a review made in this
-  // tab is kept until the page reloads; after a reload only the decision line shows.
+  // The alerts and timeline routes are stubs (501) until W3b lands, so the outcome of a
+  // review made in this tab is kept until the page reloads; after a reload only the
+  // decision line shows. Wiring those routes is part of the switch to the real API.
   private lastOutcome: ReviewResponse | null = null;
 
   async getCase(): Promise<CaseData> {
@@ -48,7 +48,7 @@ export class ApiSource implements DataSource {
   }
 
   async getTimeline(): Promise<TimelineEvent[] | null> {
-    return null; // no timeline route in contracts-v1
+    return null; // the timeline route is a stub until W3b lands
   }
 
   async getTiles() {

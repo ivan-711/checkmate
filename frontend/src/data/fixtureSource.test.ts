@@ -55,12 +55,27 @@ describe("FixtureSource", () => {
     expect(outcome?.entity?.id).toBe(scenario.entityIfApproved.id);
   });
 
-  it("answers a same-state request with the current decision and no new version", async () => {
+  it("answers a repeat approve on a LINKED pair with the current decision and no new version", async () => {
     const s = source();
     const first = await s.review(pairId, approve, "key-a");
     const again = await s.review(pairId, { ...approve, actor: "registrar:Registrar C" }, "key-b");
     expect(again.decision).toEqual(first.decision);
     expect((await s.getCase()).detail.history).toHaveLength(2);
+  });
+
+  it("refuses to reject a LINKED pair: DECISION_NOT_PENDING", async () => {
+    const s = source();
+    await s.review(pairId, approve, "key-a");
+    await expect(s.review(pairId, reject, "key-b")).rejects.toMatchObject({ code: "DECISION_NOT_PENDING" });
+    expect((await s.getCase()).detail.pair.decision.status).toBe("LINKED");
+  });
+
+  it("a second reject supersedes the first with its own reason", async () => {
+    const s = source();
+    await s.review(pairId, reject, "key-a");
+    const res = await s.review(pairId, { ...reject, reasonCode: "INSUFFICIENT_EVIDENCE" }, "key-b");
+    expect(res.decision.version).toBe(3);
+    expect(res.decision.reasonCode).toBe("INSUFFICIENT_EVIDENCE");
   });
 
   it("replays the same response for a retried idempotency key", async () => {
