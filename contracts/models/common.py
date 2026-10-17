@@ -89,7 +89,7 @@ class PairOrigin(StrEnum):
 
 
 class EventType(StrEnum):
-    """The TEXT + CHECK list in migration 0001. Migration 0002 widens it after 16:00."""
+    """The TEXT + CHECK list in migration 0001. Migration 0003_frontdesk_steps widens it after 16:00."""
 
     RECORD_INGESTED = "RECORD_INGESTED"
     MATCH_RUN_COMPLETED = "MATCH_RUN_COMPLETED"

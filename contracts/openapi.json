@@ -791,7 +791,7 @@
         "type": "object"
       },
       "EventType": {
-        "description": "The TEXT + CHECK list in migration 0001. Migration 0002 widens it after 16:00.",
+        "description": "The TEXT + CHECK list in migration 0001. Migration 0003_frontdesk_steps widens it after 16:00.",
         "enum": [
           "RECORD_INGESTED",
           "MATCH_RUN_COMPLETED",
@@ -3058,7 +3058,7 @@
   "paths": {
     "/api/v1/alerts": {
       "get": {
-        "description": "Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity; bounded list.",
+        "description": "Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity (unknown entityId is a 404) and one status; bounded list.",
         "operationId": "list_alerts_api_v1_alerts_get",
         "parameters": [
           {
@@ -3076,6 +3076,22 @@
                 }
               ],
               "title": "Entityid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AlertStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
             }
           },
           {
@@ -3118,6 +3134,16 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -3147,6 +3173,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "List Alerts",
@@ -3277,6 +3313,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "List Candidate Pairs",
@@ -3351,6 +3397,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Candidate Pair",
@@ -3483,6 +3539,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create Review",
@@ -3567,6 +3633,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create What If",
@@ -3641,6 +3717,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Entity",
@@ -3743,6 +3829,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Entity History",
@@ -3845,6 +3941,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Entity Timeline",
@@ -3855,9 +3961,26 @@
     },
     "/api/v1/events": {
       "get": {
-        "description": "Lane W3a (additive, G16 step 7). The append-only event feed, newest first; bounded list with an opaque keyset cursor over (ts, eventId).",
+        "description": "Lane W3a (additive, G16 step 7). The append-only event feed, newest first; bounded list with an opaque keyset cursor over (ts, eventId). `since` keeps only rows with ts at or after it, so a caller can count one run's events on a reused database.",
         "operationId": "list_events_api_v1_events_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
           {
             "in": "query",
             "name": "limit",
@@ -3927,6 +4050,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "List Events",
@@ -3979,6 +4112,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Health",
@@ -4051,6 +4194,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create Intake Session",
@@ -4125,6 +4278,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Intake Session",
@@ -4232,6 +4395,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create Intake Turn",
@@ -4284,6 +4457,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create Match Run",
@@ -4350,6 +4533,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Tiles",
@@ -4422,6 +4615,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Create Session",
@@ -4474,6 +4677,16 @@
               }
             },
             "description": "NOT_IMPLEMENTED"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "UPSTREAM_UNAVAILABLE"
           }
         },
         "summary": "Get Current Thresholds",
