@@ -16,8 +16,8 @@
         "id": "00000000-0000-4000-8000-000000000031",
         "pairId": "00000000-0000-4000-8000-000000000030",
         "version": 1,
-        "logit": 0.4,
-        "p": 0.55,
+        "logit": -0.6,
+        "p": 0.35,
         "band": "KEEP_SEPARATE",
         "negativeRulesFired": [
           "TWIN"
@@ -120,7 +120,7 @@
               "value": 1.0
             }
           ],
-          "rawScore": 0.4,
+          "rawScore": -0.6,
           "cLow": 0.0,
           "cHigh": 2.0,
           "plattA": null,
@@ -244,8 +244,8 @@
         "id": "00000000-0000-4000-8000-000000000031",
         "pairId": "00000000-0000-4000-8000-000000000030",
         "version": 1,
-        "logit": 0.4,
-        "p": 0.55,
+        "logit": -0.6,
+        "p": 0.35,
         "band": "KEEP_SEPARATE",
         "negativeRulesFired": [
           "TWIN"
@@ -348,7 +348,7 @@
               "value": 1.0
             }
           ],
-          "rawScore": 0.4,
+          "rawScore": -0.6,
           "cLow": 0.0,
           "cHigh": 2.0,
           "plattA": null,

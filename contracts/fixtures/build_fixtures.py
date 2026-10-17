@@ -122,14 +122,14 @@ def build_scenario() -> dict:
                    "by an approved identity link. [Clinic CSV, allergies.csv row PLACEHOLDER] documents an allergy coded "
                    "penicillin V (RxNorm 7984; status active; verification not stated in source; reaction: anaphylaxis, severe). "
                    "This rule treats that code as penicillin-class. [ER FHIR, MedicationRequest/PLACEHOLDER] has an active "
-                   "order for amoxicillin 500 MG Oral Tablet, RxNorm 308192. The amoxicillin/clavulanate label (DailyMed, set "
-                   "f10634cb-6505-43f1-9b70-314c58673016, revised 10/2026) states: \"contraindicated in patients with a history "
+                   "order for amoxicillin 500 MG Oral Tablet, RxNorm 308192. The amoxicillin label (DailyMed, set "
+                   "d5eba477-e255-4d97-9e16-30543c298680, revised 3/2023) states: \"contraindicated in patients with a history "
                    "of serious hypersensitivity reactions (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin, "
                    "clavulanate or to other beta-lactam antibacterial drugs (e.g., penicillins and cephalosporins)\". "
                    "This is a rule-based flag on synthetic data. It does not say what the patient took or tolerated, or what "
                    "should be prescribed. A clinician decides."),
-        citation=Citation(label_name="Amoxicillin and clavulanate potassium (Chartwell RX)", set_id="f10634cb-6505-43f1-9b70-314c58673016",
-                          revised="10/2026", url="https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=f10634cb-6505-43f1-9b70-314c58673016",
+        citation=Citation(label_name="Amoxicillin for oral suspension (Proficient Rx)", set_id="d5eba477-e255-4d97-9e16-30543c298680",
+                          revised="3/2023", url="https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=d5eba477-e255-4d97-9e16-30543c298680",
                           quote=("contraindicated in patients with a history of serious hypersensitivity reactions (e.g., anaphylaxis "
                                  "or Stevens-Johnson syndrome) to amoxicillin, clavulanate or to other beta-lactam antibacterial drugs "
                                  "(e.g., penicillins and cephalosporins)")),
@@ -191,7 +191,9 @@ def build_hard_negative() -> dict:
     b = card(22, "CLINIC_CSV", SourceKind.CSV_ROW, "Clinic CSV", "PLACEHOLDER-TWIN-B", "PLACEHOLDER-FAMILY", "1985-07-03", "100 Placeholder St")
     c = contribs({"given_name_jw": 0.2, "family_name_jw": 0.9, "family_metaphone": 0.5, "dob_exact": 0.8,
                   "sex_match": 0.2, "phone_match": 0.4, "address_jaccard": 0.7, "zip_match": 0.3})
-    detail = pair_detail(30, a, b, 0.4, 0.55, Band.KEEP_SEPARATE, ["TWIN"], PairOrigin.MATCH_RUN,
+    # raw score below c_low (0.0): KEEP_SEPARATE on the cutoff itself; TWIN is listed as fired so the UI shows the rule,
+    # but negative rules only ever demote AUTO_LINK to REVIEW (architecture §3 S6), never produce KEEP_SEPARATE.
+    detail = pair_detail(30, a, b, -0.6, 0.35, Band.KEEP_SEPARATE, ["TWIN"], PairOrigin.MATCH_RUN,
                          DecisionStatus.PROPOSED, "system:scorer", ActorType.SYSTEM, False, c)
     return {"placeholder": True, "kind": "HARD_NEGATIVE_TWIN",
             "note": "Same surname, DOB, address and phone; different given names: the TWIN rule keeps them separate.",

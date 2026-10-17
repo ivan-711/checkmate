@@ -58,7 +58,7 @@ async def request_id_and_log(request: Request, call_next) -> Response:
 
 @app.get(API_PREFIX + "/health", response_model=Health, tags=["core"],
          description="Lane: plumbing (lead session). Dependency status and versions.")
-async def health() -> Health:
+def health() -> Health:  # sync on purpose: the DB ping uses the sync pool, so it runs in the threadpool
     db = DependencyStatus.UP if db_is_up(engine) else DependencyStatus.DOWN
     agent = AgentStatus.REPLAY if settings.frontdesk_agent_mode != "LIVE" else AgentStatus.DOWN
     return Health(
