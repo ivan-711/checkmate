@@ -117,11 +117,13 @@ def build_app(implemented: frozenset[Route] = frozenset()) -> FastAPI:
         return not_implemented("W2/W3a")
 
     @app.get(p + "/candidate-pairs", response_model=Page[CandidatePair], tags=["core"], responses=common_errors,
-             description="Lane W3a. Review queue ordered by |p-0.5|. Bounded list.")
+             description="Lane W3a. Review queue ordered by |p-0.5|. Bounded list. `recordId` (additive) keeps only "
+                         "pairs that include that source record, so the UI binds the hero pair in one request.")
     async def list_candidate_pairs(
         band: Band | None = None,
         status: DecisionStatus | None = None,
         origin: PairOrigin | None = None,
+        record_id: Annotated[UUID | None, Query(alias="recordId")] = None,
         limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX),
         cursor: str | None = None,
     ):
