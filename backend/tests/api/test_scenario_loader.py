@@ -114,12 +114,14 @@ def test_corpus_mode_reads_the_hero_dir_from_the_env_var(corpus_mode):
     assert corpus_mode.read == [corpus_mode.hero_dir]
 
 
-def test_corpus_mode_hero_dir_defaults_to_data_scenarios_hero(corpus_mode, monkeypatch):
+def test_corpus_mode_hero_dir_defaults_to_data_scenarios_hero(corpus_mode, monkeypatch, caplog):
+    import logging
+
     monkeypatch.delenv("CHECKMATE_HERO_OVERLAY_DIR")
-    monkeypatch.setattr(loader, "_read_hero_dir", lambda path: corpus_mode.read.append(path) or loader.HeroExport())
-    with pytest.raises(loader.HeroNotFound):  # nothing to find there in this checkout: a loud failure
-        loader.load_scenario("hero")
-    assert corpus_mode.read == [loader.HERO_OVERLAY_DIR]
+    monkeypatch.setattr(loader, "HERO_OVERLAY_DIR", corpus_mode.tmp / "data" / "scenarios" / "hero")
+    with caplog.at_level(logging.WARNING, logger="checkmate.scenarios"), pytest.raises(loader.HeroNotFound):
+        loader.load_scenario("hero")  # nothing exported there: refused, and the log names where it looked
+    assert str(loader.HERO_OVERLAY_DIR) in caplog.text
     assert loader.HERO_OVERLAY_DIR.parts[-3:] == ("data", "scenarios", "hero")
 
 
@@ -147,7 +149,7 @@ def test_a_constructed_allergy_in_the_er_overlay_is_refused(corpus_mode):
     tag = {"system": loader.CONSTRUCTED_TAG_SYSTEM, "code": loader.CONSTRUCTED_TAG_CODE}
     bundle["entry"].append({"resource": {"resourceType": "AllergyIntolerance", "id": "x", "meta": {"tag": [tag]}}})
     bundle_path.write_text(json.dumps(bundle))
-    with pytest.raises(ValueError, match="AllergyIntolerance"):
+    with pytest.raises(loader.HeroNotFound):  # an unusable hero export is refused like a missing one
         loader.load_scenario("hero")
 
 
