@@ -1,0 +1,81 @@
+{
+  "name": "search_patients",
+  "description": "Find existing charts that may belong to the person at the desk. Read-only. Returns opaque candidate references and match bands, never clinical data. Provide (givenName and familyName) or birthDate.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "givenName": {
+        "type": "string",
+        "maxLength": 60
+      },
+      "familyName": {
+        "type": "string",
+        "maxLength": 80,
+        "description": "All surnames exactly as the patient said them, e.g. 'González Rivera'."
+      },
+      "birthDate": {
+        "type": "string",
+        "description": "ISO 8601 date, YYYY-MM-DD."
+      },
+      "sex": {
+        "type": "string",
+        "enum": [
+          "FEMALE",
+          "MALE",
+          "UNKNOWN"
+        ]
+      },
+      "phone": {
+        "type": "string",
+        "maxLength": 20
+      },
+      "addressLine": {
+        "type": "string",
+        "maxLength": 120
+      },
+      "postalCode": {
+        "type": "string",
+        "pattern": "^[0-9]{5}$"
+      },
+      "evidence": {
+        "type": "object",
+        "description": "For every demographic field you fill, the exact words the patient typed that support it, copied verbatim.",
+        "properties": {
+          "givenName": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "familyName": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "birthDate": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "sex": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "addressLine": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "postalCode": {
+            "type": "string",
+            "maxLength": 160
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "evidence"
+    ],
+    "additionalProperties": false
+  }
+}

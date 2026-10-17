@@ -1,0 +1,3346 @@
+{
+  "components": {
+    "schemas": {
+      "ActorType": {
+        "enum": [
+          "AGENT",
+          "REGISTRAR",
+          "PATIENT",
+          "SYSTEM"
+        ],
+        "title": "ActorType",
+        "type": "string"
+      },
+      "AgentMode": {
+        "enum": [
+          "LIVE",
+          "REPLAY"
+        ],
+        "title": "AgentMode",
+        "type": "string"
+      },
+      "AgentStatus": {
+        "enum": [
+          "LIVE",
+          "REPLAY",
+          "DOWN"
+        ],
+        "title": "AgentStatus",
+        "type": "string"
+      },
+      "AlertStatus": {
+        "enum": [
+          "PRELIMINARY",
+          "RETRACTED"
+        ],
+        "title": "AlertStatus",
+        "type": "string"
+      },
+      "AlertTier": {
+        "enum": [
+          "A",
+          "B"
+        ],
+        "title": "AlertTier",
+        "type": "string"
+      },
+      "ApproveRequest": {
+        "additionalProperties": false,
+        "description": "Requires the ``Idempotency-Key`` header, minted once when the decision dialog opens.",
+        "properties": {
+          "action": {
+            "const": "APPROVE",
+            "title": "Action",
+            "type": "string"
+          },
+          "actor": {
+            "description": "registrar:<label>; a fixture label, not an authenticated identity",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Actor",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "action",
+          "actor"
+        ],
+        "title": "ApproveRequest",
+        "type": "object"
+      },
+      "AssistantTextSource": {
+        "enum": [
+          "MODEL",
+          "TEMPLATE"
+        ],
+        "title": "AssistantTextSource",
+        "type": "string"
+      },
+      "Band": {
+        "enum": [
+          "AUTO_LINK",
+          "REVIEW",
+          "KEEP_SEPARATE"
+        ],
+        "title": "Band",
+        "type": "string"
+      },
+      "CandidatePair": {
+        "additionalProperties": false,
+        "properties": {
+          "autoEligible": {
+            "default": false,
+            "description": "\"auto-eligible\" tag; auto-link is evaluation-only",
+            "title": "Autoeligible",
+            "type": "boolean"
+          },
+          "blockKeys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blockkeys",
+            "type": "array"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/MatchDecision",
+            "description": "the current (max version) decision"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "intakeSessionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intakesessionid"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/PairOrigin"
+          },
+          "recordAId": {
+            "format": "uuid",
+            "title": "Recordaid",
+            "type": "string"
+          },
+          "recordBId": {
+            "format": "uuid",
+            "title": "Recordbid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "recordAId",
+          "recordBId",
+          "origin",
+          "decision"
+        ],
+        "title": "CandidatePair",
+        "type": "object"
+      },
+      "CandidatePairDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/Contribution"
+            },
+            "title": "Contributions",
+            "type": "array"
+          },
+          "history": {
+            "description": "all versions, oldest first",
+            "items": {
+              "$ref": "#/components/schemas/MatchDecision"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "mergePreview": {
+            "$ref": "#/components/schemas/MergePreview"
+          },
+          "pair": {
+            "$ref": "#/components/schemas/CandidatePair"
+          },
+          "recordA": {
+            "$ref": "#/components/schemas/SourceCard"
+          },
+          "recordB": {
+            "$ref": "#/components/schemas/SourceCard"
+          }
+        },
+        "required": [
+          "pair",
+          "recordA",
+          "recordB",
+          "contributions",
+          "mergePreview"
+        ],
+        "title": "CandidatePairDetail",
+        "type": "object"
+      },
+      "Citation": {
+        "additionalProperties": false,
+        "properties": {
+          "labelName": {
+            "title": "Labelname",
+            "type": "string"
+          },
+          "quote": {
+            "description": "verbatim contraindication text; never paraphrased",
+            "title": "Quote",
+            "type": "string"
+          },
+          "revised": {
+            "title": "Revised",
+            "type": "string"
+          },
+          "setId": {
+            "title": "Setid",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "labelName",
+          "setId",
+          "revised",
+          "url",
+          "quote"
+        ],
+        "title": "Citation",
+        "type": "object"
+      },
+      "Contribution": {
+        "additionalProperties": false,
+        "properties": {
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "logit": {
+            "title": "Logit",
+            "type": "number"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "feature value in [0,1]; None when missing",
+            "title": "Value"
+          }
+        },
+        "required": [
+          "feature",
+          "logit"
+        ],
+        "title": "Contribution",
+        "type": "object"
+      },
+      "CreateIntakeSessionRequest": {
+        "additionalProperties": false,
+        "description": "No mode field: the server chooses the agent mode from FRONTDESK_AGENT_MODE.",
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Language"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scenarioContextId": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenariocontextid"
+          }
+        },
+        "title": "CreateIntakeSessionRequest",
+        "type": "object"
+      },
+      "CreateSessionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "scenarioId": {
+            "description": "e.g. \"hero\" or \"frontdesk-hero\"",
+            "maxLength": 64,
+            "title": "Scenarioid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scenarioId"
+        ],
+        "title": "CreateSessionRequest",
+        "type": "object"
+      },
+      "Crosswalk": {
+        "additionalProperties": false,
+        "description": "Where a value came from: (source system, native record id).",
+        "properties": {
+          "sourceRecordId": {
+            "title": "Sourcerecordid",
+            "type": "string"
+          },
+          "sourceSystem": {
+            "title": "Sourcesystem",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceSystem",
+          "sourceRecordId"
+        ],
+        "title": "Crosswalk",
+        "type": "object"
+      },
+      "DecisionStatus": {
+        "enum": [
+          "PROPOSED",
+          "LINKED",
+          "REJECTED",
+          "REVOKED"
+        ],
+        "title": "DecisionStatus",
+        "type": "string"
+      },
+      "DegradedKind": {
+        "enum": [
+          "TIMEOUT",
+          "UNAVAILABLE",
+          "LOOP_GUARD",
+          "REPLAY_DIVERGED",
+          "REPLAY_INPUT_MISMATCH"
+        ],
+        "title": "DegradedKind",
+        "type": "string"
+      },
+      "DependencyStatus": {
+        "enum": [
+          "UP",
+          "DOWN",
+          "REPLAY"
+        ],
+        "title": "DependencyStatus",
+        "type": "string"
+      },
+      "Effect": {
+        "additionalProperties": false,
+        "properties": {
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EffectStatus"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Effect",
+        "type": "object"
+      },
+      "EffectStatus": {
+        "enum": [
+          "APPLIED",
+          "REPLAYED",
+          "NONE"
+        ],
+        "title": "EffectStatus",
+        "type": "string"
+      },
+      "Entity": {
+        "additionalProperties": false,
+        "properties": {
+          "allLinksReviewerApproved": {
+            "default": true,
+            "description": "true by construction: only humans create LINKED",
+            "title": "Alllinksreviewerapproved",
+            "type": "boolean"
+          },
+          "golden": {
+            "items": {
+              "$ref": "#/components/schemas/GoldenField"
+            },
+            "title": "Golden",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/EntityMember"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "members"
+        ],
+        "title": "Entity",
+        "type": "object"
+      },
+      "EntityMember": {
+        "additionalProperties": false,
+        "properties": {
+          "isConstructed": {
+            "default": false,
+            "title": "Isconstructed",
+            "type": "boolean"
+          },
+          "sourceRecordId": {
+            "format": "uuid",
+            "title": "Sourcerecordid",
+            "type": "string"
+          },
+          "sourceSystem": {
+            "title": "Sourcesystem",
+            "type": "string"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "e.g. AGENT_INTAKE_UNVERIFIED for intake records",
+            "title": "Verification"
+          }
+        },
+        "required": [
+          "sourceRecordId",
+          "sourceSystem"
+        ],
+        "title": "EntityMember",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorCode": {
+        "enum": [
+          "VALIDATION_ERROR",
+          "NOT_FOUND",
+          "METHOD_NOT_ALLOWED",
+          "CANNOT_LINK_CONFLICT",
+          "IDEMPOTENCY_MISMATCH",
+          "DECISION_NOT_PENDING",
+          "TURN_IN_PROGRESS",
+          "SESSION_CLOSED",
+          "UPSTREAM_UNAVAILABLE",
+          "NOT_IMPLEMENTED",
+          "INTERNAL"
+        ],
+        "title": "ErrorCode",
+        "type": "string"
+      },
+      "ErrorEnvelope": {
+        "additionalProperties": false,
+        "description": "The one error shape: ``{\"error\": {\"code\", \"message\", \"details?\"}}``.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorEnvelope",
+        "type": "object"
+      },
+      "EvidenceKind": {
+        "enum": [
+          "CANDIDATE_RECORD",
+          "MATCH_DECISION",
+          "INTAKE_RECORD"
+        ],
+        "title": "EvidenceKind",
+        "type": "string"
+      },
+      "EvidenceRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EvidenceKind"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "EvidenceRef",
+        "type": "object"
+      },
+      "EvidenceSnapshot": {
+        "additionalProperties": false,
+        "description": "Immutable at decision time; never re-decoded (the HAPI bug we avoid).",
+        "properties": {
+          "cHigh": {
+            "title": "Chigh",
+            "type": "number"
+          },
+          "cLow": {
+            "title": "Clow",
+            "type": "number"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/Contribution"
+            },
+            "title": "Contributions",
+            "type": "array"
+          },
+          "features": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Features",
+            "type": "object"
+          },
+          "intercept": {
+            "title": "Intercept",
+            "type": "number"
+          },
+          "missingFlags": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Missingflags",
+            "type": "object"
+          },
+          "negativeRulesFired": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Negativerulesfired",
+            "type": "array"
+          },
+          "plattA": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platta"
+          },
+          "plattB": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plattb"
+          },
+          "policyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policyversion"
+          },
+          "rawScore": {
+            "title": "Rawscore",
+            "type": "number"
+          },
+          "scorerVersion": {
+            "title": "Scorerversion",
+            "type": "string"
+          },
+          "tHighDisplay": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thighdisplay"
+          },
+          "tLowDisplay": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlowdisplay"
+          },
+          "thresholdSetId": {
+            "title": "Thresholdsetid",
+            "type": "string"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "features",
+          "weights",
+          "intercept",
+          "contributions",
+          "rawScore",
+          "cLow",
+          "cHigh",
+          "scorerVersion",
+          "thresholdSetId"
+        ],
+        "title": "EvidenceSnapshot",
+        "type": "object"
+      },
+      "GateResult": {
+        "additionalProperties": false,
+        "properties": {
+          "evidenceIds": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRef"
+            },
+            "title": "Evidenceids",
+            "type": "array"
+          },
+          "handoffRequired": {
+            "title": "Handoffrequired",
+            "type": "boolean"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/PolicyOutcome"
+          },
+          "policyVersion": {
+            "title": "Policyversion",
+            "type": "string"
+          },
+          "reasonCode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicyReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "outcome",
+          "handoffRequired",
+          "policyVersion"
+        ],
+        "title": "GateResult",
+        "type": "object"
+      },
+      "GoldenAlternate": {
+        "additionalProperties": false,
+        "properties": {
+          "crosswalk": {
+            "$ref": "#/components/schemas/Crosswalk"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "crosswalk"
+        ],
+        "title": "GoldenAlternate",
+        "type": "object"
+      },
+      "GoldenField": {
+        "additionalProperties": false,
+        "properties": {
+          "alternates": {
+            "items": {
+              "$ref": "#/components/schemas/GoldenAlternate"
+            },
+            "title": "Alternates",
+            "type": "array"
+          },
+          "crosswalk": {
+            "$ref": "#/components/schemas/Crosswalk"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "rule": {
+            "description": "why this value won, e.g. MOST_FREQUENT, MOST_RECENT, MAJORITY, CONFLICT_UNRESOLVED",
+            "title": "Rule",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "field",
+          "value",
+          "crosswalk",
+          "rule"
+        ],
+        "title": "GoldenField",
+        "type": "object"
+      },
+      "Health": {
+        "additionalProperties": false,
+        "properties": {
+          "agent": {
+            "$ref": "#/components/schemas/AgentStatus"
+          },
+          "db": {
+            "$ref": "#/components/schemas/DependencyStatus"
+          },
+          "gemini": {
+            "$ref": "#/components/schemas/DependencyStatus"
+          },
+          "mirror": {
+            "$ref": "#/components/schemas/DependencyStatus"
+          },
+          "modal": {
+            "$ref": "#/components/schemas/DependencyStatus"
+          },
+          "versions": {
+            "$ref": "#/components/schemas/HealthVersions"
+          }
+        },
+        "required": [
+          "db",
+          "gemini",
+          "modal",
+          "mirror",
+          "agent",
+          "versions"
+        ],
+        "title": "Health",
+        "type": "object"
+      },
+      "HealthVersions": {
+        "additionalProperties": false,
+        "properties": {
+          "contractVersion": {
+            "title": "Contractversion",
+            "type": "string"
+          },
+          "gitSha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gitsha"
+          },
+          "policyVersion": {
+            "title": "Policyversion",
+            "type": "string"
+          },
+          "scorerVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scorerversion"
+          },
+          "thresholdSetId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thresholdsetid"
+          },
+          "toolSchemaVersion": {
+            "title": "Toolschemaversion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contractVersion",
+          "policyVersion",
+          "toolSchemaVersion"
+        ],
+        "title": "HealthVersions",
+        "type": "object"
+      },
+      "HeldOutRecall": {
+        "additionalProperties": false,
+        "properties": {
+          "button": {
+            "$ref": "#/components/schemas/WhatIfButton"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "lowSupport": {
+            "default": false,
+            "description": "fewer than 50 components",
+            "title": "Lowsupport",
+            "type": "boolean"
+          },
+          "nComponents": {
+            "minimum": 0.0,
+            "title": "Ncomponents",
+            "type": "integer"
+          },
+          "nEntities": {
+            "minimum": 0.0,
+            "title": "Nentities",
+            "type": "integer"
+          },
+          "nPairs": {
+            "minimum": 0.0,
+            "title": "Npairs",
+            "type": "integer"
+          },
+          "recall": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recall"
+          }
+        },
+        "required": [
+          "button",
+          "category",
+          "nPairs",
+          "nEntities",
+          "nComponents"
+        ],
+        "title": "HeldOutRecall",
+        "type": "object"
+      },
+      "IntakeSession": {
+        "additionalProperties": false,
+        "properties": {
+          "agentMode": {
+            "$ref": "#/components/schemas/AgentMode"
+          },
+          "closed": {
+            "default": false,
+            "title": "Closed",
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "promptVersion": {
+            "title": "Promptversion",
+            "type": "string"
+          },
+          "registration": {
+            "$ref": "#/components/schemas/Registration"
+          },
+          "toolSchemaVersion": {
+            "title": "Toolschemaversion",
+            "type": "string"
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/IntakeTurn"
+            },
+            "title": "Turns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "language",
+          "agentMode",
+          "registration",
+          "promptVersion",
+          "toolSchemaVersion"
+        ],
+        "title": "IntakeSession",
+        "type": "object"
+      },
+      "IntakeTurn": {
+        "additionalProperties": false,
+        "properties": {
+          "agentMode": {
+            "$ref": "#/components/schemas/AgentMode"
+          },
+          "assistantText": {
+            "title": "Assistanttext",
+            "type": "string"
+          },
+          "assistantTextSource": {
+            "$ref": "#/components/schemas/AssistantTextSource"
+          },
+          "degraded": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DegradedKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "registration": {
+            "$ref": "#/components/schemas/Registration"
+          },
+          "toolCalls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCallRecord"
+            },
+            "title": "Toolcalls",
+            "type": "array"
+          },
+          "turnIndex": {
+            "minimum": 0.0,
+            "title": "Turnindex",
+            "type": "integer"
+          },
+          "userText": {
+            "title": "Usertext",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turnIndex",
+          "userText",
+          "assistantText",
+          "assistantTextSource",
+          "agentMode",
+          "registration"
+        ],
+        "title": "IntakeTurn",
+        "type": "object"
+      },
+      "Language": {
+        "enum": [
+          "ES",
+          "EN"
+        ],
+        "title": "Language",
+        "type": "string"
+      },
+      "MatchDecision": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "description": "recorded label, e.g. registrar:Registrar A or system:scorer",
+            "title": "Actor",
+            "type": "string"
+          },
+          "actorType": {
+            "$ref": "#/components/schemas/ActorType"
+          },
+          "band": {
+            "$ref": "#/components/schemas/Band"
+          },
+          "decidedAt": {
+            "format": "date-time",
+            "title": "Decidedat",
+            "type": "string"
+          },
+          "evidenceSnapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "present in the evidence view"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "logit": {
+            "title": "Logit",
+            "type": "number"
+          },
+          "negativeRulesFired": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Negativerulesfired",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "p": {
+            "description": "display-only",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P",
+            "type": "number"
+          },
+          "pairId": {
+            "format": "uuid",
+            "title": "Pairid",
+            "type": "string"
+          },
+          "reasonCode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasonCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scorerVersion": {
+            "title": "Scorerversion",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DecisionStatus"
+          },
+          "thresholdSetId": {
+            "title": "Thresholdsetid",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "pairId",
+          "version",
+          "logit",
+          "p",
+          "band",
+          "status",
+          "actor",
+          "actorType",
+          "decidedAt",
+          "scorerVersion",
+          "thresholdSetId"
+        ],
+        "title": "MatchDecision",
+        "type": "object"
+      },
+      "MatchRunResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "allPairs": {
+            "minimum": 0.0,
+            "title": "Allpairs",
+            "type": "integer"
+          },
+          "bandCounts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Band"
+            },
+            "title": "Bandcounts",
+            "type": "object"
+          },
+          "candidatePairs": {
+            "minimum": 0.0,
+            "title": "Candidatepairs",
+            "type": "integer"
+          },
+          "elapsedMs": {
+            "minimum": 0.0,
+            "title": "Elapsedms",
+            "type": "integer"
+          },
+          "entities": {
+            "minimum": 0.0,
+            "title": "Entities",
+            "type": "integer"
+          },
+          "oversizedBlocks": {
+            "items": {
+              "$ref": "#/components/schemas/OversizedBlock"
+            },
+            "title": "Oversizedblocks",
+            "type": "array"
+          },
+          "pairsSkippedOversized": {
+            "minimum": 0.0,
+            "title": "Pairsskippedoversized",
+            "type": "integer"
+          },
+          "queuedPairIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Queuedpairids",
+            "type": "array"
+          },
+          "records": {
+            "minimum": 0.0,
+            "title": "Records",
+            "type": "integer"
+          },
+          "reductionRatio": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Reductionratio",
+            "type": "number"
+          },
+          "runId": {
+            "format": "uuid",
+            "title": "Runid",
+            "type": "string"
+          },
+          "scorerVersion": {
+            "title": "Scorerversion",
+            "type": "string"
+          },
+          "thresholdSetId": {
+            "title": "Thresholdsetid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "runId",
+          "records",
+          "entities",
+          "allPairs",
+          "candidatePairs",
+          "reductionRatio",
+          "bandCounts",
+          "pairsSkippedOversized",
+          "scorerVersion",
+          "thresholdSetId",
+          "elapsedMs"
+        ],
+        "title": "MatchRunResponse",
+        "type": "object"
+      },
+      "MergePreview": {
+        "additionalProperties": false,
+        "properties": {
+          "alertWouldFire": {
+            "title": "Alertwouldfire",
+            "type": "boolean"
+          },
+          "entityIdIfApproved": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entityidifapproved"
+          },
+          "memberCountIfApproved": {
+            "minimum": 0.0,
+            "title": "Membercountifapproved",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "memberCountIfApproved",
+          "alertWouldFire"
+        ],
+        "title": "MergePreview",
+        "type": "object"
+      },
+      "NormalizedRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "addressLine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Addressline"
+          },
+          "birthDate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "familyName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Familyname"
+          },
+          "familyNameFolded": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Familynamefolded"
+          },
+          "givenName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Givenname"
+          },
+          "givenNameFolded": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Givennamefolded"
+          },
+          "phoneE164": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phonee164"
+          },
+          "recordId": {
+            "format": "uuid",
+            "title": "Recordid",
+            "type": "string"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sex"
+          },
+          "zip5": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zip5"
+          }
+        },
+        "required": [
+          "recordId"
+        ],
+        "title": "NormalizedRecord",
+        "type": "object"
+      },
+      "OversizedBlock": {
+        "additionalProperties": false,
+        "properties": {
+          "keyType": {
+            "title": "Keytype",
+            "type": "string"
+          },
+          "size": {
+            "minimum": 0.0,
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "keyType",
+          "size"
+        ],
+        "title": "OversizedBlock",
+        "type": "object"
+      },
+      "Page_CandidatePair_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CandidatePair"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Page[CandidatePair]",
+        "type": "object"
+      },
+      "PairOrigin": {
+        "enum": [
+          "MATCH_RUN",
+          "FRONTDESK_HANDOFF"
+        ],
+        "title": "PairOrigin",
+        "type": "string"
+      },
+      "PolicyOutcome": {
+        "enum": [
+          "ALLOW",
+          "DENY"
+        ],
+        "title": "PolicyOutcome",
+        "type": "string"
+      },
+      "PolicyReason": {
+        "enum": [
+          "UNKNOWN_TOOL",
+          "SESSION_CLOSED",
+          "INVALID_ARGUMENTS",
+          "UNGROUNDED_FIELD",
+          "LOOP_GUARD",
+          "INCOMPLETE_DEMOGRAPHICS",
+          "INTAKE_ALREADY_RECORDED",
+          "ALREADY_LINKED",
+          "CANDIDATE_IN_REVIEW_OR_HIGHER",
+          "NO_INTAKE_RECORD"
+        ],
+        "title": "PolicyReason",
+        "type": "string"
+      },
+      "ReasonCode": {
+        "enum": [
+          "DIFFERENT_PERSON",
+          "INSUFFICIENT_EVIDENCE"
+        ],
+        "title": "ReasonCode",
+        "type": "string"
+      },
+      "Registration": {
+        "additionalProperties": false,
+        "description": "Derived on read from the intake record's decisions, never toggled.",
+        "properties": {
+          "entityId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entityid"
+          },
+          "handoffPairIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Handoffpairids",
+            "type": "array"
+          },
+          "intakeRecordId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intakerecordid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RegistrationState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "Registration",
+        "type": "object"
+      },
+      "RegistrationState": {
+        "enum": [
+          "NONE",
+          "NEW_CHART",
+          "PENDING_REGISTRAR",
+          "LINKED",
+          "RELEASED"
+        ],
+        "title": "RegistrationState",
+        "type": "string"
+      },
+      "RejectRequest": {
+        "additionalProperties": false,
+        "description": "Requires the ``Idempotency-Key`` header. DIFFERENT_PERSON writes not_a_match; INSUFFICIENT_EVIDENCE does not.",
+        "properties": {
+          "action": {
+            "const": "REJECT",
+            "title": "Action",
+            "type": "string"
+          },
+          "actor": {
+            "description": "registrar:<label>; a fixture label, not an authenticated identity",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Actor",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "reasonCode": {
+            "$ref": "#/components/schemas/ReasonCode"
+          }
+        },
+        "required": [
+          "action",
+          "actor",
+          "reasonCode"
+        ],
+        "title": "RejectRequest",
+        "type": "object"
+      },
+      "ResourceRef": {
+        "additionalProperties": false,
+        "properties": {
+          "resourceId": {
+            "title": "Resourceid",
+            "type": "string"
+          },
+          "sourceRecordId": {
+            "format": "uuid",
+            "title": "Sourcerecordid",
+            "type": "string"
+          },
+          "sourceSystem": {
+            "title": "Sourcesystem",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceRecordId",
+          "sourceSystem",
+          "resourceId"
+        ],
+        "title": "ResourceRef",
+        "type": "object"
+      },
+      "ReviewResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/SafetyAlert"
+            },
+            "title": "Alerts",
+            "type": "array"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/MatchDecision"
+          },
+          "entity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Entity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the entity after APPROVE; None after REJECT"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "ReviewResponse",
+        "type": "object"
+      },
+      "SafetyAlert": {
+        "additionalProperties": false,
+        "properties": {
+          "allergyRef": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "cardFooter": {
+            "default": "Rule BL-AMOX-01 v1. Not checked: cephalosporin cross-reactivity, intolerances, dose, free-text allergies. Absence of a flag is not evidence that no conflict exists. This rule and its wording were not reviewed by a clinician.",
+            "title": "Cardfooter",
+            "type": "string"
+          },
+          "cardText": {
+            "title": "Cardtext",
+            "type": "string"
+          },
+          "citation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Citation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tier A only; None when no cached label"
+          },
+          "constructedScenario": {
+            "default": false,
+            "description": "\"constructed scenario\" badge",
+            "title": "Constructedscenario",
+            "type": "boolean"
+          },
+          "entityId": {
+            "format": "uuid",
+            "title": "Entityid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "identifiedAt": {
+            "format": "date-time",
+            "title": "Identifiedat",
+            "type": "string"
+          },
+          "orderRef": {
+            "$ref": "#/components/schemas/ResourceRef"
+          },
+          "revealedByMerge": {
+            "title": "Revealedbymerge",
+            "type": "boolean"
+          },
+          "ruleId": {
+            "default": "BL-AMOX-01",
+            "title": "Ruleid",
+            "type": "string"
+          },
+          "ruleVersion": {
+            "default": "v1",
+            "title": "Ruleversion",
+            "type": "string"
+          },
+          "severity": {
+            "default": "moderate",
+            "description": "both tiers: nothing renders as a time-critical alarm",
+            "title": "Severity",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AlertStatus"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/AlertTier"
+          }
+        },
+        "required": [
+          "id",
+          "entityId",
+          "tier",
+          "allergyRef",
+          "orderRef",
+          "revealedByMerge",
+          "status",
+          "cardText",
+          "identifiedAt"
+        ],
+        "title": "SafetyAlert",
+        "type": "object"
+      },
+      "ScoreState": {
+        "additionalProperties": false,
+        "properties": {
+          "band": {
+            "$ref": "#/components/schemas/Band"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/Contribution"
+            },
+            "title": "Contributions",
+            "type": "array"
+          },
+          "negativeRulesFired": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Negativerulesfired",
+            "type": "array"
+          },
+          "p": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P",
+            "type": "number"
+          },
+          "rawScore": {
+            "title": "Rawscore",
+            "type": "number"
+          }
+        },
+        "required": [
+          "p",
+          "rawScore",
+          "band",
+          "contributions"
+        ],
+        "title": "ScoreState",
+        "type": "object"
+      },
+      "SessionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "heroConstructedFloor": {
+            "default": false,
+            "description": "the labeled hand-built hero is in use",
+            "title": "Heroconstructedfloor",
+            "type": "boolean"
+          },
+          "heroProvisional": {
+            "description": "true until the 20:00 selection; UI badge \"provisional\"",
+            "title": "Heroprovisional",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "previousSessionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "for POST /sessions/{previousId}/restore",
+            "title": "Previoussessionid"
+          },
+          "scenarioId": {
+            "title": "Scenarioid",
+            "type": "string"
+          },
+          "scorerVersion": {
+            "title": "Scorerversion",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceCard"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "thresholdSetId": {
+            "title": "Thresholdsetid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "scenarioId",
+          "scorerVersion",
+          "thresholdSetId",
+          "createdAt",
+          "sources",
+          "heroProvisional"
+        ],
+        "title": "SessionResponse",
+        "type": "object"
+      },
+      "SourceCard": {
+        "additionalProperties": false,
+        "description": "What the UI renders as one source card (UX spec §3.1).",
+        "properties": {
+          "displayLabel": {
+            "description": "e.g. \"ER FHIR\" or \"Clinic CSV\"",
+            "title": "Displaylabel",
+            "type": "string"
+          },
+          "normalized": {
+            "$ref": "#/components/schemas/NormalizedRecord"
+          },
+          "record": {
+            "$ref": "#/components/schemas/SourceRecord"
+          }
+        },
+        "required": [
+          "record",
+          "normalized",
+          "displayLabel"
+        ],
+        "title": "SourceCard",
+        "type": "object"
+      },
+      "SourceKind": {
+        "enum": [
+          "FHIR_PATIENT",
+          "CSV_ROW",
+          "TEMPLATED_SPECIALIST",
+          "ONC_BENCH",
+          "FRONTDESK_INTAKE"
+        ],
+        "title": "SourceKind",
+        "type": "string"
+      },
+      "SourceRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ingestedAt": {
+            "format": "date-time",
+            "title": "Ingestedat",
+            "type": "string"
+          },
+          "isConstructed": {
+            "default": false,
+            "description": "overlay we authored; UI badge \"constructed scenario\"",
+            "title": "Isconstructed",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "payloadSha256": {
+            "title": "Payloadsha256",
+            "type": "string"
+          },
+          "rawPayload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "immutable; included only in the evidence view",
+            "title": "Rawpayload"
+          },
+          "sourceLocalId": {
+            "title": "Sourcelocalid",
+            "type": "string"
+          },
+          "sourceSystem": {
+            "title": "Sourcesystem",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sourceSystem",
+          "sourceLocalId",
+          "kind",
+          "payloadSha256",
+          "ingestedAt"
+        ],
+        "title": "SourceRecord",
+        "type": "object"
+      },
+      "Tile": {
+        "additionalProperties": false,
+        "properties": {
+          "aggregate": {
+            "description": "the continuous aggregate name shown in the caption",
+            "title": "Aggregate",
+            "type": "string"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/TileBucket"
+            },
+            "title": "Buckets",
+            "type": "array"
+          },
+          "id": {
+            "$ref": "#/components/schemas/TileId"
+          },
+          "realTime": {
+            "default": true,
+            "description": "materialized_only = false",
+            "title": "Realtime",
+            "type": "boolean"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          },
+          "windowMinutes": {
+            "minimum": 1.0,
+            "title": "Windowminutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "aggregate",
+          "windowMinutes",
+          "buckets",
+          "total"
+        ],
+        "title": "Tile",
+        "type": "object"
+      },
+      "TileBucket": {
+        "additionalProperties": false,
+        "properties": {
+          "bucket": {
+            "format": "date-time",
+            "title": "Bucket",
+            "type": "string"
+          },
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "maxLatencyMs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxlatencyms"
+          },
+          "meanLatencyMs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meanlatencyms"
+          },
+          "series": {
+            "description": "band, outcome, or gate outcome (ALLOW/DENY)",
+            "title": "Series",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bucket",
+          "series",
+          "count"
+        ],
+        "title": "TileBucket",
+        "type": "object"
+      },
+      "TileId": {
+        "enum": [
+          "DECISION_FLOW",
+          "HUMAN_REVIEW",
+          "AGENT_GATE"
+        ],
+        "title": "TileId",
+        "type": "string"
+      },
+      "TilesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "format": "date-time",
+            "title": "Asof",
+            "type": "string"
+          },
+          "tiles": {
+            "items": {
+              "$ref": "#/components/schemas/Tile"
+            },
+            "title": "Tiles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tiles",
+          "asOf"
+        ],
+        "title": "TilesResponse",
+        "type": "object"
+      },
+      "ToolCallCandidate": {
+        "additionalProperties": false,
+        "properties": {
+          "band": {
+            "$ref": "#/components/schemas/Band"
+          },
+          "negativeRulesFired": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Negativerulesfired",
+            "type": "array"
+          },
+          "p": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "P",
+            "type": "number"
+          },
+          "pairId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pairid"
+          },
+          "recordId": {
+            "format": "uuid",
+            "title": "Recordid",
+            "type": "string"
+          },
+          "sourceSystem": {
+            "title": "Sourcesystem",
+            "type": "string"
+          },
+          "topContributions": {
+            "items": {
+              "$ref": "#/components/schemas/Contribution"
+            },
+            "title": "Topcontributions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recordId",
+          "sourceSystem",
+          "p",
+          "band"
+        ],
+        "title": "ToolCallCandidate",
+        "type": "object"
+      },
+      "ToolCallRecord": {
+        "additionalProperties": false,
+        "description": "What the UI sees. The model sees only the minimal ToolResult (tools/tool_result.schema.json).",
+        "properties": {
+          "args": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "validated args; null when invalid",
+            "title": "Args"
+          },
+          "candidates": {
+            "description": "at most 10, highest band and raw score first; the audit row keeps all",
+            "items": {
+              "$ref": "#/components/schemas/ToolCallCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "effect": {
+            "$ref": "#/components/schemas/Effect"
+          },
+          "gate": {
+            "$ref": "#/components/schemas/GateResult"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "latencyMs": {
+            "minimum": 0.0,
+            "title": "Latencyms",
+            "type": "integer"
+          },
+          "stepIndex": {
+            "minimum": 0.0,
+            "title": "Stepindex",
+            "type": "integer"
+          },
+          "toolName": {
+            "title": "Toolname",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "stepIndex",
+          "toolName",
+          "gate",
+          "effect",
+          "latencyMs"
+        ],
+        "title": "ToolCallRecord",
+        "type": "object"
+      },
+      "TurnRequest": {
+        "additionalProperties": false,
+        "description": "Requires the ``Idempotency-Key`` header, minted once per typed message.",
+        "properties": {
+          "text": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "TurnRequest",
+        "type": "object"
+      },
+      "WhatIfButton": {
+        "enum": [
+          "REMOVE_ADDRESS",
+          "CHANGE_BIRTH_YEAR",
+          "SWAP_DOB_DAY_MONTH",
+          "ACCENT_HYPHEN_SURNAME"
+        ],
+        "title": "WhatIfButton",
+        "type": "string"
+      },
+      "WhatIfRequest": {
+        "additionalProperties": false,
+        "description": "The full button set, never a toggle.",
+        "properties": {
+          "buttons": {
+            "items": {
+              "$ref": "#/components/schemas/WhatIfButton"
+            },
+            "maxItems": 4,
+            "title": "Buttons",
+            "type": "array"
+          }
+        },
+        "title": "WhatIfRequest",
+        "type": "object"
+      },
+      "WhatIfResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "alertWouldBeHidden": {
+            "title": "Alertwouldbehidden",
+            "type": "boolean"
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/ScoreState"
+          },
+          "caption": {
+            "description": "plain language; REMOVE_ADDRESS reads \"not enough to link\", never \"two people\"",
+            "title": "Caption",
+            "type": "string"
+          },
+          "counterfactualFields": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Counterfactualfields",
+            "type": "object"
+          },
+          "deltas": {
+            "description": "per-feature logit change",
+            "items": {
+              "$ref": "#/components/schemas/Contribution"
+            },
+            "title": "Deltas",
+            "type": "array"
+          },
+          "heldOutRecall": {
+            "description": "every button's category, not just the ones pressed",
+            "items": {
+              "$ref": "#/components/schemas/HeldOutRecall"
+            },
+            "title": "Heldoutrecall",
+            "type": "array"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          },
+          "whatIf": {
+            "$ref": "#/components/schemas/ScoreState"
+          }
+        },
+        "required": [
+          "baseline",
+          "whatIf",
+          "deltas",
+          "caption",
+          "alertWouldBeHidden",
+          "heldOutRecall",
+          "seed"
+        ],
+        "title": "WhatIfResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Frozen contract (tag contracts-v1). Synthetic data only. Not for clinical use. Bound to 127.0.0.1.",
+    "title": "CheckMate API",
+    "version": "contracts-v1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/candidate-pairs": {
+      "get": {
+        "description": "Lane W3a. Review queue ordered by |p-0.5|. Bounded list.",
+        "operationId": "list_candidate_pairs_api_v1_candidate_pairs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "band",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Band"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Band"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DecisionStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "origin",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PairOrigin"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Origin"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CandidatePair_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "List Candidate Pairs",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/candidate-pairs/{pair_id}": {
+      "get": {
+        "description": "Lane W3a. Evidence view: records, contributions, decision history, merge preview.",
+        "operationId": "get_candidate_pair_api_v1_candidate_pairs__pair_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pair_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pair Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidatePairDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Get Candidate Pair",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/candidate-pairs/{pair_id}/reviews": {
+      "post": {
+        "description": "Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. Idempotency-Key required; only PROPOSED moves; same-state request returns 200 with no new version.",
+        "operationId": "create_review_api_v1_candidate_pairs__pair_id__reviews_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pair_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pair Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUIDv4 minted once per user intent and resent on retry",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "UUIDv4 minted once per user intent and resent on retry",
+              "maxLength": 128,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "discriminator": {
+                  "mapping": {
+                    "APPROVE": "#/components/schemas/ApproveRequest",
+                    "REJECT": "#/components/schemas/RejectRequest"
+                  },
+                  "propertyName": "action"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ApproveRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RejectRequest"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "DECISION_NOT_PENDING"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Create Review",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/candidate-pairs/{pair_id}/what-ifs": {
+      "post": {
+        "description": "Lane Q3.1. Judge what-ifs on the hero pair; writes nothing but WHATIF_APPLIED. p95 <= 300 ms.",
+        "operationId": "create_what_if_api_v1_candidate_pairs__pair_id__what_ifs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pair_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pair Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatIfRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatIfResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Create What If",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/entities/{entity_id}": {
+      "get": {
+        "description": "Lane W3b. Read-time golden record with crosswalks.",
+        "operationId": "get_entity_api_v1_entities__entity_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entity Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Entity"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Get Entity",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "Lane: plumbing (lead session). Dependency status and versions.",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/intake-sessions": {
+      "post": {
+        "description": "Lane Q1.2. Start an intake; the server pins the agent mode from FRONTDESK_AGENT_MODE.",
+        "operationId": "create_intake_session_api_v1_intake_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIntakeSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeSession"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Create Intake Session",
+        "tags": [
+          "frontdesk"
+        ]
+      }
+    },
+    "/api/v1/intake-sessions/{session_id}": {
+      "get": {
+        "description": "Lane Q1.2. Transcript, tool calls and derived registration state, for reload and the registrar.",
+        "operationId": "get_intake_session_api_v1_intake_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeSession"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Get Intake Session",
+        "tags": [
+          "frontdesk"
+        ]
+      }
+    },
+    "/api/v1/intake-sessions/{session_id}/turns": {
+      "post": {
+        "description": "Lane Q1.2 (gate: Q1.1). One typed message runs the agent loop. Idempotency-Key required.",
+        "operationId": "create_intake_turn_api_v1_intake_sessions__session_id__turns_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "UUIDv4 minted once per user intent and resent on retry",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "description": "UUIDv4 minted once per user intent and resent on retry",
+              "maxLength": 128,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TurnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeTurn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "SESSION_CLOSED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Create Intake Turn",
+        "tags": [
+          "frontdesk"
+        ]
+      }
+    },
+    "/api/v1/match-runs": {
+      "post": {
+        "description": "Lane W2/W3a. UX \"Resolve identity\": block, score, band. Returns counts and the first 50 queued pair ids.",
+        "operationId": "create_match_run_api_v1_match_runs_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Create Match Run",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/metrics/tiles": {
+      "get": {
+        "description": "Lane W3a (AGENT_GATE tile: Q1.3). Continuous-aggregate tiles for a window.",
+        "operationId": "get_tiles_api_v1_metrics_tiles_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "window_minutes",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "maximum": 1440,
+              "minimum": 1,
+              "title": "Window Minutes",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TilesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Get Tiles",
+        "tags": [
+          "core"
+        ]
+      }
+    },
+    "/api/v1/sessions": {
+      "post": {
+        "description": "Lane W1/W3a. Reset: truncate state, load the scenario, append DEMO_RESET.",
+        "operationId": "create_session_api_v1_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_FOUND"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "INTERNAL"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "NOT_IMPLEMENTED"
+          }
+        },
+        "summary": "Create Session",
+        "tags": [
+          "core"
+        ]
+      }
+    }
+  }
+}

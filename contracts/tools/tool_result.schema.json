@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ToolResult",
+  "description": "The minimal result the model sees. Never record UUIDs, clinical data, p values or contributions.",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "ALLOWED",
+        "DENIED"
+      ]
+    },
+    "reasonCode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "UNKNOWN_TOOL",
+        "SESSION_CLOSED",
+        "INVALID_ARGUMENTS",
+        "UNGROUNDED_FIELD",
+        "LOOP_GUARD",
+        "INCOMPLETE_DEMOGRAPHICS",
+        "INTAKE_ALREADY_RECORDED",
+        "ALREADY_LINKED",
+        "CANDIDATE_IN_REVIEW_OR_HIGHER",
+        "NO_INTAKE_RECORD",
+        null
+      ]
+    },
+    "notice": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "NEW_CHART_CREATED",
+        "HANDED_TO_REGISTRAR",
+        "ALREADY_LINKED"
+      ]
+    },
+    "candidates": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "properties": {
+          "candidateRef": {
+            "type": "string",
+            "pattern": "^C[0-9]+$"
+          },
+          "band": {
+            "type": "string",
+            "enum": [
+              "AUTO_LINK",
+              "REVIEW",
+              "KEEP_SEPARATE"
+            ]
+          },
+          "sourceLabel": {
+            "type": "string"
+          },
+          "birthYear": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "candidateRef",
+          "band",
+          "sourceLabel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "message": {
+      "type": "string",
+      "description": "template text in the session language"
+    }
+  },
+  "required": [
+    "status",
+    "notice",
+    "candidates",
+    "message"
+  ],
+  "additionalProperties": false
+}

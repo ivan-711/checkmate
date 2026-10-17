@@ -1,0 +1,38 @@
+[project]
+name = "checkmate"
+version = "0.1.0"
+description = "CheckMate: front-desk intake behind a policy gate, identity resolution with human-approved links. Synthetic data only. Not for clinical use."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "pydantic>=2.9,<3",
+  "uvicorn[standard]>=0.30,<1",
+  "psycopg[binary]>=3.2,<4",
+  "sqlalchemy>=2.0,<3",
+  "python-dotenv>=1.0,<2",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+  "httpx>=0.27",
+  "jsonschema>=4.23",
+  "ruff>=0.6",
+]
+
+[tool.uv]
+package = true
+
+[tool.setuptools]
+packages = ["contracts", "contracts.models", "contracts.migrations", "backend", "backend.app"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["contracts/tests", "backend/tests", "eval"]

@@ -1,0 +1,1346 @@
+{
+  "placeholder": true,
+  "watermark": "PLACEHOLDER: engine export replaces this file (provisional hero before 16:00, final at 20:00)",
+  "hero": {
+    "provisional": true,
+    "constructedFloor": true,
+    "selectedBy": null,
+    "criteria": null
+  },
+  "registrarLabels": [
+    "Registrar A",
+    "Registrar B",
+    "Registrar C"
+  ],
+  "session": {
+    "id": "00000000-0000-4000-8000-000000000100",
+    "scenarioId": "hero",
+    "scorerVersion": "placeholder-scorer-0",
+    "thresholdSetId": "provisional-0",
+    "createdAt": "2026-10-17T18:00:00Z",
+    "sources": [
+      {
+        "record": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "sourceSystem": "ER_FHIR",
+          "sourceLocalId": "PLACEHOLDER-1",
+          "kind": "FHIR_PATIENT",
+          "payloadSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "isConstructed": true,
+          "ingestedAt": "2026-10-17T18:00:00Z",
+          "rawPayload": null
+        },
+        "normalized": {
+          "recordId": "00000000-0000-4000-8000-000000000001",
+          "givenName": "PLACEHOLDER-GIVEN",
+          "familyName": "PLACEHOLDER-FAMILY",
+          "givenNameFolded": "placeholder-given",
+          "familyNameFolded": "placeholder-family",
+          "birthDate": "1985-07-03",
+          "sex": "FEMALE",
+          "phoneE164": "+15555550100",
+          "addressLine": "100 Placeholder St",
+          "zip5": "54311"
+        },
+        "displayLabel": "ER FHIR"
+      },
+      {
+        "record": {
+          "id": "00000000-0000-4000-8000-000000000002",
+          "sourceSystem": "CLINIC_CSV",
+          "sourceLocalId": "PLACEHOLDER-2",
+          "kind": "CSV_ROW",
+          "payloadSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "isConstructed": false,
+          "ingestedAt": "2026-10-17T18:00:00Z",
+          "rawPayload": null
+        },
+        "normalized": {
+          "recordId": "00000000-0000-4000-8000-000000000002",
+          "givenName": "PLACEHOLDER-GIVEN",
+          "familyName": "PLACEHOLDER FAMILY",
+          "givenNameFolded": "placeholder-given",
+          "familyNameFolded": "placeholder family",
+          "birthDate": "1985-07-03",
+          "sex": "FEMALE",
+          "phoneE164": "+15555550100",
+          "addressLine": "100 Placeholder St",
+          "zip5": "54311"
+        },
+        "displayLabel": "Clinic CSV"
+      }
+    ],
+    "heroProvisional": true,
+    "heroConstructedFloor": true,
+    "previousSessionId": null
+  },
+  "pair": {
+    "pair": {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "recordAId": "00000000-0000-4000-8000-000000000001",
+      "recordBId": "00000000-0000-4000-8000-000000000002",
+      "blockKeys": [
+        "metaphone_surname_birth_year:PLACEHOLDER"
+      ],
+      "origin": "MATCH_RUN",
+      "intakeSessionId": null,
+      "decision": {
+        "id": "00000000-0000-4000-8000-000000000011",
+        "pairId": "00000000-0000-4000-8000-000000000010",
+        "version": 1,
+        "logit": 1.0,
+        "p": 0.73,
+        "band": "REVIEW",
+        "negativeRulesFired": [],
+        "status": "PROPOSED",
+        "actor": "system:scorer",
+        "actorType": "SYSTEM",
+        "reasonCode": null,
+        "note": null,
+        "decidedAt": "2026-10-17T18:00:00Z",
+        "scorerVersion": "placeholder-scorer-0",
+        "thresholdSetId": "provisional-0",
+        "evidenceSnapshot": {
+          "features": {
+            "given_name_jw": 1.0,
+            "family_name_jw": 1.0,
+            "family_metaphone": 1.0,
+            "dob_exact": 1.0,
+            "dob_day_month_swap": null,
+            "dob_one_digit_edit": null,
+            "sex_match": 1.0,
+            "phone_match": 1.0,
+            "address_jaccard": 1.0,
+            "zip_match": 1.0
+          },
+          "missingFlags": {
+            "given_name_jw": false,
+            "family_name_jw": false,
+            "family_metaphone": false,
+            "dob_exact": false,
+            "dob_day_month_swap": true,
+            "dob_one_digit_edit": true,
+            "sex_match": false,
+            "phone_match": false,
+            "address_jaccard": false,
+            "zip_match": false
+          },
+          "weights": {
+            "given_name_jw": 1.0,
+            "family_name_jw": 1.0,
+            "family_metaphone": 1.0,
+            "dob_exact": 1.0,
+            "dob_day_month_swap": 1.0,
+            "dob_one_digit_edit": 1.0,
+            "sex_match": 1.0,
+            "phone_match": 1.0,
+            "address_jaccard": 1.0,
+            "zip_match": 1.0
+          },
+          "intercept": -2.0,
+          "contributions": [
+            {
+              "feature": "given_name_jw",
+              "logit": 0.9,
+              "value": 1.0
+            },
+            {
+              "feature": "family_name_jw",
+              "logit": 0.6,
+              "value": 1.0
+            },
+            {
+              "feature": "family_metaphone",
+              "logit": 0.5,
+              "value": 1.0
+            },
+            {
+              "feature": "dob_exact",
+              "logit": 0.8,
+              "value": 1.0
+            },
+            {
+              "feature": "dob_day_month_swap",
+              "logit": 0.0,
+              "value": null
+            },
+            {
+              "feature": "dob_one_digit_edit",
+              "logit": 0.0,
+              "value": null
+            },
+            {
+              "feature": "sex_match",
+              "logit": 0.2,
+              "value": 1.0
+            },
+            {
+              "feature": "phone_match",
+              "logit": 0.4,
+              "value": 1.0
+            },
+            {
+              "feature": "address_jaccard",
+              "logit": 0.7,
+              "value": 1.0
+            },
+            {
+              "feature": "zip_match",
+              "logit": 0.3,
+              "value": 1.0
+            }
+          ],
+          "rawScore": 1.0,
+          "cLow": 0.0,
+          "cHigh": 2.0,
+          "plattA": null,
+          "plattB": null,
+          "tLowDisplay": null,
+          "tHighDisplay": null,
+          "negativeRulesFired": [],
+          "scorerVersion": "placeholder-scorer-0",
+          "thresholdSetId": "provisional-0",
+          "policyVersion": null
+        }
+      },
+      "autoEligible": false
+    },
+    "recordA": {
+      "record": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "sourceSystem": "ER_FHIR",
+        "sourceLocalId": "PLACEHOLDER-1",
+        "kind": "FHIR_PATIENT",
+        "payloadSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "isConstructed": true,
+        "ingestedAt": "2026-10-17T18:00:00Z",
+        "rawPayload": null
+      },
+      "normalized": {
+        "recordId": "00000000-0000-4000-8000-000000000001",
+        "givenName": "PLACEHOLDER-GIVEN",
+        "familyName": "PLACEHOLDER-FAMILY",
+        "givenNameFolded": "placeholder-given",
+        "familyNameFolded": "placeholder-family",
+        "birthDate": "1985-07-03",
+        "sex": "FEMALE",
+        "phoneE164": "+15555550100",
+        "addressLine": "100 Placeholder St",
+        "zip5": "54311"
+      },
+      "displayLabel": "ER FHIR"
+    },
+    "recordB": {
+      "record": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "sourceSystem": "CLINIC_CSV",
+        "sourceLocalId": "PLACEHOLDER-2",
+        "kind": "CSV_ROW",
+        "payloadSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "isConstructed": false,
+        "ingestedAt": "2026-10-17T18:00:00Z",
+        "rawPayload": null
+      },
+      "normalized": {
+        "recordId": "00000000-0000-4000-8000-000000000002",
+        "givenName": "PLACEHOLDER-GIVEN",
+        "familyName": "PLACEHOLDER FAMILY",
+        "givenNameFolded": "placeholder-given",
+        "familyNameFolded": "placeholder family",
+        "birthDate": "1985-07-03",
+        "sex": "FEMALE",
+        "phoneE164": "+15555550100",
+        "addressLine": "100 Placeholder St",
+        "zip5": "54311"
+      },
+      "displayLabel": "Clinic CSV"
+    },
+    "contributions": [
+      {
+        "feature": "given_name_jw",
+        "logit": 0.9,
+        "value": 1.0
+      },
+      {
+        "feature": "family_name_jw",
+        "logit": 0.6,
+        "value": 1.0
+      },
+      {
+        "feature": "family_metaphone",
+        "logit": 0.5,
+        "value": 1.0
+      },
+      {
+        "feature": "dob_exact",
+        "logit": 0.8,
+        "value": 1.0
+      },
+      {
+        "feature": "dob_day_month_swap",
+        "logit": 0.0,
+        "value": null
+      },
+      {
+        "feature": "dob_one_digit_edit",
+        "logit": 0.0,
+        "value": null
+      },
+      {
+        "feature": "sex_match",
+        "logit": 0.2,
+        "value": 1.0
+      },
+      {
+        "feature": "phone_match",
+        "logit": 0.4,
+        "value": 1.0
+      },
+      {
+        "feature": "address_jaccard",
+        "logit": 0.7,
+        "value": 1.0
+      },
+      {
+        "feature": "zip_match",
+        "logit": 0.3,
+        "value": 1.0
+      }
+    ],
+    "history": [
+      {
+        "id": "00000000-0000-4000-8000-000000000011",
+        "pairId": "00000000-0000-4000-8000-000000000010",
+        "version": 1,
+        "logit": 1.0,
+        "p": 0.73,
+        "band": "REVIEW",
+        "negativeRulesFired": [],
+        "status": "PROPOSED",
+        "actor": "system:scorer",
+        "actorType": "SYSTEM",
+        "reasonCode": null,
+        "note": null,
+        "decidedAt": "2026-10-17T18:00:00Z",
+        "scorerVersion": "placeholder-scorer-0",
+        "thresholdSetId": "provisional-0",
+        "evidenceSnapshot": {
+          "features": {
+            "given_name_jw": 1.0,
+            "family_name_jw": 1.0,
+            "family_metaphone": 1.0,
+            "dob_exact": 1.0,
+            "dob_day_month_swap": null,
+            "dob_one_digit_edit": null,
+            "sex_match": 1.0,
+            "phone_match": 1.0,
+            "address_jaccard": 1.0,
+            "zip_match": 1.0
+          },
+          "missingFlags": {
+            "given_name_jw": false,
+            "family_name_jw": false,
+            "family_metaphone": false,
+            "dob_exact": false,
+            "dob_day_month_swap": true,
+            "dob_one_digit_edit": true,
+            "sex_match": false,
+            "phone_match": false,
+            "address_jaccard": false,
+            "zip_match": false
+          },
+          "weights": {
+            "given_name_jw": 1.0,
+            "family_name_jw": 1.0,
+            "family_metaphone": 1.0,
+            "dob_exact": 1.0,
+            "dob_day_month_swap": 1.0,
+            "dob_one_digit_edit": 1.0,
+            "sex_match": 1.0,
+            "phone_match": 1.0,
+            "address_jaccard": 1.0,
+            "zip_match": 1.0
+          },
+          "intercept": -2.0,
+          "contributions": [
+            {
+              "feature": "given_name_jw",
+              "logit": 0.9,
+              "value": 1.0
+            },
+            {
+              "feature": "family_name_jw",
+              "logit": 0.6,
+              "value": 1.0
+            },
+            {
+              "feature": "family_metaphone",
+              "logit": 0.5,
+              "value": 1.0
+            },
+            {
+              "feature": "dob_exact",
+              "logit": 0.8,
+              "value": 1.0
+            },
+            {
+              "feature": "dob_day_month_swap",
+              "logit": 0.0,
+              "value": null
+            },
+            {
+              "feature": "dob_one_digit_edit",
+              "logit": 0.0,
+              "value": null
+            },
+            {
+              "feature": "sex_match",
+              "logit": 0.2,
+              "value": 1.0
+            },
+            {
+              "feature": "phone_match",
+              "logit": 0.4,
+              "value": 1.0
+            },
+            {
+              "feature": "address_jaccard",
+              "logit": 0.7,
+              "value": 1.0
+            },
+            {
+              "feature": "zip_match",
+              "logit": 0.3,
+              "value": 1.0
+            }
+          ],
+          "rawScore": 1.0,
+          "cLow": 0.0,
+          "cHigh": 2.0,
+          "plattA": null,
+          "plattB": null,
+          "tLowDisplay": null,
+          "tHighDisplay": null,
+          "negativeRulesFired": [],
+          "scorerVersion": "placeholder-scorer-0",
+          "thresholdSetId": "provisional-0",
+          "policyVersion": null
+        }
+      }
+    ],
+    "mergePreview": {
+      "entityIdIfApproved": "00000000-0000-4000-8000-000000000900",
+      "memberCountIfApproved": 2,
+      "alertWouldFire": true
+    }
+  },
+  "entityIfApproved": {
+    "id": "00000000-0000-4000-8000-000000000900",
+    "version": 1,
+    "members": [
+      {
+        "sourceRecordId": "00000000-0000-4000-8000-000000000001",
+        "sourceSystem": "ER_FHIR",
+        "isConstructed": true,
+        "verification": null
+      },
+      {
+        "sourceRecordId": "00000000-0000-4000-8000-000000000002",
+        "sourceSystem": "CLINIC_CSV",
+        "isConstructed": false,
+        "verification": null
+      }
+    ],
+    "golden": [
+      {
+        "field": "givenName",
+        "value": "PLACEHOLDER-GIVEN",
+        "crosswalk": {
+          "sourceSystem": "CLINIC_CSV",
+          "sourceRecordId": "PLACEHOLDER-2"
+        },
+        "rule": "MOST_FREQUENT",
+        "alternates": []
+      },
+      {
+        "field": "familyName",
+        "value": "PLACEHOLDER FAMILY",
+        "crosswalk": {
+          "sourceSystem": "CLINIC_CSV",
+          "sourceRecordId": "PLACEHOLDER-2"
+        },
+        "rule": "MOST_RECENT",
+        "alternates": [
+          {
+            "value": "PLACEHOLDER-FAMILY",
+            "crosswalk": {
+              "sourceSystem": "ER_FHIR",
+              "sourceRecordId": "PLACEHOLDER-x"
+            }
+          }
+        ]
+      },
+      {
+        "field": "birthDate",
+        "value": "1985-07-03",
+        "crosswalk": {
+          "sourceSystem": "ER_FHIR",
+          "sourceRecordId": "PLACEHOLDER-1"
+        },
+        "rule": "MAJORITY",
+        "alternates": []
+      },
+      {
+        "field": "phone",
+        "value": "+15555550100",
+        "crosswalk": {
+          "sourceSystem": "ER_FHIR",
+          "sourceRecordId": "PLACEHOLDER-1"
+        },
+        "rule": "MOST_RECENT",
+        "alternates": []
+      }
+    ],
+    "allLinksReviewerApproved": true
+  },
+  "timelineIfApproved": [
+    {
+      "entityId": "00000000-0000-4000-8000-000000000900",
+      "occurredAt": "2024-03-02T00:00:00Z",
+      "type": "ALLERGY",
+      "codes": [
+        "RxNorm:7984"
+      ],
+      "display": "Allergy to penicillin V (reaction: anaphylaxis, severe)",
+      "sourceRecordId": "00000000-0000-4000-8000-000000000002",
+      "sourceSystem": "CLINIC_CSV",
+      "resourceId": "allergies.csv:PLACEHOLDER",
+      "verification": "CSV_DERIVED",
+      "isConstructed": false
+    },
+    {
+      "entityId": "00000000-0000-4000-8000-000000000900",
+      "occurredAt": "2026-10-17T18:00:00Z",
+      "type": "MEDICATION_ORDER",
+      "codes": [
+        "RxNorm:308192"
+      ],
+      "display": "Amoxicillin 500 MG Oral Tablet (active order)",
+      "sourceRecordId": "00000000-0000-4000-8000-000000000001",
+      "sourceSystem": "ER_FHIR",
+      "resourceId": "MedicationRequest/PLACEHOLDER",
+      "verification": "CODED",
+      "isConstructed": true
+    }
+  ],
+  "alertIfApproved": {
+    "id": "00000000-0000-4000-8000-000000000950",
+    "entityId": "00000000-0000-4000-8000-000000000900",
+    "ruleId": "BL-AMOX-01",
+    "ruleVersion": "v1",
+    "tier": "A",
+    "allergyRef": {
+      "sourceRecordId": "00000000-0000-4000-8000-000000000002",
+      "sourceSystem": "CLINIC_CSV",
+      "resourceId": "allergies.csv:PLACEHOLDER"
+    },
+    "orderRef": {
+      "sourceRecordId": "00000000-0000-4000-8000-000000000001",
+      "sourceSystem": "ER_FHIR",
+      "resourceId": "MedicationRequest/PLACEHOLDER"
+    },
+    "revealedByMerge": true,
+    "severity": "moderate",
+    "status": "PRELIMINARY",
+    "cardText": "Flagged for clinician review. Two records that were previously separate are now linked to this patient by an approved identity link. [Clinic CSV, allergies.csv row PLACEHOLDER] documents an allergy coded penicillin V (RxNorm 7984; status active; verification not stated in source; reaction: anaphylaxis, severe). This rule treats that code as penicillin-class. [ER FHIR, MedicationRequest/PLACEHOLDER] has an active order for amoxicillin 500 MG Oral Tablet, RxNorm 308192. The amoxicillin/clavulanate label (DailyMed, set f10634cb-6505-43f1-9b70-314c58673016, revised 10/2026) states: \"contraindicated in patients with a history of serious hypersensitivity reactions (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin, clavulanate or to other beta-lactam antibacterial drugs (e.g., penicillins and cephalosporins)\". This is a rule-based flag on synthetic data. It does not say what the patient took or tolerated, or what should be prescribed. A clinician decides.",
+    "cardFooter": "Rule BL-AMOX-01 v1. Not checked: cephalosporin cross-reactivity, intolerances, dose, free-text allergies. Absence of a flag is not evidence that no conflict exists. This rule and its wording were not reviewed by a clinician.",
+    "citation": {
+      "labelName": "Amoxicillin and clavulanate potassium (Chartwell RX)",
+      "setId": "f10634cb-6505-43f1-9b70-314c58673016",
+      "revised": "10/2026",
+      "url": "https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid=f10634cb-6505-43f1-9b70-314c58673016",
+      "quote": "contraindicated in patients with a history of serious hypersensitivity reactions (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin, clavulanate or to other beta-lactam antibacterial drugs (e.g., penicillins and cephalosporins)"
+    },
+    "constructedScenario": true,
+    "identifiedAt": "2026-10-17T18:00:00Z"
+  },
+  "thresholds": {
+    "thresholdsId": "provisional-0",
+    "cLow": 0.0,
+    "cHigh": 2.0,
+    "tLowDisplay": null,
+    "tHighDisplay": null,
+    "autoLinkEnabled": false,
+    "isCalibrated": false,
+    "sourceRunId": null
+  },
+  "tiles": {
+    "tiles": [
+      {
+        "id": "DECISION_FLOW",
+        "aggregate": "band_flow_1m",
+        "windowMinutes": 60,
+        "buckets": [
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "REVIEW",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          },
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "KEEP_SEPARATE",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          },
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "AUTO_LINK",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          }
+        ],
+        "total": 0,
+        "realTime": true
+      },
+      {
+        "id": "HUMAN_REVIEW",
+        "aggregate": "review_outcomes_5m",
+        "windowMinutes": 60,
+        "buckets": [
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "APPROVED",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          },
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "REJECTED",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          }
+        ],
+        "total": 0,
+        "realTime": true
+      },
+      {
+        "id": "AGENT_GATE",
+        "aggregate": "agent_gate_5m",
+        "windowMinutes": 60,
+        "buckets": [
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "ALLOW",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          },
+          {
+            "bucket": "2026-10-17T18:00:00Z",
+            "series": "DENY",
+            "count": 0,
+            "meanLatencyMs": null,
+            "maxLatencyMs": null
+          }
+        ],
+        "total": 0,
+        "realTime": true
+      }
+    ],
+    "asOf": "2026-10-17T18:00:00Z"
+  },
+  "whatIfs": {
+    "REMOVE_ADDRESS": {
+      "baseline": {
+        "p": 0.73,
+        "rawScore": 1.0,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.9,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 0.6,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.8,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.2,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 0.4,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 0.7,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.3,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "whatIf": {
+        "p": 0.35,
+        "rawScore": -0.6,
+        "band": "KEEP_SEPARATE",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.9,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 0.6,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.8,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.2,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 0.4,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 0.7,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.3,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "deltas": [
+        {
+          "feature": "address_jaccard",
+          "logit": -1.6,
+          "value": null
+        }
+      ],
+      "caption": "Without the address there is not enough to link.",
+      "counterfactualFields": {
+        "address_jaccard": "PLACEHOLDER"
+      },
+      "alertWouldBeHidden": true,
+      "heldOutRecall": [
+        {
+          "button": "REMOVE_ADDRESS",
+          "category": "PLACEHOLDER-REMOVE_ADDRESS",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "CHANGE_BIRTH_YEAR",
+          "category": "PLACEHOLDER-CHANGE_BIRTH_YEAR",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "SWAP_DOB_DAY_MONTH",
+          "category": "PLACEHOLDER-SWAP_DOB_DAY_MONTH",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "ACCENT_HYPHEN_SURNAME",
+          "category": "PLACEHOLDER-ACCENT_HYPHEN_SURNAME",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        }
+      ],
+      "seed": 20261017
+    },
+    "CHANGE_BIRTH_YEAR": {
+      "baseline": {
+        "p": 0.73,
+        "rawScore": 1.0,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.9,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 0.6,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.8,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.2,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 0.4,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 0.7,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.3,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "whatIf": {
+        "p": 0.29,
+        "rawScore": -0.9,
+        "band": "KEEP_SEPARATE",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.9,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 0.6,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.8,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.2,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 0.4,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 0.7,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.3,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "deltas": [
+        {
+          "feature": "dob_exact",
+          "logit": -1.9,
+          "value": null
+        }
+      ],
+      "caption": "A different birth year: not enough to link.",
+      "counterfactualFields": {
+        "dob_exact": "PLACEHOLDER"
+      },
+      "alertWouldBeHidden": true,
+      "heldOutRecall": [
+        {
+          "button": "REMOVE_ADDRESS",
+          "category": "PLACEHOLDER-REMOVE_ADDRESS",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "CHANGE_BIRTH_YEAR",
+          "category": "PLACEHOLDER-CHANGE_BIRTH_YEAR",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "SWAP_DOB_DAY_MONTH",
+          "category": "PLACEHOLDER-SWAP_DOB_DAY_MONTH",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "ACCENT_HYPHEN_SURNAME",
+          "category": "PLACEHOLDER-ACCENT_HYPHEN_SURNAME",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        }
+      ],
+      "seed": 20261017
+    },
+    "SWAP_DOB_DAY_MONTH": {
+      "baseline": {
+        "p": 0.73,
+        "rawScore": 1.0,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.9,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 0.6,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.8,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.2,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 0.4,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 0.7,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.3,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "whatIf": {
+        "p": 0.72,
+        "rawScore": 0.95,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.9,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 0.6,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.8,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.2,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 0.4,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 0.7,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.3,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "deltas": [
+        {
+          "feature": "dob_day_month_swap",
+          "logit": -0.050000000000000044,
+          "value": null
+        }
+      ],
+      "caption": "Day and month swapped: the engine has a named feature for this; the score barely moves.",
+      "counterfactualFields": {
+        "dob_day_month_swap": "PLACEHOLDER"
+      },
+      "alertWouldBeHidden": false,
+      "heldOutRecall": [
+        {
+          "button": "REMOVE_ADDRESS",
+          "category": "PLACEHOLDER-REMOVE_ADDRESS",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "CHANGE_BIRTH_YEAR",
+          "category": "PLACEHOLDER-CHANGE_BIRTH_YEAR",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "SWAP_DOB_DAY_MONTH",
+          "category": "PLACEHOLDER-SWAP_DOB_DAY_MONTH",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "ACCENT_HYPHEN_SURNAME",
+          "category": "PLACEHOLDER-ACCENT_HYPHEN_SURNAME",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        }
+      ],
+      "seed": 20261017
+    },
+    "ACCENT_HYPHEN_SURNAME": {
+      "baseline": {
+        "p": 0.73,
+        "rawScore": 1.0,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.9,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 0.6,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.8,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.2,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 0.4,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 0.7,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.3,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "whatIf": {
+        "p": 0.72,
+        "rawScore": 0.97,
+        "band": "REVIEW",
+        "contributions": [
+          {
+            "feature": "given_name_jw",
+            "logit": 0.9,
+            "value": 1.0
+          },
+          {
+            "feature": "family_name_jw",
+            "logit": 0.6,
+            "value": 1.0
+          },
+          {
+            "feature": "family_metaphone",
+            "logit": 0.5,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_exact",
+            "logit": 0.8,
+            "value": 1.0
+          },
+          {
+            "feature": "dob_day_month_swap",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "dob_one_digit_edit",
+            "logit": 0.0,
+            "value": null
+          },
+          {
+            "feature": "sex_match",
+            "logit": 0.2,
+            "value": 1.0
+          },
+          {
+            "feature": "phone_match",
+            "logit": 0.4,
+            "value": 1.0
+          },
+          {
+            "feature": "address_jaccard",
+            "logit": 0.7,
+            "value": 1.0
+          },
+          {
+            "feature": "zip_match",
+            "logit": 0.3,
+            "value": 1.0
+          }
+        ],
+        "negativeRulesFired": []
+      },
+      "deltas": [
+        {
+          "feature": "family_name_jw",
+          "logit": -0.030000000000000027,
+          "value": null
+        }
+      ],
+      "caption": "Accents and hyphens changed: a named feature; the score barely moves.",
+      "counterfactualFields": {
+        "family_name_jw": "PLACEHOLDER"
+      },
+      "alertWouldBeHidden": false,
+      "heldOutRecall": [
+        {
+          "button": "REMOVE_ADDRESS",
+          "category": "PLACEHOLDER-REMOVE_ADDRESS",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "CHANGE_BIRTH_YEAR",
+          "category": "PLACEHOLDER-CHANGE_BIRTH_YEAR",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "SWAP_DOB_DAY_MONTH",
+          "category": "PLACEHOLDER-SWAP_DOB_DAY_MONTH",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        },
+        {
+          "button": "ACCENT_HYPHEN_SURNAME",
+          "category": "PLACEHOLDER-ACCENT_HYPHEN_SURNAME",
+          "recall": null,
+          "nPairs": 0,
+          "nEntities": 0,
+          "nComponents": 0,
+          "lowSupport": true
+        }
+      ],
+      "seed": 20261017
+    }
+  },
+  "frontdeskIntake": {
+    "scenarioContextId": "hero-er-arrival",
+    "utteranceEs": "Me llamo PLACEHOLDER-GIVEN PLACEHOLDER FAMILY, nací el 3 de julio de 1985.",
+    "utteranceEn": "My name is PLACEHOLDER-GIVEN PLACEHOLDER FAMILY, born July 3, 1985.",
+    "expectedGate": {
+      "tool": "propose_new_chart",
+      "outcome": "DENY",
+      "reasonCode": "CANDIDATE_IN_REVIEW_OR_HIGHER"
+    }
+  }
+}

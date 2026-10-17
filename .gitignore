@@ -43,6 +43,7 @@ htmlcov/
 .playwright/
 test-results/
 playwright-report/
+.schemathesis/
 
 # Editors
 .idea/
