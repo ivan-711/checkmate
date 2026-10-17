@@ -28,6 +28,3 @@ def components[N: Hashable](edges: Iterable[tuple[N, N]], nodes: Iterable[N] = (
         groups.setdefault(find(n), set()).add(n)
     return {n: frozenset(members) for members in groups.values() for n in members}
 
-
-def component_of[N: Hashable](edges: Iterable[tuple[N, N]], node: N) -> frozenset[N]:
-    return components(edges, [node])[node]

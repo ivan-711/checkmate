@@ -227,3 +227,23 @@ def test_never_say_words_are_absent_from_every_card():
             low = flag.card_text.lower()
             assert all(b.lower() not in low for b in banned), flag.card_text
             assert "flagged for clinician review" in low
+
+
+def test_csv_encounter_rows_with_reasoncode_are_encounters_not_orders():
+    member = clinic_member()
+    payload = {"Id": "p", "encounters": [{"Id": "e1", "START": "2024-03-02T10:00:00Z", "STOP": "2024-03-02T10:30:00Z",
+                                           "PATIENT": "p", "ENCOUNTERCLASS": "ambulatory", "CODE": "185349003",
+                                           "DESCRIPTION": "Encounter for check up (procedure)", "REASONCODE": "", "REASONDESCRIPTION": ""}],
+               "medications": [{"START": "2026-10-01", "STOP": "", "PATIENT": "p", "CODE": "308192",
+                                "DESCRIPTION": "Amoxicillin 500 MG Oral Tablet", "DISPENSES": "1", "REASONCODE": "43878008"}]}
+    parsed = parse_member(source_record_id=member.source_record_id, source_system="CLINIC_CSV", source_local_id="CLINIC-7",
+                          kind=SourceKind.CSV_ROW, is_constructed=False, ingested_at=T0, raw_payload=payload)
+    assert len(parsed.encounters) == 1 and parsed.encounters[0].class_code == "ambulatory"
+    assert [o.code.code for o in parsed.orders] == ["308192"] and parsed.orders[0].code.system == RXNORM
+
+
+def test_csv_unknown_system_is_rxnorm_only_for_cached_codes():
+    member = clinic_member(allergies=[csv_allergy_row(code="91930004", description="Animal dander (substance)"), csv_allergy_row()])
+    systems = {a.code.code: a.code.system for a in member.allergies}
+    assert systems["7984"] == RXNORM and systems["91930004"] is None
+    assert evaluate([member, HERO_ORDER]) and all(f.allergy.code.code == "7984" for f in evaluate([member, HERO_ORDER]))

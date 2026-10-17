@@ -6,15 +6,14 @@ normalized rows and raw payloads. Nothing is cached (ADR-014).
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from backend.golden.survivorship import MemberDemographics, golden_demographics, golden_union
+from backend.golden.timeline import BadCursor, timeline_events
 from backend.golden.timeline import page as timeline_page
-from backend.golden.timeline import timeline_events
 from backend.rule.resources import MemberResources, parse_member
 from contracts.models.alerts import AlertStatus, AlertTier, Citation, ResourceRef, SafetyAlert
 from contracts.models.common import Crosswalk, Page
@@ -38,11 +37,22 @@ _ALERTS = text(
 )
 
 
-def load_members(conn: Connection, entity_id: UUID) -> list[MemberResources]:
-    rows = conn.execute(_MEMBERS, {"entity_id": entity_id}).mappings().all()
+def _member_rows(conn: Connection, entity_id: UUID):
+    return conn.execute(_MEMBERS, {"entity_id": entity_id}).mappings().all()
+
+
+def _parse_rows(rows) -> list[MemberResources]:
     return [parse_member(source_record_id=r["id"], source_system=r["source_system"], source_local_id=r["source_local_id"],
                          kind=r["kind"], is_constructed=r["is_constructed"], ingested_at=r["ingested_at"],
                          raw_payload=r["raw_payload"]) for r in rows]
+
+
+def load_members(conn: Connection, entity_id: UUID) -> list[MemberResources]:
+    return _parse_rows(_member_rows(conn, entity_id))
+
+
+def entity_exists(conn: Connection, entity_id: UUID) -> bool:
+    return conn.execute(_ENTITY, {"entity_id": entity_id}).first() is not None
 
 
 def _demographics(rows) -> list[MemberDemographics]:
@@ -72,10 +82,8 @@ def read_entity(conn: Connection, entity_id: UUID) -> Entity | None:
     head = conn.execute(_ENTITY, {"entity_id": entity_id}).mappings().first()
     if head is None:
         return None
-    rows = conn.execute(_MEMBERS, {"entity_id": entity_id}).mappings().all()
-    members = [parse_member(source_record_id=r["id"], source_system=r["source_system"], source_local_id=r["source_local_id"],
-                            kind=r["kind"], is_constructed=r["is_constructed"], ingested_at=r["ingested_at"],
-                            raw_payload=r["raw_payload"]) for r in rows]
+    rows = _member_rows(conn, entity_id)
+    members = _parse_rows(rows)
     return Entity(
         id=head["id"], version=head["version"],
         members=[EntityMember(source_record_id=r["id"], source_system=r["source_system"], is_constructed=r["is_constructed"])
@@ -86,7 +94,8 @@ def read_entity(conn: Connection, entity_id: UUID) -> Entity | None:
 
 
 def read_timeline(conn: Connection, entity_id: UUID, limit: int, cursor: str | None) -> Page[TimelineEvent] | None:
-    if conn.execute(_ENTITY, {"entity_id": entity_id}).first() is None:
+    """None for an unknown entity; raises BadCursor for a cursor the server did not mint."""
+    if not entity_exists(conn, entity_id):
         return None
     items, next_cursor = timeline_page(timeline_events(entity_id, load_members(conn, entity_id)), limit, cursor)
     return Page[TimelineEvent](items=items, next_cursor=next_cursor)
@@ -112,16 +121,14 @@ def read_alerts(conn: Connection, entity_id: UUID, *, status: AlertStatus | None
 
 
 def alert_page(alerts: Sequence[SafetyAlert], limit: int, cursor: str | None) -> Page[SafetyAlert]:
-    """Keyset on (identified_at, id); the cursor is the last item's id."""
+    """Keyset on (identified_at, id); the cursor is the last item's id. Raises BadCursor for an unknown one."""
     start = 0
     if cursor:
         ids = [str(a.id) for a in alerts]
-        start = ids.index(cursor) + 1 if cursor in ids else len(alerts)
+        if cursor not in ids:
+            raise BadCursor("cursor is not one this endpoint issued")
+        start = ids.index(cursor) + 1
     items = list(alerts[start:start + limit])
     next_cursor = str(items[-1].id) if items and start + limit < len(alerts) else None
     return Page[SafetyAlert](items=items, next_cursor=next_cursor)
 
-
-def now_utc() -> datetime:
-    from datetime import UTC
-    return datetime.now(UTC)

@@ -153,3 +153,40 @@ def test_completed_order_means_no_alert_after_approve(conn):
     clinic, er = hero_records(conn, order_status="completed")
     entity, alerts = apply_approve(conn, *linked_pair(conn, clinic, er))
     assert alerts == [] and alert_rows(conn, entity.id) == []
+
+
+def test_retry_of_approve_logs_one_entity_merged(conn):
+    clinic, er = hero_records(conn)
+    pair, decision = linked_pair(conn, clinic, er)
+    apply_approve(conn, pair, decision)
+    entity, _ = apply_approve(conn, pair, decision)
+    assert events(conn, entity_id=entity.id).count("ENTITY_MERGED") == 1
+
+
+def test_split_moves_an_alert_whose_records_move_together(conn):
+    clinic, er = hero_records(conn)
+    z = insert_record(conn, system="ER_FHIR", local_id="ER-MRN-0", kind=SourceKind.FHIR_PATIENT,
+                      raw_payload={"resourceType": "Patient", "id": "z"}, ingested_at=T0 - timedelta(days=1))
+    entity, _ = apply_approve(conn, *linked_pair(conn, z, clinic))
+    entity, alerts = apply_approve(conn, *linked_pair(conn, clinic, er))
+    assert [a.tier for a in alerts] == [AlertTier.A]
+    result = apply_split(conn, entity.id, [clinic, er], actor="registrar:Registrar A", reason_code=ReasonCode.INSUFFICIENT_EVIDENCE)
+    assert result.retracted_alert_ids == [], "the clinic-er edge was never revoked, so the flag keeps its id"
+    assert result.entities[0].id == entity.id and {m.source_record_id for m in result.entities[0].members} == {z}
+    moved = read_alerts(conn, result.entities[1].id, status=AlertStatus.PRELIMINARY)
+    assert [a.id for a in moved] == [alerts[0].id]
+    assert "ALERT_RETRACTED" not in events(conn)
+
+
+def test_revoke_that_does_not_disconnect_writes_no_split_event(conn):
+    mk = lambda i: insert_record(conn, system="ER_FHIR", local_id=f"T{i}", kind=SourceKind.FHIR_PATIENT,
+                                 raw_payload={"resourceType": "Patient", "id": f"t{i}"}, ingested_at=T0 + timedelta(minutes=i))
+    a, b, c = mk(1), mk(2), mk(3)
+    pair_ab, _ = linked_pair(conn, a, b)
+    apply_approve(conn, pair_ab, conn.execute(text("SELECT id FROM match_decision WHERE pair_id = :p AND version = 2"), {"p": pair_ab}).scalar())
+    apply_approve(conn, *linked_pair(conn, b, c))
+    entity, _ = apply_approve(conn, *linked_pair(conn, a, c))
+    revoked = insert_decision(conn, pair_ab, 3, DecisionStatus.REVOKED, reason_code=ReasonCode.INSUFFICIENT_EVIDENCE.value)
+    result = apply_revoke(conn, pair_ab, revoked)
+    assert len(result.entities) == 1 and result.entities[0].id == entity.id
+    assert "ENTITY_SPLIT" not in events(conn, entity_id=entity.id)

@@ -102,3 +102,14 @@ def test_routes_404_use_the_error_envelope(client):
     t = client.get(f"/api/v1/entities/{uuid4()}/timeline")
     assert t.status_code == 404 and t.json()["error"]["code"] == "NOT_FOUND"
     assert client.get("/api/v1/entities/not-a-uuid").status_code == 422
+
+
+def test_routes_bad_cursor_is_422_and_limit_is_clamped(client, committed_entity):
+    entity, _, _ = committed_entity
+    bad = client.get(f"/api/v1/entities/{entity.id}/timeline", params={"cursor": "not-a-cursor"})
+    assert bad.status_code == 422 and bad.json()["error"]["code"] == "VALIDATION_ERROR"
+    bad_alert = client.get("/api/v1/alerts", params={"entityId": str(entity.id), "cursor": str(uuid4())})
+    assert bad_alert.status_code == 422
+    big = client.get(f"/api/v1/entities/{entity.id}/timeline", params={"limit": 5000})
+    assert big.status_code == 200 and big.json()["nextCursor"] is None
+    assert client.get("/api/v1/alerts", params={"entityId": str(uuid4())}).status_code == 404

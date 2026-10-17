@@ -17,9 +17,9 @@ from backend.rule.resources import (
     AllergyRecord,
     MemberResources,
     OrderRecord,
-    Reaction,
     SourceRef,
     strip_snomed_tag,
+    worst_reaction,
 )
 from backend.rule.terminology import ANAPHYLAXIS_SNOMED, RXNORM_SYSTEM, Terminology, load_terminology
 from contracts.models.alerts import CARD_FOOTER, AlertStatus, AlertTier, Citation, ResourceRef, SafetyAlert
@@ -35,7 +35,6 @@ VERIFICATION_NOT_STATED = "not stated in source"
 NO_CACHED_LABEL = "no cached label for this drug"
 # Closed map from source system to the on-screen label (UX spec 3.1); unknown systems show their id.
 SOURCE_LABELS = {"ER_FHIR": "ER FHIR", "CLINIC_CSV": "Clinic CSV", "SPECIALIST": "Specialist"}
-_SEVERITY_RANK = {SERIOUS_SEVERITY: 3, "moderate": 2, "mild": 1, None: 0}
 
 HEADLINE_A = "Flagged for clinician review."
 HEADLINE_B = "Possible conflict, flagged for clinician review."
@@ -112,14 +111,8 @@ def _ref_text(ref: SourceRef, csv_file: str) -> str:
     return f"[{label}, {ref.resource_id}]"
 
 
-def _worst_reaction(allergy: AllergyRecord) -> Reaction | None:
-    if not allergy.reactions:
-        return None
-    return max(allergy.reactions, key=lambda r: (ANAPHYLAXIS_SNOMED in r.manifestation_codes, _SEVERITY_RANK.get(r.severity, 0)))
-
-
 def _reaction_text(allergy: AllergyRecord) -> str:
-    worst = _worst_reaction(allergy)
+    worst = worst_reaction(allergy.reactions)
     if worst is None:
         return "not recorded"
     name = strip_snomed_tag(worst.manifestation_display) or ("anaphylaxis" if ANAPHYLAXIS_SNOMED in worst.manifestation_codes else None)
@@ -128,7 +121,7 @@ def _reaction_text(allergy: AllergyRecord) -> str:
 
 
 def _reaction_word(allergy: AllergyRecord) -> str:
-    worst = _worst_reaction(allergy)
+    worst = worst_reaction(allergy.reactions)
     return worst.severity if worst and worst.severity else "not recorded"
 
 
@@ -181,6 +174,8 @@ def evaluate(members: Sequence[MemberResources], term: Terminology | None = None
     for allergy in allergies:
         for order in orders:
             tier = AlertTier.A if is_serious(allergy) else AlertTier.B
+            # Spec section 5 pseudocode compares source systems, not record ids: two records of one
+            # system that a registrar links read as "Both records come from the same source."
             revealed = allergy.ref.source_system != order.ref.source_system
             citation, drug_name = _citation_for(order, term) if tier == AlertTier.A else (None, None)
             flags.append(RuleFlag(

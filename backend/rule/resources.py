@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+from backend.rule.terminology import ANAPHYLAXIS_SNOMED, RXNORM_SYSTEM, load_terminology
 from contracts.models.common import SourceKind
 from contracts.models.entities import TimelineVerification
 
@@ -28,9 +29,11 @@ CONSTRUCTED_TAG_CODE = "constructed-scenario"
 ALLERGY_FILE = "allergies.csv"
 MEDICATION_FILE = "medications.csv"
 ENCOUNTER_FILE = "encounters.csv"
-# CSV SYSTEM values accepted as RxNorm. The Nov 2021 sample writes "Unknown" on every
-# allergy row, so a strict "RxNorm" test would silence the rule on real Synthea CSV.
-CSV_RXNORM_SYSTEMS = frozenset({"rxnorm", "unknown", ""})
+# CSV SYSTEM values that do not name a code system. The Nov 2021 sample writes "Unknown" on
+# every allergy row, so a strict "RxNorm" test would silence the rule on real Synthea CSV;
+# such a row is labeled RxNorm only when the terminology cache knows the code.
+CSV_UNSTATED_SYSTEMS = frozenset({"unknown", ""})
+_SEVERITY_RANK = {"severe": 3, "moderate": 2, "mild": 1}
 _SNOMED_TAG = re.compile(r"\s*\((disorder|finding|substance|procedure|product)\)\s*$", re.IGNORECASE)
 
 
@@ -46,6 +49,13 @@ class Reaction:
     severity: str | None                      # mild / moderate / severe, lower-case; None when not recorded
     manifestation_codes: tuple[str, ...]      # SNOMED codes
     manifestation_display: str | None
+
+
+def worst_reaction(reactions: tuple[Reaction, ...]) -> Reaction | None:
+    """Anaphylaxis first, then the explicit severity rank; shared by the card and the timeline."""
+    if not reactions:
+        return None
+    return max(reactions, key=lambda r: (ANAPHYLAXIS_SNOMED in r.manifestation_codes, _SEVERITY_RANK.get(r.severity, 0)))
 
 
 @dataclass(frozen=True)
@@ -211,13 +221,15 @@ def _upper(row: Mapping) -> dict[str, Any]:
 
 
 def _row_kind(row: Mapping, container_key: str | None) -> str | None:
+    """Container key first, then the header column unique to each Synthea file. REASONCODE is
+    not a discriminator: encounters, procedures and careplans carry it too."""
     key = (container_key or "").lower()
     if "allerg" in key or "REACTION1" in row or "SEVERITY1" in row:
         return ALLERGY_FILE
-    if "medic" in key or "DISPENSES" in row or "REASONCODE" in row and "CODE" in row and "START" in row:
-        return MEDICATION_FILE
     if "encounter" in key or "ENCOUNTERCLASS" in row:
         return ENCOUNTER_FILE
+    if "medic" in key or "DISPENSES" in row or "TOTALCOST" in row:
+        return MEDICATION_FILE
     return None
 
 
@@ -247,13 +259,15 @@ def _csv_ref(base: MemberResources, file: str, row: Mapping, index: int) -> Sour
                      base.is_constructed or _truthy(row.get("CONSTRUCTED", "")), TimelineVerification.CSV_DERIVED)
 
 
-def _csv_code(row: Mapping, system_default: str | None) -> Coding | None:
+def _csv_code(row: Mapping) -> Coding | None:
     code = str(row.get("CODE") or "").strip()
     if not code:
         return None
-    system = str(row.get("SYSTEM") or "").strip().lower()
-    if system in CSV_RXNORM_SYSTEMS:
-        system = system_default
+    system: str | None = str(row.get("SYSTEM") or "").strip()
+    if system.lower() == "rxnorm":
+        system = RXNORM_SYSTEM
+    elif system.lower() in CSV_UNSTATED_SYSTEMS:
+        system = RXNORM_SYSTEM if load_terminology().knows(code) else None
     return Coding(system=system, code=code, display=row.get("DESCRIPTION") or None)
 
 
@@ -266,7 +280,7 @@ def _csv_allergy(base: MemberResources, row: Mapping, index: int) -> AllergyReco
                                       (str(code),) if code else (), row.get(f"DESCRIPTION{n}") or None))
     return AllergyRecord(
         ref=_csv_ref(base, ALLERGY_FILE, row, index),
-        code=_csv_code(row, "http://www.nlm.nih.gov/research/umls/rxnorm"),
+        code=_csv_code(row),
         type=(str(row.get("TYPE")).lower() or None) if row.get("TYPE") else None,
         clinical_status="active" if not row.get("STOP") else "inactive",
         verification_status=None,  # allergies.csv carries no verificationStatus: "not stated in source"
@@ -278,7 +292,7 @@ def _csv_allergy(base: MemberResources, row: Mapping, index: int) -> AllergyReco
 def _csv_order(base: MemberResources, row: Mapping, index: int) -> OrderRecord:
     return OrderRecord(
         ref=_csv_ref(base, MEDICATION_FILE, row, index),
-        code=_csv_code(row, "http://www.nlm.nih.gov/research/umls/rxnorm"),
+        code=_csv_code(row),
         status=str(row["STATUS"]).lower() if row.get("STATUS") else ("active" if not row.get("STOP") else "completed"),
         intent=str(row["INTENT"]).lower() if row.get("INTENT") else "order",
         authored_at=parse_timestamp(row.get("START")), requester_display=row.get("PROVIDER") or None,

@@ -34,10 +34,13 @@ class Terminology:
     rxnav_version: str
     fetched: str
     class_ingredients: frozenset[str]
-    ingredient_names: dict[str, str]
     pin_to_in: dict[str, str]
     scd_to_ingredients: dict[str, tuple[str, ...]]
     labels: tuple[Label, ...]
+
+    def knows(self, code: str) -> bool:
+        """Whether the cache can say anything about this RxNorm code."""
+        return code in self.class_ingredients or code in self.pin_to_in or code in self.scd_to_ingredients
 
     def fold(self, code: str) -> str:
         """A precise ingredient (PIN) folds to its ingredient (IN); anything else stays."""
@@ -90,7 +93,6 @@ def load_terminology(cache_dir: Path = CACHE_DIR) -> Terminology:
         rxnav_version=klass["rxnav_version"],
         fetched=klass["fetched"],
         class_ingredients=frozenset(i["rxcui"] for i in klass["ingredients"]),
-        ingredient_names={i["rxcui"]: i["name"] for i in klass["ingredients"]},
         pin_to_in=dict(klass["pin_to_in"]),
         scd_to_ingredients={code: tuple(entry["ingredients"]) for code, entry in scd["codes"].items()},
         labels=labels,

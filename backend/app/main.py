@@ -16,10 +16,11 @@ from starlette.responses import Response
 
 from backend.app.config import load_settings
 from backend.app.db import db_is_up, make_engine
-from backend.golden.service import alert_page, read_alerts, read_entity, read_timeline
-from contracts.api_spec import build_app, error_envelope
+from backend.golden.service import alert_page, entity_exists, read_alerts, read_entity, read_timeline
+from backend.golden.timeline import BadCursor
+from contracts.api_spec import _err, build_app, error_envelope
 from contracts.models.alerts import AlertStatus, SafetyAlert
-from contracts.models.common import ERROR_STATUS, ErrorCode, ErrorEnvelope, Page
+from contracts.models.common import ErrorCode, Page
 from contracts.models.entities import Entity, TimelineEvent
 from contracts.models.health import AgentStatus, DependencyStatus, Health, HealthVersions
 from contracts.version import (
@@ -92,10 +93,13 @@ async def health() -> Health:
 
 # W3b: read-time golden record, timeline and alerts (architecture section 5, section 8; ADR-014).
 # The timeline and alerts routes are additive to contracts-v1 (flagged in the lane's PR).
-Limit = Annotated[int, Query(ge=1, le=LIST_LIMIT_MAX, description="clamped to the contract's bounds")]
-_NOT_FOUND = {404: {"model": ErrorEnvelope, "description": ErrorCode.NOT_FOUND.value}}
-_COMMON = {ERROR_STATUS[c]: {"model": ErrorEnvelope, "description": c.value}
-           for c in (ErrorCode.VALIDATION_ERROR, ErrorCode.INTERNAL)}
+Limit = Annotated[int, Query(ge=1, description=f"clamped to {LIST_LIMIT_MAX}, never rejected")]
+_NOT_FOUND = _err(ErrorCode.NOT_FOUND)
+_COMMON = _err(ErrorCode.VALIDATION_ERROR, ErrorCode.INTERNAL)
+
+
+def _clamp(limit: int) -> int:
+    return min(limit, LIST_LIMIT_MAX)
 
 
 @app.get(API_PREFIX + "/entities/{entity_id}", response_model=Entity, tags=["core"], responses=_NOT_FOUND | _COMMON,
@@ -110,8 +114,11 @@ def get_entity(entity_id: uuid.UUID):
          responses=_NOT_FOUND | _COMMON,
          description="Lane W3b (additive). Timeline from the members' encounters, allergies and orders; bounded keyset list.")
 def get_entity_timeline(entity_id: uuid.UUID, limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None):
-    with engine.connect() as conn:
-        page = read_timeline(conn, entity_id, limit, cursor)
+    try:
+        with engine.connect() as conn:
+            page = read_timeline(conn, entity_id, _clamp(limit), cursor)
+    except BadCursor as exc:
+        return error_envelope(ErrorCode.VALIDATION_ERROR, str(exc))
     return page if page is not None else error_envelope(ErrorCode.NOT_FOUND, "entity not found")
 
 
@@ -120,5 +127,10 @@ def get_entity_timeline(entity_id: uuid.UUID, limit: Limit = LIST_LIMIT_DEFAULT,
 def list_alerts(entity_id: Annotated[uuid.UUID, Query(alias="entityId")], status: AlertStatus | None = None,
                 limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None):
     with engine.connect() as conn:
+        if not entity_exists(conn, entity_id):
+            return error_envelope(ErrorCode.NOT_FOUND, "entity not found")
         alerts = read_alerts(conn, entity_id, status=status)
-    return alert_page(alerts, limit, cursor)
+    try:
+        return alert_page(alerts, _clamp(limit), cursor)
+    except BadCursor as exc:
+        return error_envelope(ErrorCode.VALIDATION_ERROR, str(exc))

@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from backend.app.db import make_engine
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://checkmate:checkmate@127.0.0.1:5432/checkmate_test_w3b")
+SKIP_DB_TESTS = os.environ.get("CHECKMATE_SKIP_DB_TESTS") == "1"  # explicit opt-out only; never a silent skip
 
 
 @pytest.fixture(scope="session")
@@ -21,7 +22,9 @@ def engine():
         with eng.connect() as c:
             c.execute(text("SELECT 1 FROM entity LIMIT 1"))
     except SQLAlchemyError as exc:  # pragma: no cover - environment, not code
-        pytest.skip(f"test database unavailable or unmigrated: {exc}")
+        if SKIP_DB_TESTS:
+            pytest.skip(f"test database unavailable or unmigrated: {exc}")
+        pytest.fail(f"test database unavailable or unmigrated (set CHECKMATE_SKIP_DB_TESTS=1 to skip): {exc}")
     return eng
 
 

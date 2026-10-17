@@ -6,7 +6,14 @@ from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
-from backend.rule.resources import AllergyRecord, EncounterRecord, MemberResources, OrderRecord, strip_snomed_tag
+from backend.rule.resources import (
+    AllergyRecord,
+    EncounterRecord,
+    MemberResources,
+    OrderRecord,
+    strip_snomed_tag,
+    worst_reaction,
+)
 from contracts.models.entities import TimelineEvent
 
 TYPE_ENCOUNTER = "ENCOUNTER"
@@ -25,7 +32,7 @@ def _allergy_event(entity_id: UUID, a: AllergyRecord) -> TimelineEvent | None:
     if a.recorded_at is None:
         return None
     name = (strip_snomed_tag(a.code.display) if a.code else None) or (a.code.code if a.code else "unknown substance")
-    worst = max(a.reactions, key=lambda r: r.severity or "", default=None)
+    worst = worst_reaction(a.reactions)
     reaction = ""
     if worst is not None:
         parts = [p for p in (strip_snomed_tag(worst.manifestation_display), worst.severity) if p]
@@ -81,12 +88,16 @@ def encode_cursor(event: TimelineEvent) -> str:
     return base64.urlsafe_b64encode(raw.encode()).decode()
 
 
-def decode_cursor(cursor: str) -> tuple[datetime, str, str] | None:
+class BadCursor(ValueError):
+    """An opaque cursor the server did not mint: the route answers 422 VALIDATION_ERROR."""
+
+
+def decode_cursor(cursor: str) -> tuple[datetime, str, str]:
     try:
         ts, rid, res = base64.urlsafe_b64decode(cursor.encode()).decode().split("|", 2)
         return (datetime.fromisoformat(ts), rid, res)
-    except (ValueError, UnicodeDecodeError):
-        return None
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise BadCursor("cursor is not one this endpoint issued") from exc
 
 
 def page(events: Sequence[TimelineEvent], limit: int, cursor: str | None) -> tuple[list[TimelineEvent], str | None]:
