@@ -2,7 +2,7 @@
 
 Author: Gojo (docs) · 2026-10-17
 
-Every third-party package this repository installs, read from its lock file. Licenses are the SPDX expression (or, where a package publishes none, the license field and classifiers) in the PyPI metadata for the exact pinned version. The table is maintained by hand: update it in the same pull request that changes a lock file.
+Every third-party package in the repository's lock files, plus the container images and build tools installed outside them. For lock-file packages, the license is the SPDX expression (or, where a package publishes none, the license field and classifiers) in the PyPI metadata for the exact pinned version. The tables are maintained by hand: update them in the same pull request that changes a lock file, an image or a build step.
 
 The project's own code license is not set yet.
 
@@ -55,6 +55,14 @@ Runtime packages are reached from `[project].dependencies` in `pyproject.toml`; 
 ## JavaScript: `frontend/package.json`
 
 Added when the frontend lane (W4) merges and `frontend/package-lock.json` exists on `main`.
+
+## Container images and build tools
+
+| Component | Where | Version | License |
+|---|---|---|---|
+| `timescale/timescaledb-ha:pg18` | `docker-compose.yml` | pinned by digest (PG 18.6, TimescaleDB 2.30.2) | PostgreSQL License for PostgreSQL. TimescaleDB is Apache-2.0 for its core and Timescale License (TSL) for its community features, which include the continuous aggregates this repository uses. Other bundled extensions carry their own licenses. |
+| `python:3.12-slim` | `backend/Dockerfile` | tag, not pinned by digest | Python under PSF-2.0 on a Debian base; Debian packages carry their own licenses |
+| uv | `backend/Dockerfile` (`pip install uv`) | not pinned | MIT OR Apache-2.0 |
 
 ## RxNav drug class table (rule BL-AMOX-01)
 

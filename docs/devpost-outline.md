@@ -10,9 +10,9 @@ The seven headings of the Devpost project story. Every number is a `{placeholder
 
 ## What it does
 
-{FrontDesk: typed check-in in Spanish or English; the deterministic gate denies a new chart when an existing chart scores in the REVIEW band or higher, with n of {gate_eval_n} scripted check-ins}
+FrontDesk: {frontdesk_summary}. Scripted check-ins evaluated: {gate_eval_n}.
 
-{ChartGuard: candidate pairs in three decision bands; every link requires recorded human approval; after approval the flag card cites rule BL-AMOX-01}
+ChartGuard: {chartguard_summary}
 
 ## How we built it
 
@@ -24,7 +24,13 @@ The seven headings of the Devpost project story. Every number is a `{placeholder
 
 ## Accomplishments that we're proud of
 
-{per-band precision {precision_review} and recall {recall_review} with n of {n_pairs_heldout}, observed on the frozen held-out set, run {eval_run_id}}
+Observed on the frozen held-out set, run {eval_run_id}:
+
+| Band | Precision | Recall | n |
+|---|---|---|---|
+| AUTO_LINK | {precision_auto_link} | {recall_auto_link} | {n_auto_link} |
+| REVIEW | {precision_review} | {recall_review} | {n_review} |
+| KEEP_SEPARATE | {precision_keep_separate} | {recall_keep_separate} | {n_keep_separate} |
 
 ## What we learned
 
@@ -32,4 +38,4 @@ The seven headings of the Devpost project story. Every number is a `{placeholder
 
 ## What's next for CheckMate
 
-{next step; synthetic data only so far, so the thresholds have not met a real registration log}
+{next_steps}

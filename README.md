@@ -27,7 +27,7 @@ Requires Docker. From the repository root:
 make up
 ```
 
-`make up` builds and starts the database and the API (`Makefile`, `docker-compose.yml`); the API container applies the migrations before it starts (`backend/Dockerfile`). Then open http://127.0.0.1:8000/api/v1/health and expect `"db":"UP"` (`backend/app/main.py`, `contracts/models/health.py`).
+`make up` builds and starts the database and the API (`Makefile`, `docker-compose.yml`); the API container applies the migrations before it starts (`backend/Dockerfile`), so the API can take a few seconds to answer after `make up` returns. Then open http://127.0.0.1:8000/api/v1/health and expect `"db":"UP"` (`backend/app/main.py`, `contracts/models/health.py`).
 
 To drop the synthetic database and start over:
 
@@ -89,13 +89,13 @@ Third-party code licenses are listed in `docs/LICENSES.md`.
 
 CheckMate is a synthetic-data prototype for identity reconciliation and evidence display. Flags are rule-based, cite their sources, are shown only after a person approves an identity link, and do not direct treatment. Not for clinical use. No clinician has reviewed the rule, the class table or the wording. Absence of a flag does not mean absence of a conflict.
 
-Every flag card's footer names what the rule does not check, says that absence of a flag is not evidence that no conflict exists, and says that no clinician reviewed the rule or its wording (`CARD_FOOTER` in `contracts/models/alerts.py`).
+The contract's default flag footer, `CARD_FOOTER` in `contracts/models/alerts.py`, names what the rule does not check. It also says that absence of a flag is not evidence that no conflict exists, and that no clinician reviewed the rule or its wording.
 
 ## Known limits and non-goals
 
 - **Synthetic data only.** The database holds only synthetic records and is dropped with one command (`docker-compose.yml`, `Makefile`); source datasets are never committed (`.gitignore`).
 - **Two sources at the core path:** an ER FHIR record and a clinic CSV row (`contracts/fixtures/scenario.json`).
-- **Thresholds come from the synthetic labeled set and are reported with n.** They are evaluation thresholds, not clinical ones. A threshold set has a field for the run it came from (`sourceRunId`), `isCalibrated` defaults to false, and auto-link defaults to off (`contracts/models/thresholds.py`).
+- **Thresholds are evaluation thresholds, not clinical ones.** Today the only threshold set is the hand-set placeholder `provisional-0`, with no source run (`contracts/migrations/0001_initial.sql`). The scorer lanes replace it with thresholds fit on the synthetic labeled set, reported with n. Auto-link defaults to off (`contracts/models/thresholds.py`).
 - **No authentication.** A registrar name is a recorded label, not an authenticated identity (`contracts/models/reviews.py`).
 - **One process on one laptop, bound to localhost** (`docker-compose.yml`, `Makefile`).
 - **The live agent depends on the Gemini API,** with a labeled REPLAY fallback; the API starts in REPLAY (`FRONTDESK_AGENT_MODE` in `docker-compose.yml`, `backend/app/config.py`, `contracts/models/health.py`).
