@@ -21,13 +21,15 @@ from backend.api import match_runs, pairs, reviews, sessions, thresholds, tiles
 from backend.app import request_context
 from backend.app.config import load_settings
 from backend.app.db import db_is_up, make_engine
+from backend.app.deps import EngineDep
 from backend.app.errors import ApiError
-from backend.app.openapi_meta import common_error_responses
+from backend.app.openapi_meta import common_error_responses, error_responses
 from backend.golden.service import alert_page, entity_exists, read_alerts, read_entity, read_timeline
 from backend.golden.timeline import BadCursor
+from backend.link.service import CannotLinkConflict
 from contracts.api_spec import build_app, error_envelope
 from contracts.models.alerts import AlertStatus, SafetyAlert
-from contracts.models.common import ERROR_STATUS, ErrorCode, ErrorEnvelope, Page
+from contracts.models.common import ErrorCode, Page
 from contracts.models.entities import Entity, TimelineEvent
 from contracts.models.health import AgentStatus, DependencyStatus, Health, HealthVersions
 from contracts.version import (
@@ -78,6 +80,17 @@ app.add_middleware(
 @app.exception_handler(ApiError)
 async def _api_error(_: Request, exc: ApiError):
     return error_envelope(exc.code, exc.message, exc.details)
+
+
+@app.exception_handler(CannotLinkConflict)
+async def _cannot_link(_: Request, exc: CannotLinkConflict):
+    """The link service found a not_a_match pair inside the would-be entity (architecture §7). The
+    review route checks the crossing pairs first; this is the service's own refusal, so it gets the
+    same 409 instead of surfacing as a 500. Record ids stay out of the message."""
+    log.info("cannot link: not_a_match inside the would-be entity request_id=%s", request_context.current().request_id)
+    return error_envelope(
+        ErrorCode.CANNOT_LINK_CONFLICT, "the link would join records a registrar marked as different people"
+    )
 
 
 @app.exception_handler(PoolTimeout)
@@ -152,52 +165,43 @@ def health() -> Health:  # sync: db_is_up blocks, so it runs in the threadpool, 
 
 
 # W3b: read-time golden record, timeline and alerts (architecture section 5, section 8; ADR-014).
-# Real handlers for the three stubs named in IMPLEMENTED above.
-Limit = Annotated[int, Query(ge=1, description=f"clamped to {LIST_LIMIT_MAX}, never rejected")]
+# Real handlers for the three stubs named in IMPLEMENTED above. Same engine dependency and the
+# same documented errors as the frozen stubs; ``limit`` above LIST_LIMIT_MAX is a 422, as the
+# frozen schema says.
+Limit = Annotated[int, Query(ge=1, le=LIST_LIMIT_MAX)]
+_ENTITY_ERRORS = error_responses(ErrorCode.NOT_FOUND) | common_error_responses()
 
 
-def _responses(*codes: ErrorCode) -> dict:
-    """OpenAPI ``responses`` entries for the error envelope (the same shape api_spec uses for its stubs)."""
-    return {ERROR_STATUS[c]: {"model": ErrorEnvelope, "description": c.value} for c in codes}
-
-
-_NOT_FOUND = _responses(ErrorCode.NOT_FOUND)
-_COMMON = _responses(ErrorCode.VALIDATION_ERROR, ErrorCode.INTERNAL)
-
-
-def _clamp(limit: int) -> int:
-    return min(limit, LIST_LIMIT_MAX)
-
-
-@app.get(API_PREFIX + "/entities/{entity_id}", response_model=Entity, tags=["core"], responses=_NOT_FOUND | _COMMON,
+@app.get(API_PREFIX + "/entities/{entity_id}", response_model=Entity, tags=["core"], responses=_ENTITY_ERRORS,
          description="Lane W3b. Read-time golden record with crosswalks.")
-def get_entity(entity_id: uuid.UUID):
+def get_entity(entity_id: uuid.UUID, engine: EngineDep):
     with engine.connect() as conn:
         entity = read_entity(conn, entity_id)
     return entity if entity is not None else error_envelope(ErrorCode.NOT_FOUND, "entity not found")
 
 
 @app.get(API_PREFIX + "/entities/{entity_id}/timeline", response_model=Page[TimelineEvent], tags=["core"],
-         responses=_NOT_FOUND | _COMMON,
+         responses=_ENTITY_ERRORS,
          description="Lane W3b. Timeline across the entity's sources; bounded keyset list.")
-def get_entity_timeline(entity_id: uuid.UUID, limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None):
+def get_entity_timeline(entity_id: uuid.UUID, engine: EngineDep, limit: Limit = LIST_LIMIT_DEFAULT,
+                        cursor: str | None = None):
     try:
         with engine.connect() as conn:
-            page = read_timeline(conn, entity_id, _clamp(limit), cursor)
+            page = read_timeline(conn, entity_id, limit, cursor)
     except BadCursor as exc:
         return error_envelope(ErrorCode.VALIDATION_ERROR, str(exc))
     return page if page is not None else error_envelope(ErrorCode.NOT_FOUND, "entity not found")
 
 
-@app.get(API_PREFIX + "/alerts", response_model=Page[SafetyAlert], tags=["core"], responses=_NOT_FOUND | _COMMON,
+@app.get(API_PREFIX + "/alerts", response_model=Page[SafetyAlert], tags=["core"], responses=_ENTITY_ERRORS,
          description="Lane W3b. DetectedIssue-shaped alerts, optionally for one entity; bounded keyset list.")
-def list_alerts(entity_id: Annotated[uuid.UUID | None, Query(alias="entityId")] = None,
+def list_alerts(engine: EngineDep, entity_id: Annotated[uuid.UUID | None, Query(alias="entityId")] = None,
                 status: AlertStatus | None = None, limit: Limit = LIST_LIMIT_DEFAULT, cursor: str | None = None):
     with engine.connect() as conn:
         if entity_id is not None and not entity_exists(conn, entity_id):
             return error_envelope(ErrorCode.NOT_FOUND, "entity not found")
         alerts = read_alerts(conn, entity_id, status=status)
     try:
-        return alert_page(alerts, _clamp(limit), cursor)
+        return alert_page(alerts, limit, cursor)
     except BadCursor as exc:
         return error_envelope(ErrorCode.VALIDATION_ERROR, str(exc))
