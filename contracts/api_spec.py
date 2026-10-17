@@ -124,8 +124,9 @@ def build_app(implemented: frozenset[Route] = frozenset()) -> FastAPI:
         return not_implemented("W3a")
 
     @app.post(p + "/candidate-pairs/{pair_id}/reviews", response_model=ReviewResponse, status_code=201, tags=["core"],
-              responses=_err(ErrorCode.NOT_FOUND, ErrorCode.CANNOT_LINK_CONFLICT, ErrorCode.DECISION_NOT_PENDING,
-                             ErrorCode.IDEMPOTENCY_MISMATCH) | common_errors,
+              responses={200: {"model": ReviewResponse, "description": "Same-state request: the current decision, no new version"}}
+              | _err(ErrorCode.NOT_FOUND, ErrorCode.CANNOT_LINK_CONFLICT, ErrorCode.DECISION_NOT_PENDING,
+                     ErrorCode.IDEMPOTENCY_MISMATCH) | common_errors,
               description="Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. "
                           "Idempotency-Key required. PROPOSED or REJECTED may move to LINKED or REJECTED (a second review supersedes the first, "
                           "so the demo can reject and then approve; history keeps both). LINKED only accepts the same-state APPROVE, which "
