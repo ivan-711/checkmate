@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * List Alerts
-         * @description Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity; bounded list.
+         * @description Lane W3b (additive). DetectedIssue-shaped alerts, optionally for one entity (unknown entityId is a 404) and one status; bounded list.
          */
         get: operations["list_alerts_api_v1_alerts_get"];
         put?: never;
@@ -156,6 +156,26 @@ export interface paths {
          * @description Lane W3b (additive). Timeline across the entity's sources; bounded list.
          */
         get: operations["get_entity_timeline_api_v1_entities__entity_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Events
+         * @description Lane W3a (additive, G16 step 7). The append-only event feed, newest first; bounded list with an opaque keyset cursor over (ts, eventId). `since` keeps only rows with ts at or after it, so a caller can count one run's events on a reused database.
+         */
+        get: operations["list_events_api_v1_events_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -547,6 +567,11 @@ export interface components {
              */
             verification?: string | null;
         };
+        /**
+         * EntryPoint
+         * @enum {string}
+         */
+        EntryPoint: "API" | "CLI" | "EVAL_WORKER" | "REPLAY" | "AGENT";
         /** ErrorBody */
         ErrorBody: {
             code: components["schemas"]["ErrorCode"];
@@ -569,6 +594,74 @@ export interface components {
         ErrorEnvelope: {
             error: components["schemas"]["ErrorBody"];
         };
+        /** EventLogRow */
+        EventLogRow: {
+            /** Actor */
+            actor: string;
+            actorType: components["schemas"]["ActorType"];
+            band?: components["schemas"]["Band"] | null;
+            /** Clientrequestid */
+            clientRequestId?: string | null;
+            /** Decisionid */
+            decisionId?: string | null;
+            /** Effectstatus */
+            effectStatus?: string | null;
+            /** Entityid */
+            entityId?: string | null;
+            entryPoint: components["schemas"]["EntryPoint"];
+            /**
+             * Eventid
+             * Format: uuid
+             */
+            eventId: string;
+            eventType: components["schemas"]["EventType"];
+            /** Evidenceids */
+            evidenceIds?: string[];
+            /** Evidencesnapshot */
+            evidenceSnapshot?: {
+                [key: string]: unknown;
+            } | null;
+            /** Gateoutcome */
+            gateOutcome?: string | null;
+            /** Intakesessionid */
+            intakeSessionId?: string | null;
+            /** Latencyms */
+            latencyMs?: number | null;
+            mode: components["schemas"]["Mode"];
+            /** Outcome */
+            outcome?: string | null;
+            /** Pairid */
+            pairId?: string | null;
+            /**
+             * Payload
+             * @description validated args or summary; never free text
+             */
+            payload?: {
+                [key: string]: unknown;
+            };
+            /** Reasoncode */
+            reasonCode?: string | null;
+            /** Requestid */
+            requestId?: string | null;
+            /** Runid */
+            runId?: string | null;
+            /** Toolcallid */
+            toolCallId?: string | null;
+            /** Toolname */
+            toolName?: string | null;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            versions?: components["schemas"]["Versions"];
+        };
+        /**
+         * EventType
+         * @description The TEXT + CHECK list in migration 0001. Migration 0003_frontdesk_steps widens it after 16:00.
+         * @enum {string}
+         */
+        EventType: "RECORD_INGESTED" | "MATCH_RUN_COMPLETED" | "PAIR_SCORED" | "LINK_APPROVED" | "LINK_REJECTED" | "LINK_REVOKED" | "ENTITY_MERGED" | "ENTITY_SPLIT" | "ALERT_RAISED" | "ALERT_RETRACTED" | "WHATIF_APPLIED" | "DEMO_RESET" | "DEMO_RESTORED" | "EXPLANATION_GENERATED" | "EXTERNAL_CALL" | "EVAL_RUN_STARTED" | "EVAL_RUN_FINISHED" | "INTAKE_STARTED" | "AGENT_TOOL_CALLED" | "INTAKE_HANDOFF_CREATED" | "AGENT_TURN_DEGRADED";
         /**
          * EvidenceKind
          * @enum {string}
@@ -863,6 +956,11 @@ export interface components {
             /** Membercountifapproved */
             memberCountIfApproved: number;
         };
+        /**
+         * Mode
+         * @enum {string}
+         */
+        Mode: "LIVE" | "LOCAL" | "REPLAY";
         /** NormalizedRecord */
         NormalizedRecord: {
             /** Addressline */
@@ -900,6 +998,13 @@ export interface components {
         Page_CandidatePair_: {
             /** Items */
             items: components["schemas"]["CandidatePair"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
+        /** Page[EventLogRow] */
+        Page_EventLogRow_: {
+            /** Items */
+            items: components["schemas"]["EventLogRow"][];
             /** Nextcursor */
             nextCursor?: string | null;
         };
@@ -1339,6 +1444,26 @@ export interface components {
             text: string;
         };
         /**
+         * Versions
+         * @description Every agent_tool_called event and every replay recording carries promptVersion.
+         */
+        Versions: {
+            /** Modelid */
+            modelId?: string | null;
+            /** Policyversion */
+            policyVersion?: string | null;
+            /** Promptversion */
+            promptVersion?: string | null;
+            /** Scorerversion */
+            scorerVersion?: string | null;
+            /** Thresholdsetid */
+            thresholdSetId?: string | null;
+            /** Toolschemaversion */
+            toolSchemaVersion?: string | null;
+            /** Transcriptsha256 */
+            transcriptSha256?: string | null;
+        };
+        /**
          * WhatIfButton
          * @enum {string}
          */
@@ -1392,6 +1517,7 @@ export interface operations {
         parameters: {
             query?: {
                 entityId?: string | null;
+                status?: components["schemas"]["AlertStatus"] | null;
                 limit?: number;
                 cursor?: string | null;
             };
@@ -1408,6 +1534,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_SafetyAlert_"];
+                };
+            };
+            /** @description NOT_FOUND */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
             /** @description VALIDATION_ERROR */
@@ -1430,6 +1565,15 @@ export interface operations {
             };
             /** @description NOT_IMPLEMENTED */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1483,6 +1627,15 @@ export interface operations {
             };
             /** @description NOT_IMPLEMENTED */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1548,6 +1701,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     create_review_api_v1_candidate_pairs__pair_id__reviews_post: {
@@ -1568,6 +1730,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Same-state request: the current decision, no new version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewResponse"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
@@ -1615,6 +1786,15 @@ export interface operations {
             };
             /** @description NOT_IMPLEMENTED */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1684,6 +1864,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     get_entity_api_v1_entities__entity_id__get: {
@@ -1735,6 +1924,15 @@ export interface operations {
             };
             /** @description NOT_IMPLEMENTED */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1803,6 +2001,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     get_entity_timeline_api_v1_entities__entity_id__timeline_get: {
@@ -1864,6 +2071,75 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    list_events_api_v1_events_get: {
+        parameters: {
+            query?: {
+                since?: string | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_EventLogRow_"];
+                };
+            };
+            /** @description VALIDATION_ERROR */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description INTERNAL */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description NOT_IMPLEMENTED */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     health_api_v1_health_get: {
@@ -1904,6 +2180,15 @@ export interface operations {
             };
             /** @description NOT_IMPLEMENTED */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1971,6 +2256,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     get_intake_session_api_v1_intake_sessions__session_id__get: {
@@ -2022,6 +2316,15 @@ export interface operations {
             };
             /** @description NOT_IMPLEMENTED */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2103,6 +2406,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     create_match_run_api_v1_match_runs_post: {
@@ -2143,6 +2455,15 @@ export interface operations {
             };
             /** @description NOT_IMPLEMENTED */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2192,6 +2513,15 @@ export interface operations {
             };
             /** @description NOT_IMPLEMENTED */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2259,6 +2589,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     get_current_thresholds_api_v1_threshold_sets_current_get: {
@@ -2299,6 +2638,15 @@ export interface operations {
             };
             /** @description NOT_IMPLEMENTED */
             501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description UPSTREAM_UNAVAILABLE */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

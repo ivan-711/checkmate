@@ -8,6 +8,8 @@ export function SourceCardView({ card, differs }: { card: SourceCard; differs: S
   const { record, normalized, displayLabel } = card;
   return (
     <article
+      data-testid="source-card"
+      data-source-system={record.sourceSystem}
       aria-label={`${displayLabel} record`}
       className="rounded-lg border border-border-subtle bg-surface p-4"
     >

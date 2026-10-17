@@ -14,6 +14,8 @@ export function ResetButton() {
   async function refreshAfterSessionChange() {
     await Promise.all([
       queryClient.resetQueries({ queryKey: ["case"] }),
+      queryClient.invalidateQueries({ queryKey: ["session"] }),
+      queryClient.invalidateQueries({ queryKey: ["events"] }),
       queryClient.resetQueries({ queryKey: ["timeline"] }),
       queryClient.invalidateQueries({ queryKey: ["tiles"] }),
     ]);
@@ -43,6 +45,7 @@ export function ResetButton() {
   return (
     <button
       type="button"
+      data-testid="reset-button"
       onClick={() => reset.mutate()}
       disabled={reset.isPending}
       className="h-11 rounded-md border border-border-strong bg-surface px-4 text-[16px] font-semibold text-ink-1 hover:bg-sunken disabled:text-ink-3"

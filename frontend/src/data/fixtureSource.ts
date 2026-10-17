@@ -1,7 +1,10 @@
 import type {
+  EventLogRow,
+  EventType,
   MatchDecision,
   ReviewRequest,
   ReviewResponse,
+  SafetyAlert,
   SessionResponse,
   TilesResponse,
   TimelineEvent,
@@ -14,6 +17,9 @@ interface SessionState {
   /** Append-only, oldest first, like the API's decision history. */
   history: MatchDecision[];
   outcome: ReviewResponse | null;
+  /** Append-only, oldest first: what the API's event_log would hold for this session. */
+  events: EventLogRow[];
+  resolved: boolean;
 }
 
 interface KeyedReview {
@@ -39,11 +45,21 @@ export class FixtureSource implements DataSource {
     this.current = this.freshSession(null);
   }
 
+  async getSession(): Promise<SessionResponse> {
+    return this.current.session;
+  }
+
   async getCase(): Promise<CaseData> {
-    const { history, outcome } = this.current;
+    const { history, outcome, resolved } = this.current;
     const base = this.fixture.pair;
     const detail = { ...base, pair: { ...base.pair, decision: history[history.length - 1] }, history };
-    return { detail, outcome };
+    return { detail, outcome, resolved };
+  }
+
+  /** The fixture is already scored; Resolve only re-queues the pair and logs the run. */
+  async resolve(): Promise<void> {
+    this.current = { ...this.current, resolved: true };
+    this.log("MATCH_RUN_COMPLETED", { pairId: this.fixture.pair.pair.id });
   }
 
   async review(pairId: string, body: ReviewRequest, idempotencyKey: string): Promise<ReviewResponse> {
@@ -68,13 +84,29 @@ export class FixtureSource implements DataSource {
     return this.fixture.timelineIfApproved.filter((event) => event.entityId === entityId);
   }
 
+  async getAlerts(entityId: string): Promise<SafetyAlert[]> {
+    const alerts = this.current.outcome?.alerts ?? [];
+    return alerts.filter((a) => a.entityId === entityId);
+  }
+
+  async getEvents(): Promise<EventLogRow[]> {
+    const all = [...(this.previous?.events ?? []), ...this.current.events];
+    return all.slice().reverse(); // newest first, like GET /events
+  }
+
+  /** The fixture tiles with HUMAN_REVIEW counting this session's registrar decisions. */
   async getTiles(): Promise<TilesResponse> {
-    return this.fixture.tiles;
+    const reviews = this.current.history.filter((d) => d.actorType === "REGISTRAR").length;
+    const tiles = this.fixture.tiles.tiles.map((tile) =>
+      tile.id === "HUMAN_REVIEW" ? { ...tile, total: tile.total + reviews } : tile,
+    );
+    return { ...this.fixture.tiles, tiles };
   }
 
   async reset(): Promise<SessionResponse> {
     this.previous = this.current;
     this.current = this.freshSession(this.previous.session.id);
+    this.log("DEMO_RESET", { sessionId: this.current.session.id });
     return this.current.session;
   }
 
@@ -114,7 +146,38 @@ export class FixtureSource implements DataSource {
       alerts: alertFires ? [this.fixture.alertIfApproved] : [],
     };
     this.current = { ...this.current, history: [...history, decision], outcome: response };
+    this.log(
+      approving ? "LINK_APPROVED" : "LINK_REJECTED",
+      { pairId: this.fixture.pair.pair.id },
+      {
+        decisionId: decision.id,
+        actor: body.actor,
+        actorType: "REGISTRAR",
+      },
+    );
+    for (const alert of response.alerts ?? []) {
+      this.log("ALERT_RAISED", { alertId: alert.id, ruleId: alert.ruleId }, { entityId: alert.entityId });
+    }
     return response;
+  }
+
+  private log(
+    eventType: EventType,
+    payload: Record<string, unknown>,
+    extra: Partial<EventLogRow> = {},
+  ): void {
+    const row: EventLogRow = {
+      ts: this.now().toISOString(),
+      eventId: crypto.randomUUID(),
+      eventType,
+      entryPoint: "API",
+      actor: "system:fixture",
+      actorType: "SYSTEM",
+      mode: "REPLAY",
+      payload,
+      ...extra,
+    };
+    this.current = { ...this.current, events: [...this.current.events, row] };
   }
 
   private freshSession(previousSessionId: string | null): SessionState {
@@ -126,6 +189,12 @@ export class FixtureSource implements DataSource {
       previousSessionId,
     };
     const { pair, history } = this.fixture.pair;
-    return { session, history: history?.length ? [...history] : [pair.decision], outcome: null };
+    return {
+      session,
+      history: history?.length ? [...history] : [pair.decision],
+      outcome: null,
+      events: [],
+      resolved: false,
+    };
   }
 }

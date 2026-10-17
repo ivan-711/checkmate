@@ -25,6 +25,7 @@ export function FlagCard({ state }: { state: FlagState }) {
   const { alert } = state;
   return (
     <article
+      data-testid="flag-card"
       aria-labelledby="flag-heading"
       className="enter enter-last rounded-lg border-2 border-l-[6px] border-ink-1 border-l-band-keep bg-surface p-4"
     >
@@ -44,6 +45,9 @@ export function FlagCard({ state }: { state: FlagState }) {
           </a>
         </p>
       )}
+      <p className="text-[14px] text-ink-3">
+        Rule <span data-testid="flag-card-rule-id">{alert.ruleId}</span> {alert.ruleVersion}
+      </p>
       <p className="text-[14px] text-ink-3">{alert.cardFooter}</p>
     </article>
   );

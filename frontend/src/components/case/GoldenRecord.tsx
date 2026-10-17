@@ -25,6 +25,7 @@ function CrosswalkChip({
 }) {
   return (
     <span
+      data-testid="crosswalk-chip"
       title={`Source record ${recordId}`}
       className="rounded border border-border-strong bg-surface px-2 text-[14px] font-medium text-ink-2"
     >
@@ -51,6 +52,7 @@ export function GoldenRecord({ entity, cards, focusOnMount, onFocused }: Props) 
   const golden = entity.golden ?? [];
   return (
     <section
+      data-testid="golden-record"
       aria-labelledby="golden-heading"
       className="enter rounded-lg border border-border-subtle bg-surface p-4"
     >

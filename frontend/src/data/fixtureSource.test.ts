@@ -119,3 +119,38 @@ describe("FixtureSource", () => {
     await expect(source().restore("unknown")).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
+
+describe("FixtureSource G16 path", () => {
+  it("waits for Resolve after a reset and logs one event per action, newest first", async () => {
+    const s = source();
+    expect((await s.getCase()).resolved).toBe(false);
+    await s.reset();
+    await s.resolve();
+    expect((await s.getCase()).resolved).toBe(true);
+    await s.review(pairId, { ...reject, reasonCode: "INSUFFICIENT_EVIDENCE" }, "k1");
+    await s.resolve();
+    const res = await s.review(pairId, approve, "k2");
+    const types = (await s.getEvents()).map((e) => e.eventType);
+    expect(types).toEqual([
+      "ALERT_RAISED",
+      "LINK_APPROVED",
+      "MATCH_RUN_COMPLETED",
+      "LINK_REJECTED",
+      "MATCH_RUN_COMPLETED",
+      "DEMO_RESET",
+    ]);
+    expect(await s.getAlerts(res.entity!.id)).toHaveLength(1);
+    const tiles = await s.getTiles();
+    expect(tiles.tiles.find((t) => t.id === "HUMAN_REVIEW")?.total).toBe(2);
+    expect((await s.getSession()).heroProvisional).toBe(scenario.session.heroProvisional);
+  });
+
+  it("a reset clears the resolved state and the review count", async () => {
+    const s = source();
+    await s.resolve();
+    await s.review(pairId, approve, "k1");
+    await s.reset();
+    expect((await s.getCase()).resolved).toBe(false);
+    expect((await s.getTiles()).tiles.find((t) => t.id === "HUMAN_REVIEW")?.total).toBe(0);
+  });
+});

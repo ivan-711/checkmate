@@ -9,6 +9,7 @@ function caseWith(status: MatchDecision["status"], outcome: CaseData["outcome"])
   return {
     detail: { ...base, pair: { ...base.pair, decision: { ...base.pair.decision, status } } },
     outcome,
+    resolved: true,
   };
 }
 
