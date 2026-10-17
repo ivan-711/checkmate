@@ -24,7 +24,10 @@ dev = [
 package = true
 
 [tool.setuptools]
-packages = ["contracts", "contracts.models", "contracts.migrations", "backend", "backend.app"]
+packages = ["contracts", "contracts.models", "contracts.migrations", "backend", "backend.app", "backend.link", "backend.golden", "backend.rule"]
+
+[tool.setuptools.package-data]
+"backend.rule" = ["cache/*.json", "cache/labels/*.json"]
 
 [build-system]
 requires = ["setuptools>=69"]
