@@ -1,16 +1,19 @@
-from datetime import date
+"""Ingest's block_key rows are backend.core's keys (issue #10); one vocabulary for every writer."""
 
-from backend.ingest.blocking import (
+from importlib.metadata import version
+
+from backend.core.api import CORE
+from backend.core.block import (
+    KEY_DMETA_FAMILY_YEAR,
+    KEY_DOB_DAY_MONTH_SWAP,
     KEY_DOB_EXACT,
-    KEY_METAPHONE_SURNAME_BIRTH_YEAR,
     KEY_PHONE_LAST7,
     KEY_ZIP5_INITIAL,
-    block_keys,
-    surname_key_token,
-    swapped_day_month,
 )
+from backend.core.block import KEY_TYPES as CORE_KEY_TYPES
+from backend.core.phonetics import PHONETICS_LIBRARY, double_metaphone
+from backend.ingest.blocking import KEY_TYPES, block_keys
 from backend.ingest.normalize import Identity, normalize_identity
-from backend.ingest.phonetics import LIBRARY, primary_code
 
 
 def keys_for(**kwargs) -> dict[str, set[str]]:
@@ -20,49 +23,58 @@ def keys_for(**kwargs) -> dict[str, set[str]]:
     return grouped
 
 
-def test_phonetics_library_pick_is_recorded():
-    assert LIBRARY == "metaphone==0.6"
-    assert primary_code("garcia") == primary_code("garsia")
+def test_one_vocabulary_and_the_phonetics_pick():
+    assert KEY_TYPES == CORE_KEY_TYPES
+    assert PHONETICS_LIBRARY == "metaphone" and version("metaphone") == "0.6"  # first in the install order
 
 
-def test_full_key_set():
+def test_full_key_set_in_cores_vocabulary():
     keys = keys_for(given="José", family="García", birth_date="1990-03-07", phone="555-123-4567", postal_code="01604")
-    assert keys[KEY_METAPHONE_SURNAME_BIRTH_YEAR] == {f"{primary_code('garcia')}:1990"}
-    assert keys[KEY_DOB_EXACT] == {"1990-03-07", "1990-07-03"}  # exact plus the day/month swap
+    assert keys[KEY_DMETA_FAMILY_YEAR] == {f"{code}|1990" for code in double_metaphone("garcia") if code}
+    assert keys[KEY_DOB_EXACT] == {"1990-03-07"}
+    assert keys[KEY_DOB_DAY_MONTH_SWAP] == {"1990-03-07"}  # the unordered (month, day) pair
     assert keys[KEY_PHONE_LAST7] == {"1234567"}
-    assert keys[KEY_ZIP5_INITIAL] == {"01604:j"}
+    assert keys[KEY_ZIP5_INITIAL] == {"01604|j"}
 
 
-def test_swapped_dob_only_when_day_can_be_a_month():
-    assert swapped_day_month(date(1990, 3, 7)) == date(1990, 7, 3)
-    assert swapped_day_month(date(1990, 3, 17)) is None
-    assert swapped_day_month(date(1990, 3, 3)) is None
-    assert keys_for(family="Garcia", birth_date="1990-03-17")[KEY_DOB_EXACT] == {"1990-03-17"}
+def test_rows_equal_core_block_keys_over_the_stored_row():
+    """The gate's property: what ingest writes is what CORE.block_keys computes from the row it reads."""
+    n = normalize_identity(Identity(given="María", family="García López", birth_date="1990-03-07", sex="female",
+                                    phone="617-555-2368", postal_code="02139"))
+    row = n.to_row_dict()
+    from_core = {(k.key_type, k.key_value) for k in CORE.block_keys(row)}
+    assert set(block_keys(n)) == set(block_keys(row)) == from_core
+    assert block_keys(row) == sorted(from_core)  # sorted and unique
 
 
-def test_surname_variants_share_the_metaphone_block():
-    base = keys_for(family="García López", birth_date="1990-03-07")[KEY_METAPHONE_SURNAME_BIRTH_YEAR]
-    assert keys_for(family="Garcia", birth_date="1990-03-07")[KEY_METAPHONE_SURNAME_BIRTH_YEAR] == base  # S1 + S3
-    assert keys_for(family="García-López", birth_date="1990-03-07")[KEY_METAPHONE_SURNAME_BIRTH_YEAR] == base  # S5
-    assert surname_key_token("de la cruz") == "cruz"
-    assert surname_key_token("de") is None
+def test_day_month_swap_shares_a_block_only_when_the_day_could_be_a_month():
+    assert keys_for(birth_date="1990-03-07")[KEY_DOB_DAY_MONTH_SWAP] == keys_for(birth_date="1990-07-03")[KEY_DOB_DAY_MONTH_SWAP]
+    assert KEY_DOB_DAY_MONTH_SWAP not in keys_for(birth_date="1990-03-17")
+    assert KEY_DOB_DAY_MONTH_SWAP not in keys_for(birth_date="1990-03-03")
+
+
+def test_surname_variants_share_a_phonetic_block():
+    def dmeta(family: str) -> set[str]:
+        return keys_for(family=family, birth_date="1990-03-07")[KEY_DMETA_FAMILY_YEAR]
+
+    full = dmeta("García López")
+    assert dmeta("Garcia") & full  # S1 + S3: accent and maternal surname dropped
+    assert dmeta("García-López") == full  # S5
+    assert dmeta("de la Cruz") == dmeta("Cruz")  # particles never key on their own
 
 
 def test_placeholders_never_form_keys():
     keys = keys_for(given="Unknown", family="Doe", birth_date="1900-01-01", phone="555-555-5555", postal_code="01604")
-    assert KEY_DOB_EXACT not in keys
-    assert KEY_METAPHONE_SURNAME_BIRTH_YEAR not in keys
-    assert KEY_PHONE_LAST7 not in keys
-    assert KEY_ZIP5_INITIAL not in keys  # placeholder given name gives no initial
-
-
-def test_missing_values_give_no_keys_of_that_type():
-    keys = keys_for(given="Ana", family="Garcia", birth_date="1990-03-07")
-    assert KEY_PHONE_LAST7 not in keys and KEY_ZIP5_INITIAL not in keys
-    assert block_keys(normalize_identity(Identity())) == []
+    assert not keys  # placeholder name, DOB and phone; no initial for a placeholder given name
 
 
 def test_placeholder_zip_and_phone_suffix_never_form_keys():
     keys = keys_for(given="Ana", family="Garcia", birth_date="1990-03-07", phone="617-000-0000", postal_code="00000")
     assert KEY_ZIP5_INITIAL not in keys and KEY_PHONE_LAST7 not in keys
     assert KEY_ZIP5_INITIAL in keys_for(given="Ana", family="Garcia", birth_date="1990-03-07", postal_code="01604")
+
+
+def test_missing_values_give_no_keys_of_that_type():
+    keys = keys_for(given="Ana", family="Garcia", birth_date="1990-03-07")
+    assert KEY_PHONE_LAST7 not in keys and KEY_ZIP5_INITIAL not in keys
+    assert block_keys(normalize_identity(Identity())) == []
