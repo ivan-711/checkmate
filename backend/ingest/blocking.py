@@ -13,6 +13,7 @@ from backend.ingest.normalize import (
     is_placeholder_dob,
     is_placeholder_name,
     is_placeholder_phone,
+    is_placeholder_zip,
 )
 from backend.ingest.phonetics import primary_code
 
@@ -65,7 +66,7 @@ def block_keys(fields: NormalizedFields) -> list[tuple[str, str]]:
     if not is_placeholder_phone(fields.phone_e164):
         keys.append((KEY_PHONE_LAST7, fields.phone_e164[-PHONE_SUFFIX_LEN:]))
 
-    if fields.zip5 and not is_placeholder_name(fields.given_name_folded):
+    if not is_placeholder_zip(fields.zip5) and not is_placeholder_name(fields.given_name_folded):
         keys.append((KEY_ZIP5_INITIAL, f"{fields.zip5}:{fields.given_name_folded[0]}"))
 
     return keys

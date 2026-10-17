@@ -86,3 +86,53 @@ def test_same_input_same_hash(bundles):
     a = bundles[PATIENT_A]
     assert plain_fhir_draft(a).sha256 == plain_fhir_draft(a).sha256
     assert plain_fhir_draft(a).sha256 != plain_fhir_draft(bundles[PATIENT_B]).sha256
+
+
+def test_rendered_fhir_never_echoes_the_original_name_or_shares_clinical_ids(bundles):
+    from dataclasses import replace
+
+    a = bundles[PATIENT_A]
+    changed = replace(a.identity, given="Pepe", family="Nunes")
+    one = fhir_draft(changed, a, "ER-V1")
+    two = fhir_draft(a.identity, a, "ER-V2")
+    text = json.dumps(one.raw_payload, ensure_ascii=False)
+    for original in ("Núñez", "Nunez", "José", "Jose", "Núñez-García77", "José45"):
+        assert original not in text, original
+    assert one.raw_payload["encounters"][0]["subject"]["display"] == "Pepe Nunes"
+    assert one.raw_payload["encounters"][0]["subject"]["reference"] == f"urn:uuid:{one.id}"
+    ids = lambda d: {r["id"] for k in ("allergyIntolerances", "medicationRequests", "encounters", "medications") for r in d.raw_payload[k]}
+    assert ids(one) and not ids(one) & ids(two)  # re-minted per record
+    original_ids = {r["id"] for r in a.allergies + a.medication_requests + a.encounters + a.medications}
+    assert not ids(one) & original_ids
+    # references inside the record still resolve: the order points at this record's encounter and medication
+    mr = one.raw_payload["medicationRequests"][0]
+    assert mr["encounter"]["reference"] == f"urn:uuid:{one.raw_payload['encounters'][0]['id']}"
+    assert mr["medicationReference"]["reference"] == f"urn:uuid:{one.raw_payload['medications'][0]['id']}"
+
+
+def test_variants_of_one_entity_share_no_identifier(bundles):
+    a = bundles[PATIENT_A]
+    one, two = fhir_draft(a.identity, a, "ER-V1"), fhir_draft(a.identity, a, "ER-V2")
+    values = lambda d: {i["value"] for i in d.raw_payload["patient"]["identifier"]}
+    assert values(one) == {"ER-V1"} and values(two) == {"ER-V2"}
+    assert "999-11-1111" not in json.dumps(one.raw_payload)  # SSN, licence and passport are never rendered
+
+
+def test_csv_variants_share_no_encounter_id_and_mixed_case_headers_cannot_leak(bundles, csv_patients):
+    from dataclasses import replace
+
+    a = bundles[PATIENT_A]
+    base = csv_patients[PATIENT_A]
+    one = csv_draft(a.identity, base, "CL-V1", include_phone=True)
+    two = csv_draft(a.identity, base, "CL-V2", include_phone=True)
+    enc = lambda d: {d.raw_payload["encounters"][0]["Id"], d.raw_payload["allergies"][0]["ENCOUNTER"]}
+    assert len(enc(one)) == 1 and not enc(one) & enc(two)
+    assert "aaaaaaaa-0000-4000-8000-000000000002" not in json.dumps(one.raw_payload)
+    from backend.ingest.csvio import CsvPatient
+
+    mixed = CsvPatient(PATIENT_A, base.identity, {"Id": PATIENT_A, "Last": "Núñez-García", "Phone": "555-123-4567", "BIRTHDATE": "1990-03-07"})
+    draft = csv_draft(replace(a.identity, family="Nunes"), mixed, "CL-MIXED", include_phone=False)
+    row = draft.raw_payload["patient"]
+    assert row["LAST"] == "Nunes" and "Last" not in row and "Phone" not in row and "PHONE" not in row
+    assert draft.identity.family == "Nunes" and draft.identity.phone is None
+    assert "Núñez" not in json.dumps(draft.raw_payload, ensure_ascii=False)

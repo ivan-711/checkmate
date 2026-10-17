@@ -29,6 +29,9 @@ PLACEHOLDER_DOBS = frozenset({date(1900, 1, 1), date(1901, 1, 1), date(1800, 1, 
 # Fictional NANP numbers are NXX-555-01XX; Synthea's own numbers are 555-NNN-NNNN, so only the
 # 555-01XX local part and one-repeated-digit numbers count as placeholders.
 _FICTIONAL_LOCAL_PREFIX = "55501"
+PHONE_LOCAL_LEN = 7
+# ZIPs that registration systems use when the real one is unknown; they never form a block key.
+PLACEHOLDER_ZIPS = frozenset({"00000", "12345", "99999"})
 
 SEX_BY_RAW = {"male": "MALE", "m": "MALE", "female": "FEMALE", "f": "FEMALE"}
 
@@ -160,10 +163,16 @@ def is_placeholder_dob(value: date | None) -> bool:
 
 
 def is_placeholder_phone(e164: str | None) -> bool:
+    """One repeated digit over the number or over its 7-digit local part (617-000-0000), or the
+    NXX-555-01XX fictional block: anything that would put unrelated people in one phone block."""
     if e164 is None:
         return True
-    local = e164[-10:]
-    return len(set(local)) == 1 or local[3:].startswith(_FICTIONAL_LOCAL_PREFIX)
+    local = e164[-PHONE_LOCAL_LEN:]
+    return len(set(e164[-10:])) == 1 or len(set(local)) == 1 or local.startswith(_FICTIONAL_LOCAL_PREFIX)
+
+
+def is_placeholder_zip(value: str | None) -> bool:
+    return value is None or value in PLACEHOLDER_ZIPS or len(set(value)) == 1
 
 
 def normalize_identity(identity: Identity) -> NormalizedFields:

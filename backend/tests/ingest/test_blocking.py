@@ -60,3 +60,9 @@ def test_missing_values_give_no_keys_of_that_type():
     keys = keys_for(given="Ana", family="Garcia", birth_date="1990-03-07")
     assert KEY_PHONE_LAST7 not in keys and KEY_ZIP5_INITIAL not in keys
     assert block_keys(normalize_identity(Identity())) == []
+
+
+def test_placeholder_zip_and_phone_suffix_never_form_keys():
+    keys = keys_for(given="Ana", family="Garcia", birth_date="1990-03-07", phone="617-000-0000", postal_code="00000")
+    assert KEY_ZIP5_INITIAL not in keys and KEY_PHONE_LAST7 not in keys
+    assert KEY_ZIP5_INITIAL in keys_for(given="Ana", family="Garcia", birth_date="1990-03-07", postal_code="01604")

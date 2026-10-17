@@ -31,7 +31,7 @@
         "status": "finished",
         "class": {"code": "AMB"},
         "type": [{"coding": [{"system": "http://snomed.info/sct", "code": "185345009", "display": "Encounter for symptom"}]}],
-        "subject": {"reference": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000001"},
+        "subject": {"reference": "urn:uuid:aaaaaaaa-0000-4000-8000-000000000001", "display": "José45 Núñez-García77"},
         "period": {"start": "2021-05-01T09:00:00-04:00", "end": "2021-05-01T09:15:00-04:00"}
       }
     },

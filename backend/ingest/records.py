@@ -6,8 +6,10 @@ four parsed clinical resource lists) or a Clinic CSV row (with its clinical rows
 identity is then read back from the rendered payload by the same loaders the sample goes
 through, so the normalized record can never carry a value the raw payload does not show.
 
-The Synthea person id, narrative and extensions are the hidden truth (evaluation plan §3): the
-Patient is rebuilt from a whitelist and the person id is replaced everywhere by the MRN.
+Nothing in a rendered payload may tie two variants of one person together except what the
+taxonomy row changed: the Synthea person id, narrative and extensions are dropped, identity
+documents (SSN, licence, passport) are dropped, every clinical resource id is re-minted per
+record, and display strings that echo the name are rewritten to the rendered name.
 """
 from __future__ import annotations
 
@@ -27,13 +29,18 @@ KIND_FOR_SOURCE = {SOURCE_ER_FHIR: SourceKind.FHIR_PATIENT, SOURCE_CLINIC_CSV: S
 
 # Fixed namespace so record ids are a pure function of (source_system, source_local_id).
 RECORD_NAMESPACE = UUID("6f1c2a4e-7b3d-4e5f-9a1b-2c3d4e5f6a7b")
-MR_IDENTIFIER_CODE = "MR"
-SS_IDENTIFIER_CODE = "SS"
+MRN_SYSTEM = "http://hospital.smarthealthit.org"
+IDENTIFIER_TYPE_SYSTEM = "http://terminology.hl7.org/CodeSystem/v2-0203"
 # Patient fields an ER registration carries. Everything else Synthea writes (text narrative with
-# the person seed, race/ethnicity/birthsex/birthplace/DALY extensions, meta) is dropped.
+# the person seed, race/ethnicity/birthsex/birthplace/DALY extensions, meta, SS/DL/PPN) is dropped.
 PATIENT_KEPT_FIELDS = ("maritalStatus", "multipleBirthBoolean", "multipleBirthInteger", "communication")
+FHIR_CLINICAL_LISTS = ("allergyIntolerances", "medicationRequests", "encounters", "medications")
+# Keys whose value is a reference-with-display to the patient (the only place the name echoes).
+PATIENT_REFERENCE_KEYS = ("subject", "patient")
 # Columns that are never part of a clinic export (identity documents and geocoding).
 CLINIC_DROPPED_COLUMNS = ("SSN", "DRIVERS", "PASSPORT", "LAT", "LON", "HEALTHCARE_EXPENSES", "HEALTHCARE_COVERAGE", "INCOME")
+CSV_CLINICAL_LISTS = ("allergies", "medications", "encounters")
+CSV_ENCOUNTER_ID_COLUMNS = ("ID", "ENCOUNTER")
 CSV_SEX_CODES = {"male": "M", "female": "F"}
 
 
@@ -70,26 +77,30 @@ class SourceRecordDraft:
         return payload_sha256(self.raw_payload)
 
 
-def _replace_person_id(payload: dict, old: str, new: str) -> dict:
-    """Every reference (subject, patient, PATIENT column) carries the Synthea id; swap it in one pass."""
-    return json.loads(json.dumps(payload, ensure_ascii=False).replace(old, new))
+def _remap_ids(payload: dict, id_map: dict[str, str]) -> dict:
+    """One textual pass: every occurrence of an old id (person id, resource ids, references) becomes the new one."""
+    text = json.dumps(payload, ensure_ascii=False)
+    for old, new in id_map.items():
+        text = text.replace(old, new)
+    return json.loads(text)
 
 
-def _identifiers(base: dict, local_id: str) -> list[dict]:
-    """MR becomes the per-source MRN; SS is kept (it is not a feature); the Synthea id is dropped."""
-    kept = []
-    for ident in base.get("identifier") or []:
-        codings = (ident.get("type") or {}).get("coding") or []
-        codes = {c.get("code") for c in codings}
-        if MR_IDENTIFIER_CODE in codes:
-            kept.append({**ident, "value": local_id})
-        elif SS_IDENTIFIER_CODE in codes:
-            kept.append(ident)
-    return kept
+def _per_record_id(record_uuid: str, old: str) -> str:
+    return str(uuid5(RECORD_NAMESPACE, f"{record_uuid}:{old}"))
+
+
+def display_name(identity: Identity) -> str:
+    return " ".join(part for part in (identity.given, identity.family) if part)
 
 
 def render_fhir_patient(identity: Identity, base: dict, local_id: str) -> dict:
-    patient: dict = {"resourceType": "Patient", "id": str(record_id(SOURCE_ER_FHIR, local_id)), "identifier": _identifiers(base, local_id)}
+    patient: dict = {
+        "resourceType": "Patient",
+        "id": str(record_id(SOURCE_ER_FHIR, local_id)),
+        # the record's own MRN only; it is the source_local_id and never shared between records
+        "identifier": [{"type": {"coding": [{"system": IDENTIFIER_TYPE_SYSTEM, "code": "MR", "display": "Medical Record Number"}]},
+                        "system": MRN_SYSTEM, "value": local_id}],
+    }
     for key in PATIENT_KEPT_FIELDS:
         if key in base:
             patient[key] = base[key]
@@ -123,7 +134,16 @@ def render_fhir_patient(identity: Identity, base: dict, local_id: str) -> dict:
     return patient
 
 
+def _relabel_patient_references(resources: list[dict], name: str) -> None:
+    for resource in resources:
+        for key in PATIENT_REFERENCE_KEYS:
+            ref = resource.get(key)
+            if isinstance(ref, dict) and "display" in ref:
+                ref["display"] = name
+
+
 def fhir_draft(identity: Identity, bundle: FhirPatientBundle, local_id: str, is_constructed: bool = False) -> SourceRecordDraft:
+    record_uuid = str(record_id(SOURCE_ER_FHIR, local_id))
     payload = {
         "patient": render_fhir_patient(identity, bundle.patient, local_id),
         "allergyIntolerances": bundle.allergies,
@@ -131,14 +151,32 @@ def fhir_draft(identity: Identity, bundle: FhirPatientBundle, local_id: str, is_
         "encounters": bundle.encounters,
         "medications": bundle.medications,
     }
-    payload = _replace_person_id(payload, bundle.patient_id, str(record_id(SOURCE_ER_FHIR, local_id)))
+    # Re-mint every clinical resource id per record so two variants of one person share none.
+    id_map = {res["id"]: _per_record_id(record_uuid, res["id"]) for key in FHIR_CLINICAL_LISTS for res in payload[key] if res.get("id")}
+    id_map[bundle.patient_id] = record_uuid
+    payload = _remap_ids(payload, id_map)
+    for key in FHIR_CLINICAL_LISTS:
+        _relabel_patient_references(payload[key], display_name(identity))
     return SourceRecordDraft(SOURCE_ER_FHIR, local_id, payload, identity_from_patient(payload["patient"]), is_constructed)
+
+
+def canonical_headers(row: dict[str, str]) -> dict[str, str]:
+    """UPPERCASE keys, so a mixed-case header (``Last`` beside ``LAST``) cannot keep a value the
+    renderer meant to replace or drop."""
+    out: dict[str, str] = {}
+    for key, value in row.items():
+        if key is None:
+            continue
+        upper = key.strip().upper()
+        if upper not in out or not out[upper]:
+            out[upper] = value
+    return out
 
 
 def render_csv_row(identity: Identity, base: dict[str, str], local_id: str, include_phone: bool) -> dict[str, str]:
     """A clinic-shaped row: Synthea columns minus identity documents, DOB as MM/DD/YYYY, phone sometimes."""
-    row = {k: v for k, v in base.items() if k.upper() not in CLINIC_DROPPED_COLUMNS}
-    row["Id"] = local_id
+    row = {k: v for k, v in canonical_headers(base).items() if k not in CLINIC_DROPPED_COLUMNS}
+    row["ID"] = local_id
     parsed_dob = parse_date(identity.birth_date)
     row.update({
         "BIRTHDATE": parsed_dob.strftime("%m/%d/%Y") if parsed_dob else (identity.birth_date or ""),
@@ -168,7 +206,12 @@ def csv_draft(identity: Identity, patient: CsvPatient, local_id: str, include_ph
         "medications": patient.medications,
         "encounters": patient.encounters,
     }
-    payload = _replace_person_id(payload, patient.patient_id, local_id)
+    # Encounter ids are shared across the clinical rows of one person; re-mint them per record.
+    id_map = {value: _per_record_id(local_id, value)
+              for key in CSV_CLINICAL_LISTS for row in payload[key]
+              for col, value in row.items() if col and col.upper() in CSV_ENCOUNTER_ID_COLUMNS and value}
+    id_map[patient.patient_id] = local_id
+    payload = _remap_ids(payload, id_map)
     return SourceRecordDraft(SOURCE_CLINIC_CSV, local_id, payload, identity_from_row(payload["patient"]), is_constructed)
 
 

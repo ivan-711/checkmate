@@ -99,3 +99,20 @@ def test_normalize_identity_csv_sex_codes_and_missing_values():
     fields = normalize_identity(Identity(given="Robert", family="Smith", sex="F"))
     assert fields.sex == "FEMALE"
     assert fields.birth_date is None and fields.phone_e164 is None and fields.zip5 is None
+
+
+def test_placeholder_phone_rejects_repeated_local_suffix_and_fictional_block():
+    from backend.ingest.normalize import is_placeholder_phone as ph
+    assert ph(phone_to_e164("617-000-0000"))  # 0000000 suffix
+    assert ph(phone_to_e164("617-555-0100"))  # NXX-555-01XX fictional block
+    assert ph(phone_to_e164("555-555-0199"))
+    assert ph(phone_to_e164("999-999-9999"))
+    assert not ph(phone_to_e164("617-555-0200"))  # 555-02XX is outside the fictional block
+    assert not ph(phone_to_e164("555-768-4657"))
+
+
+def test_placeholder_zip():
+    from backend.ingest.normalize import is_placeholder_zip
+    assert is_placeholder_zip("00000") and is_placeholder_zip("99999") and is_placeholder_zip("11111") and is_placeholder_zip("12345")
+    assert is_placeholder_zip(None)
+    assert not is_placeholder_zip("01604")
