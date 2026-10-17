@@ -29,14 +29,16 @@ make up
 
 `make up` builds and starts the database and the API (`Makefile`, `docker-compose.yml`); the API container applies the migrations before it starts (`backend/Dockerfile`). Then open http://127.0.0.1:8000/api/v1/health and expect `"db":"UP"` (`backend/app/main.py`, `contracts/models/health.py`).
 
-To drop the synthetic database and rebuild it from the seed:
+To drop the synthetic database and start over:
 
 ```sh
 make down-v
 make up
 ```
 
-Both ports bind to 127.0.0.1 only (`docker-compose.yml`). Routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the contract's error envelope (`contracts/api_spec.py`).
+`make down-v` removes the database volume (`Makefile`); the next `make up` recreates it and reapplies the migrations (`backend/Dockerfile`). The seed loader is not on `main` yet, so the tables start empty.
+
+Compose publishes both ports on 127.0.0.1 only (`docker-compose.yml`). Routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the contract's error envelope (`contracts/api_spec.py`).
 
 ## Architecture
 
@@ -45,7 +47,7 @@ What exists on `main` today. Components are added to this diagram only when thei
 ```mermaid
 flowchart LR
     contracts["contracts/<br/>Pydantic models, openapi.json,<br/>migration 0001, fixtures"]
-    api["API process<br/>FastAPI on 127.0.0.1:8000<br/>backend/app/main.py"]
+    api["API process<br/>FastAPI, port 8000<br/>backend/app/main.py"]
     db[("TimescaleDB<br/>event_log hypertable")]
     aggs["Continuous aggregates, real-time<br/>band_flow_1m<br/>review_outcomes_5m<br/>agent_gate_5m"]
     contracts -- "routes and models" --> api
@@ -63,7 +65,7 @@ flowchart LR
 
 ## Repository layout
 
-| Directory | Owner lanes (`CLAUDE.md`) | On `main` today |
+| Directory | Owner lanes (`CLAUDE.md`) | Contents |
 |---|---|---|
 | `contracts/` | lead session | The frozen contract, tag `contracts-v1` (`contracts/README.md`) |
 | `backend/` | W1, W2, W3a, W3b and wave 2 | `backend/app/`: health route, error envelope, request id and log line, one database pool |
@@ -87,13 +89,13 @@ Third-party code licenses are listed in `docs/LICENSES.md`.
 
 CheckMate is a synthetic-data prototype for identity reconciliation and evidence display. Flags are rule-based, cite their sources, are shown only after a person approves an identity link, and do not direct treatment. Not for clinical use. No clinician has reviewed the rule, the class table or the wording. Absence of a flag does not mean absence of a conflict.
 
-Every flag carries this boundary in its footer (`CARD_FOOTER` in `contracts/models/alerts.py`).
+Every flag card's footer names what the rule does not check, says that absence of a flag is not evidence that no conflict exists, and says that no clinician reviewed the rule or its wording (`CARD_FOOTER` in `contracts/models/alerts.py`).
 
 ## Known limits and non-goals
 
-- **Synthetic data only.** The database holds only synthetic records and is rebuilt from the seed (`docker-compose.yml`); source datasets are never committed (`.gitignore`).
+- **Synthetic data only.** The database holds only synthetic records and is dropped with one command (`docker-compose.yml`, `Makefile`); source datasets are never committed (`.gitignore`).
 - **Two sources at the core path:** an ER FHIR record and a clinic CSV row (`contracts/fixtures/scenario.json`).
-- **Thresholds come from the synthetic labeled set and are reported with n.** They are evaluation thresholds, not clinical ones. Each threshold set names the run it came from (`sourceRunId`), `isCalibrated` defaults to false, and auto-link is off (`contracts/models/thresholds.py`).
+- **Thresholds come from the synthetic labeled set and are reported with n.** They are evaluation thresholds, not clinical ones. A threshold set has a field for the run it came from (`sourceRunId`), `isCalibrated` defaults to false, and auto-link defaults to off (`contracts/models/thresholds.py`).
 - **No authentication.** A registrar name is a recorded label, not an authenticated identity (`contracts/models/reviews.py`).
 - **One process on one laptop, bound to localhost** (`docker-compose.yml`, `Makefile`).
 - **The live agent depends on the Gemini API,** with a labeled REPLAY fallback; the API starts in REPLAY (`FRONTDESK_AGENT_MODE` in `docker-compose.yml`, `backend/app/config.py`, `contracts/models/health.py`).

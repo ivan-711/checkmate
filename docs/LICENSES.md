@@ -2,7 +2,7 @@
 
 Author: Gojo (docs) · 2026-10-17
 
-Every third-party package this repository installs, read from its lock file. Licenses are the SPDX expression (or, where a package publishes none, the license field and classifiers) in the PyPI metadata for the exact pinned version. Regenerate this list whenever a lock file changes.
+Every third-party package this repository installs, read from its lock file. Licenses are the SPDX expression (or, where a package publishes none, the license field and classifiers) in the PyPI metadata for the exact pinned version. The table is maintained by hand: update it in the same pull request that changes a lock file.
 
 The project's own code license is not set yet.
 
