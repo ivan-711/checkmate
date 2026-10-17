@@ -112,3 +112,39 @@ def test_event_types_are_upper_snake_and_payloads_never_carry_records(client, se
     for e in items:
         assert e["payload"] is not None
         assert "raw_payload" not in e["payload"] and "rawPayload" not in e["payload"]
+
+
+def test_a_row_with_extra_version_keys_and_null_evidence_ids_is_served(client, session):
+    """W3b's ALERT_RAISED stores ruleId/ruleVersion/classTable in versions (outside the contract's
+    Versions) and leaves evidence_ids NULL. The feed must still answer 200 and serve that row."""
+    import json
+
+    event_id = uuid.uuid4()
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO event_log (ts, event_id, event_type, entry_point, actor, actor_type, outcome, mode, "
+                "versions, payload) VALUES (:ts, :id, 'ALERT_RAISED', 'API', 'registrar:Registrar A', 'REGISTRAR', "
+                "'TIER_A', 'LOCAL', CAST(:versions AS jsonb), CAST(:payload AS jsonb))"
+            ),
+            {
+                "ts": datetime.now(UTC),
+                "id": event_id,
+                "versions": json.dumps(
+                    {
+                        "ruleId": "BL-AMOX-01",
+                        "ruleVersion": "v1",
+                        "classTable": {"7984": "PENICILLIN"},
+                        "scorerVersion": "handset-0",
+                    }
+                ),
+                "payload": json.dumps({"alertId": str(uuid.uuid4())}),
+            },
+        )
+    r = client.get(f"{API}/events", params={"limit": 5})
+    assert r.status_code == 200, r.text
+    row = next(e for e in r.json()["items"] if e["eventId"] == str(event_id))
+    assert row["eventType"] == "ALERT_RAISED"
+    assert row["evidenceIds"] == []
+    assert row["versions"]["scorerVersion"] == "handset-0"
+    assert "ruleId" not in row["versions"] and "classTable" not in row["versions"]

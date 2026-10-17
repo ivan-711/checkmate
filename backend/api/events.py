@@ -16,7 +16,7 @@ from backend.api.common import invalid_cursor, pack_cursor, unpack_cursor
 from backend.app.deps import EngineDep
 from backend.app.openapi_meta import common_error_responses
 from contracts.models.common import Page
-from contracts.models.events import EventLogRow
+from contracts.models.events import EventLogRow, Versions
 from contracts.version import API_PREFIX, LIST_LIMIT_DEFAULT, LIST_LIMIT_MAX
 
 
@@ -50,9 +50,23 @@ _NEXT_PAGE = text(
 )
 
 
+# The contract's Versions keys, in both spellings a writer may store (camelCase alias or snake_case).
+VERSION_KEYS = frozenset(
+    key for name, info in Versions.model_fields.items() for key in (name, info.alias) if key is not None
+)
+
+
+def contract_versions(stored: dict | None) -> dict:
+    """Only the keys the contract's ``Versions`` declares. Writers other than ``write_event`` may store
+    more (W3b's ALERT_RAISED keeps ruleId, ruleVersion and the class table there); the table keeps
+    them, the feed serves the contract shape, so one such row can never turn a page into a 500."""
+    return {k: v for k, v in (stored or {}).items() if k in VERSION_KEYS}
+
+
 def event_from_row(row) -> EventLogRow:
     fields = dict(row._mapping)
     fields["evidence_ids"] = fields["evidence_ids"] or []  # the column is nullable; the model's list is not
+    fields["versions"] = contract_versions(fields["versions"])
     return EventLogRow.model_validate(fields)
 
 
