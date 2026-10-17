@@ -11,18 +11,20 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import uuid
 from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from contracts.fixtures.build_fixtures import FEATURES, T0, build_scenario
+from contracts.fixtures.build_fixtures import T0, build_scenario
 from contracts.models.common import Band
 from contracts.models.whatifs import WhatIfButton
 from data.hero_overlay import PROVENANCE_SENTENCE, write_overlay
 from data.hero_select import whatif_year_direction
 from eval.harness import whatifs
-from eval.harness.standin import block_keys, display_p, fold
+from eval.harness.product import Engine, standin_engine
+from eval.harness.standin import fold
 from eval.harness.types import BAND_KEEP_SEPARATE, Record
 
 if TYPE_CHECKING:
@@ -30,12 +32,30 @@ if TYPE_CHECKING:
     from eval.harness.run import RunResult
 
 NAMESPACE = uuid.UUID("6f1b4a3e-2c7d-4d0a-9a6e-5a1e00000000")  # fixed: record ids are stable across runs
-BUTTON_FEATURE = {WhatIfButton.REMOVE_ADDRESS: "address_jaccard", WhatIfButton.CHANGE_BIRTH_YEAR: "dob_exact",
-                  WhatIfButton.SWAP_DOB_DAY_MONTH: "dob_day_month_swap", WhatIfButton.ACCENT_HYPHEN_SURNAME: "family_name_jw"}
+# the record field each what-if edits (the counterfactual shown beside the button)
+BUTTON_FIELD = {WhatIfButton.REMOVE_ADDRESS: "addressLine", WhatIfButton.CHANGE_BIRTH_YEAR: "birthDate",
+                WhatIfButton.SWAP_DOB_DAY_MONTH: "birthDate", WhatIfButton.ACCENT_HYPHEN_SURNAME: "familyName"}
 MONTHS_ES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
              "noviembre", "diciembre")
 MONTHS_EN = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
              "November", "December")
+
+
+_ISO = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})")
+_US = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
+
+
+def iso_date(value: str | None) -> str | None:
+    """A source DOB (ISO from FHIR, MM/DD/YYYY from the Clinic CSV) as the contract's ISO date; None if partial."""
+    if not value:
+        return None
+    if m := _ISO.match(value):
+        y, mo, d = m.groups()
+    elif m := _US.match(value.strip()):
+        mo, d, y = m.groups()
+    else:
+        return None
+    return f"{int(y):04d}-{int(mo):02d}-{int(d):02d}"
 
 
 def record_uuid(record_id: str) -> str:
@@ -52,7 +72,7 @@ def source_card(rec: Record, label: str, constructed: bool) -> dict:
         "normalized": {"recordId": rid, "givenName": rec.get("given_name"), "familyName": rec.get("family_name"),
                        "givenNameFolded": fold(rec.get("given_name")) or None,
                        "familyNameFolded": fold(rec.get("family_name")) or None,
-                       "birthDate": rec.get("birth_date"), "sex": rec.get("sex"), "phoneE164": rec.get("phone"),
+                       "birthDate": iso_date(rec.get("birth_date")), "sex": rec.get("sex"), "phoneE164": rec.get("phone"),
                        "addressLine": rec.get("address_line"), "zip5": rec.get("zip5")},
         "displayLabel": label,
     }
@@ -66,7 +86,7 @@ def feature_value(s: Scored, f: str) -> float | None:
 
 
 def contributions(s: Scored) -> list[dict]:
-    return [{"feature": f, "logit": s.contributions.get(f, 0.0), "value": feature_value(s, f)} for f in FEATURES]
+    return [{"feature": f, "logit": s.contributions.get(f, 0.0), "value": feature_value(s, f)} for f in s.contributions]
 
 
 def score_state(s: Scored) -> dict:
@@ -91,7 +111,7 @@ def _whatif_key(button: WhatIfButton, hero: Candidate) -> str:
 
 
 def utterances(er: Record) -> dict[str, str]:
-    y, m, d = (int(x) for x in er["birth_date"].split("-"))
+    y, m, d = (int(x) for x in iso_date(er["birth_date"]).split("-"))
     name = f"{er['given_name']} {er['family_name']}"
     es = f"Me llamo {name}, nací el {d} de {MONTHS_ES[m - 1]} de {y}"
     en = f"My name is {name}, born {MONTHS_EN[m - 1]} {d}, {y}"
@@ -105,8 +125,10 @@ def utterances(er: Record) -> dict[str, str]:
 
 
 def export(selection: HeroSelection, result: RunResult, out: Path, provisional: bool,
-           hero: Candidate | None = None) -> None:
-    """``hero`` overrides the selection's hero (the best partial when nothing qualified)."""
+           hero: Candidate | None = None, engine: Engine | None = None) -> None:
+    """``hero`` overrides the selection's hero (the best partial when nothing qualified); ``engine`` is the
+    scorer that selected it (block keys, display p and the shipped weights come from it)."""
+    engine = engine or standin_engine()
     hero = hero or selection.hero
     assert hero is not None
     qualified = selection.ok and hero is selection.hero
@@ -147,15 +169,17 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
     base = hero.baseline
     decision = pair["pair"]["decision"]
     snapshot = decision["evidenceSnapshot"]
-    snapshot.update(features={f: feature_value(base, f) for f in FEATURES},
-                    missingFlags={f: feature_value(base, f) is None for f in FEATURES},
-                    weights={f: result.weights.get(f, 0.0) for f in FEATURES}, intercept=result.weights.get("intercept", 0.0),
+    names = list(base.contributions)  # the scorer's own feature names, in its order
+    snapshot.update(features={f: feature_value(base, f) for f in names},
+                    missingFlags={f: feature_value(base, f) is None for f in names},
+                    weights={f: engine.shipped_weights.get(f, 0.0) for f in names},
+                    intercept=engine.shipped_weights.get("intercept", 0.0),
                     contributions=contributions(base), rawScore=base.raw_score, cLow=c_low, cHigh=c_high,
                     negativeRulesFired=list(base.negative_rules_fired), scorerVersion=scorer, thresholdSetId=thresholds_id)
     decision.update(id=decision_id, pairId=pair_id, logit=base.raw_score, p=base.p, band=base.band,
                     negativeRulesFired=list(base.negative_rules_fired), scorerVersion=scorer, thresholdSetId=thresholds_id)
     pair["pair"].update(id=pair_id, recordAId=er_id, recordBId=clinic_id,
-                        blockKeys=sorted(set(block_keys(er)) & set(block_keys(clinic))))
+                        blockKeys=sorted(set(engine.block_keys(er)) & set(engine.block_keys(clinic))))
     pair.update(recordA=er_card, recordB=clinic_card, contributions=contributions(base), history=[decision])
     pair["mergePreview"].update(entityIdIfApproved=entity_id, memberCountIfApproved=2, alertWouldFire=True)
 
@@ -176,7 +200,7 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
     entity["golden"] = [
         golden("givenName", clinic["given_name"], "CLINIC_CSV", "MOST_FREQUENT", (er["given_name"], "ER_FHIR")),
         golden("familyName", clinic["family_name"], "CLINIC_CSV", "MOST_RECENT", (er["family_name"], "ER_FHIR")),
-        golden("birthDate", er["birth_date"], "ER_FHIR", "MAJORITY", (clinic["birth_date"], "CLINIC_CSV")),
+        golden("birthDate", iso_date(er["birth_date"]), "ER_FHIR", "MAJORITY", (iso_date(clinic["birth_date"]), "CLINIC_CSV")),
         golden("phone", er.get("phone") or clinic.get("phone"), "ER_FHIR" if er.get("phone") else "CLINIC_CSV", "MOST_RECENT"),
     ]
     for ev in scenario["timelineIfApproved"]:
@@ -192,21 +216,20 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
     alert["cardText"] = (alert["cardText"].replace("allergies.csv row PLACEHOLDER", f"allergies.csv row {overlay.clinic_patient_id}")
                          .replace("MedicationRequest/PLACEHOLDER", order_ref))
     scenario["thresholds"].update(thresholdsId=thresholds_id, cLow=c_low, cHigh=c_high,
-                                  tLowDisplay=round(display_p(c_low, {}), 6), tHighDisplay=round(display_p(c_high, {}), 6),
+                                  tLowDisplay=round(engine.display_p(c_low), 6), tHighDisplay=round(engine.display_p(c_high), 6),
                                   autoLinkEnabled=False, isCalibrated=False, sourceRunId=None)  # the selector's run dir is temporary
     recall = held_out_recall(result.numbers)
     baseline_state = score_state(base)
     scenario["whatIfs"] = {}
     for button in WhatIfButton:
         s = hero.what_ifs[_whatif_key(button, hero)]
-        feat = BUTTON_FEATURE[button]
+        field_name = BUTTON_FIELD[button]
         scenario["whatIfs"][button.value] = {
             "baseline": baseline_state, "whatIf": score_state(s),
             "deltas": [{"feature": f, "logit": round(s.contributions.get(f, 0.0) - base.contributions.get(f, 0.0), 6), "value": None}
-                       for f in FEATURES if abs(s.contributions.get(f, 0.0) - base.contributions.get(f, 0.0)) > 1e-9] or
-                      [{"feature": feat, "logit": 0.0, "value": None}],
+                       for f in base.contributions if abs(s.contributions.get(f, 0.0) - base.contributions.get(f, 0.0)) > 1e-9],
             "caption": whatifs.caption_for(button.value, base.band, s.band, s.p - base.p),
-            "counterfactualFields": {feat: _counterfactual(button, er, hero)},
+            "counterfactualFields": {field_name: _counterfactual(button, er, hero)},
             "alertWouldBeHidden": s.band == BAND_KEEP_SEPARATE, "heldOutRecall": recall, "seed": selection.seed,
         }
     intake = utterances(er)
@@ -222,14 +245,14 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
         "baseline": asdict(base), "whatIfs": {k: asdict(v) for k, v in hero.what_ifs.items()}, "intake": asdict(hero.intake),
         "exportedWhatIfKeys": {b.value: _whatif_key(b, hero) for b in WhatIfButton},
         "criteria": hero.criteria, "criteriaLevel": hero.level, "criteriaRequired": list(hero.required),
-        "weights": dict(result.weights),
+        "weights": dict(engine.shipped_weights),
         "constructedOverlay": {"allergyRef": allergy_ref, "orderRef": order_ref, "isConstructed": True,
                                "manifest": "scenario_manifest.json", "provenance": PROVENANCE_SENTENCE},
     }, indent=2, ensure_ascii=False) + "\n")
     (out / "frontdesk_intake.json").write_text(json.dumps({
         "scenarioContextId": "hero-er-arrival", **intake,
         "expectedProposeNewChartArgs": {
-            "givenName": er["given_name"], "familyName": er["family_name"], "birthDate": er["birth_date"],
+            "givenName": er["given_name"], "familyName": er["family_name"], "birthDate": iso_date(er["birth_date"]),
             "sex": er.get("sex"), "phone": er.get("phone"), "addressLine": er.get("address_line"), "postalCode": er.get("zip5"),
             "preferredLanguage": er.get("language", "EN"),
         },

@@ -1,35 +1,40 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { API_BASE } from './playwright.config';
 
-// The hero the engine exported (data/hero_select.py). The cards and the golden record must be the
-// hero's, not any two records: a stub rendering two cards, REVIEW and BL-AMOX-01 must not pass.
-const SCENARIO_PATH = process.env.CHECKMATE_SCENARIO ?? resolve(__dirname, '../../data/scenarios/hero/scenario.json');
+// The hero the engine exported (data/hero_select.py, data/scenarios/hero/hero.json). The cards and the
+// golden record must be the hero's, not any two records: a stub rendering two cards, REVIEW and
+// BL-AMOX-01 must not pass.
+const HERO_PATH = process.env.CHECKMATE_HERO ?? resolve(__dirname, '../../data/scenarios/hero/hero.json');
 
-interface HeroNormalized {
-  givenName: string | null;
-  familyName: string | null;
-  birthDate: string | null;
+interface HeroRecord {
+  given_name: string | null;
+  family_name: string | null;
 }
 
-interface HeroScenario {
-  session: { sources: Array<{ record: { sourceSystem: string }; normalized: HeroNormalized }> };
-  entityIfApproved: { golden: Array<{ field: string; value: unknown }> };
+interface HeroExport {
+  records: { ER_FHIR: HeroRecord; CLINIC_CSV: HeroRecord };
 }
 
-const HERO = JSON.parse(readFileSync(SCENARIO_PATH, 'utf8')) as HeroScenario;
+const HERO = JSON.parse(readFileSync(HERO_PATH, 'utf8')) as HeroExport;
 
-function heroSource(system: string): HeroNormalized {
-  const source = HERO.session.sources.find((s) => s.record.sourceSystem === system);
-  if (!source) throw new Error(`scenario.json has no ${system} source`);
-  return source.normalized;
+function heroRecord(system: 'ER_FHIR' | 'CLINIC_CSV'): HeroRecord {
+  const record = HERO.records[system];
+  if (!record) throw new Error(`hero.json has no ${system} record`);
+  return record;
 }
 
-function heroGolden(field: string): string {
-  const value = HERO.entityIfApproved.golden.find((g) => g.field === field)?.value;
-  if (typeof value !== 'string' || value.length === 0) throw new Error(`scenario.json golden ${field} missing`);
-  return value;
+// Names compare case-, accent-, space- and punctuation-insensitively: the UI may show the source
+// spelling, W2's normalized form or the golden value ("Mesa-López", "mesa lopez", "MesaLopez").
+function nameKey(text: string): string {
+  return text.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+async function expectShowsName(locator: Locator, name: string | null, what: string): Promise<void> {
+  if (!name) return;
+  await expect.poll(async () => nameKey(await locator.innerText()), { message: `${what} shows ${name}` })
+    .toContain(nameKey(name));
 }
 
 /**
@@ -90,14 +95,28 @@ async function submitReview(page: Page, kind: 'approve' | 'reject', note: string
   await byId(page, T.reviewSubmitButton).click();
 }
 
-async function eventCounts(request: APIRequestContext): Promise<Record<string, number>> {
-  // Event rows are append-only and the database is reused (CLAUDE.md rule 4), so counts are read in
-  // full (cursor pagination, clamped limit) and the assertions below compare deltas against a snapshot.
+// The events feed holds every earlier run on a reused database, and one match run writes about 7,000
+// PAIR_SCORED rows, so counts are read from the API's own clock onwards (GET /events?since=) and in
+// full: the cap covers two match runs with room to spare, and a feed longer than the cap fails loudly
+// instead of being truncated. The same `since` goes on every page (a cursor is bound to it).
+const EVENT_PAGE_LIMIT = 200;
+const MAX_EVENT_PAGES = 250;
+
+async function apiClock(request: APIRequestContext): Promise<string> {
+  const res = await request.get(`${API_BASE}/api/v1/health`);
+  const header = res.headers()['date'];
+  if (!header) throw new Error('GET /health returned no Date header; cannot take the API clock');
+  // second precision, explicit UTC offset (a naive timestamp would be read as UTC anyway)
+  return new Date(header).toISOString().replace('Z', '+00:00');
+}
+
+async function eventCounts(request: APIRequestContext, since: string): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
   let cursor: string | null = null;
-  for (let page = 0; page < 50; page++) {
-    const url = `${API_BASE}/api/v1/events?limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
-    const res = await request.get(url);
+  for (let page = 0; page < MAX_EVENT_PAGES; page++) {
+    const query = `since=${encodeURIComponent(since)}&limit=${EVENT_PAGE_LIMIT}` +
+      (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '');
+    const res = await request.get(`${API_BASE}/api/v1/events?${query}`);
     expect(res.status(), 'GET /events must answer 200').toBe(200);
     const body = (await res.json()) as { items: Array<{ eventType: string }>; nextCursor: string | null };
     for (const row of body.items) {
@@ -105,9 +124,9 @@ async function eventCounts(request: APIRequestContext): Promise<Record<string, n
       counts[key] = (counts[key] ?? 0) + 1;
     }
     cursor = body.nextCursor;
-    if (!cursor) break;
+    if (!cursor) return counts;
   }
-  return counts;
+  throw new Error(`GET /events since ${since} has more than ${MAX_EVENT_PAGES * EVENT_PAGE_LIMIT} rows`);
 }
 
 function delta(after: Record<string, number>, before: Record<string, number>, key: string): number {
@@ -124,7 +143,8 @@ test.describe('G16 demo path', () => {
       if (res.status() >= 500) serverErrors.push(`${res.status()} ${res.request().method()} ${res.url()}`);
     });
 
-    const before = await eventCounts(request);
+    const since = await apiClock(request);
+    const before = await eventCounts(request, since);
     await page.goto('/');
     await expect(byId(page, T.modeBadge)).toBeVisible();
 
@@ -135,10 +155,9 @@ test.describe('G16 demo path', () => {
     for (const system of ['ER_FHIR', 'CLINIC_CSV']) {
       const card = page.locator(`[data-testid="${T.sourceCard}"][data-source-system="${system}"]`);
       await expect(card).toHaveCount(1);
-      const hero = heroSource(system);
-      for (const value of [hero.givenName, hero.familyName]) {
-        if (value) await expect(card, `${system} card shows the hero's ${value}`).toContainText(value);
-      }
+      const hero = heroRecord(system as 'ER_FHIR' | 'CLINIC_CSV');
+      await expectShowsName(card, hero.given_name, `${system} card`);
+      await expectShowsName(card, hero.family_name, `${system} card`);
     }
 
     // 2. resolve: the hero pair lands in REVIEW with the evidence rail
@@ -161,8 +180,15 @@ test.describe('G16 demo path', () => {
 
     // 5. cards collapse into one golden record with crosswalk chips; the timeline shows both sources
     await expect(byId(page, T.goldenRecord)).toBeVisible();
-    await expect(byId(page, T.goldenRecord)).toContainText(heroGolden('givenName'));
-    await expect(byId(page, T.goldenRecord)).toContainText(heroGolden('familyName'));
+    // the golden record is the hero's: its given name, and the family name from either source
+    // (survivorship picks one; W3b owns that rule)
+    const golden = byId(page, T.goldenRecord);
+    await expectShowsName(golden, heroRecord('CLINIC_CSV').given_name ?? heroRecord('ER_FHIR').given_name, 'golden record');
+    await expect.poll(async () => {
+      const text = nameKey(await golden.innerText());
+      return [heroRecord('ER_FHIR').family_name, heroRecord('CLINIC_CSV').family_name]
+        .some((n) => n !== null && text.includes(nameKey(n)));
+    }, { message: "golden record shows one of the hero's family names" }).toBe(true);
     await expect(byId(page, T.sourceCard)).toHaveCount(0);
     expect(await byId(page, T.crosswalkChip).count()).toBeGreaterThan(0);
     await expect(byId(page, T.timeline)).toBeVisible();
@@ -180,7 +206,7 @@ test.describe('G16 demo path', () => {
     for (const banned of NEVER_SAY) expect(flagText, `flag card must never say "${banned}"`).not.toContain(banned);
 
     // 7. GET /events has one row per action (deltas since the pre-run snapshot)
-    const after = await eventCounts(request);
+    const after = await eventCounts(request, since);
     expect(delta(after, before, 'demo_reset')).toBe(1);
     expect(delta(after, before, 'match_run_completed')).toBe(2);
     expect(delta(after, before, 'link_rejected')).toBe(1);

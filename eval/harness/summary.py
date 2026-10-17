@@ -58,10 +58,14 @@ def render(numbers: dict, manifest: dict | None = None) -> str:
                      f"{cell.get('n_components', 'n/a')} | {', '.join(flags)} |")
     th = numbers.get("thresholds.alpha_target_reachable", {})
     lines.append("")
-    lines.append(f"c_low = {_fmt(numbers.get('thresholds.c_low', {}).get('value'))}, "
-                 f"c_high = {_fmt(numbers.get('thresholds.c_high', {}).get('value'))}; "
+    op = numbers.get("thresholds.operating_point", {})
+    lines.append(f"Operating point `{op.get('value')}` ({op.get('source')}): "
+                 f"c_low = {_fmt(numbers.get('thresholds.c_low', {}).get('value'))}, "
+                 f"c_high = {_fmt(numbers.get('thresholds.c_high', {}).get('value'))}. "
+                 f"Out-of-fold proposal: c_low = {_fmt(numbers.get('thresholds.proposed.c_low', {}).get('value'))}, "
+                 f"c_high = {_fmt(numbers.get('thresholds.proposed.c_high', {}).get('value'))}; "
                  f"alpha target reachable: {th.get('value')} (fallback used: {th.get('fallback_used')}). "
-                 "Demo cutoffs chosen on development data; configuration, not clinical thresholds.")
+                 "Configuration, not clinical thresholds.")
     lat = numbers.get("latency.match.p95_ms")
     if lat:
         lines.append(f"match() p95 {_fmt(lat.get('value'))} ms, warm, n = {lat.get('n')}, in-process.")

@@ -34,7 +34,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from eval.harness import whatifs
+from eval.harness.current_thresholds import CurrentThresholds, from_migrations
 from eval.harness.fixture import CLINIC_CSV, ER_FHIR, FixtureConfig
+from eval.harness.product import Engine
 from eval.harness.run import RunConfig, RunResult, run
 from eval.harness.splits import Assignment
 from eval.harness.types import (
@@ -51,6 +53,7 @@ from eval.harness.types import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = REPO_ROOT / "data" / "scenarios" / "hero"
+EXIT_PRODUCT_UNAVAILABLE = 4
 ROBUSTNESS_TOLERANCE = 0.05
 ROBUSTNESS_TOLERANCE_RELAXED = 0.10
 P_RAISE_BOUND = 0.005          # fixture_check: no what-if raises p above the baseline by more than this
@@ -156,10 +159,13 @@ class HeroSelection:
         return d
 
 
+HERO_BIRTH_YEAR_DELTA = -1  # fork #11, decided option A: the shipped CHANGE_BIRTH_YEAR what-if is fixed at -1
+
+
 def whatif_year_direction(c: Candidate) -> int:
-    """The CHANGE_BIRTH_YEAR direction the UI shows: the one that drops the raw score furthest (+1 on ties)."""
-    plus, minus = c.what_ifs[f"{whatifs.CHANGE_BIRTH_YEAR}:+1"], c.what_ifs[f"{whatifs.CHANGE_BIRTH_YEAR}:-1"]
-    return 1 if plus.raw_score <= minus.raw_score else -1
+    """The CHANGE_BIRTH_YEAR direction the UI shows: fixed at -1 (fork #11). Both directions still enter the
+    published criterion, and fixture_check --strict fails an AUTO_LINK in either."""
+    return HERO_BIRTH_YEAR_DELTA
 
 
 def intake_rendering(er: Record) -> Record:
@@ -290,10 +296,13 @@ def select_hero(corpus: Corpus, assignment: Assignment, match: MatchFn, weights:
                          criteria=criteria_text, candidates=sorted(candidates, key=_rank_key))
 
 
-def development_run(seed: int, fixture: FixtureConfig | None = None, corpus_loader=None) -> RunResult:
-    """Frozen scorer and thresholds come from the development run with the same seed (fast config)."""
+def development_run(seed: int, engine: Engine, corpus_loader=None, fixture: FixtureConfig | None = None,
+                    operating_point: CurrentThresholds | None = None) -> RunResult:
+    """The development run with the same seed (fast config) through ``engine``, banded at the current row."""
     cfg = RunConfig(name="hero-select", seed=seed, fast=True, out_dir=Path(tempfile.mkdtemp(prefix="hero-select-")),
-                    fixture=fixture or FixtureConfig(seed=seed), corpus_loader=corpus_loader)
+                    fixture=fixture or FixtureConfig(seed=seed), corpus_loader=corpus_loader, match=engine.match,
+                    fit=engine.fit, block=engine.block, scorer_version=engine.scorer_version,
+                    provenance={"engine": engine.provenance}, operating_point=operating_point or from_migrations())
     return run(cfg)
 
 
@@ -304,27 +313,43 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--allow-test-fallback", action="store_true")
     parser.add_argument("--no-require-spanish", action="store_true",
                         help="skip level 0 when the 12:30 census failed the Spanish gate")
+    parser.add_argument("--engine", choices=("product", "standin"), default="product",
+                        help="product (default): W1's corpus and W2's engine; standin: harness self-test only")
+    parser.add_argument("--raw", type=Path, default=None, help="extracted Synthea sample (data/download.py)")
     parser.add_argument("--allow-partial", action="store_true",
                         help="when no hero qualifies, export the best partial candidate with its unmet criteria "
                              "(architecture 9.1: the pitch narrates the band changes that actually occur); exit 0")
     args = parser.parse_args(argv)
     from data.hero_export import export  # local import: the exporter pulls in the contract models
+    from eval.harness import product
 
-    result = development_run(args.seed)
-    selection = select_hero(result.corpus, result.assignment, RunConfig().match, result.weights,
-                            result.thresholds.c_low, result.thresholds.c_high, args.seed, result.manifest["scorerVersion"],
-                            result.manifest["thresholdSetId"], allow_test_fallback=args.allow_test_fallback,
-                            require_spanish=not args.no_require_spanish)
+    op = from_migrations()
+    try:
+        if args.engine == "product":
+            engine = product.load_engine()
+            raw = args.raw or product.DEFAULT_RAW_DIR
+            result = development_run(args.seed, engine, corpus_loader=lambda: product.load_corpus(args.seed, raw)[0],
+                                     operating_point=op)
+        else:
+            engine = product.standin_engine()
+            result = development_run(args.seed, engine, operating_point=op)
+    except product.ProductUnavailable as exc:
+        print(f"PRODUCT UNAVAILABLE: {exc}", file=sys.stderr)
+        return EXIT_PRODUCT_UNAVAILABLE
+    # the hero is scored with the weights the app ships, banded at the app's current threshold row
+    selection = select_hero(result.corpus, result.assignment, engine.match, engine.shipped_weights,
+                            op.c_low, op.c_high, args.seed, engine.scorer_version, op.thresholds_id,
+                            allow_test_fallback=args.allow_test_fallback, require_spanish=not args.no_require_spanish)
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "selection.json").write_text(json.dumps(selection.as_json(), indent=2, ensure_ascii=False) + "\n")
     print(selection.reason)
     if selection.ok:
-        export(selection, result, args.out, provisional=True)
+        export(selection, result, args.out, provisional=True, engine=engine)
         print(f"hero {selection.hero.entity_id} exported to {args.out}")
         return 0
     partial = selection.best_partial
     if args.allow_partial and partial is not None and partial.criteria.get("baseline_review"):
-        export(selection, result, args.out, provisional=True, hero=partial)
+        export(selection, result, args.out, provisional=True, hero=partial, engine=engine)
         print(f"NO QUALIFIER: best partial {partial.entity_id} exported with unmet criteria {partial.unmet()}; "
               "the pitch narrates only the band changes that occur", file=sys.stderr)
         return 0
