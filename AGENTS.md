@@ -84,6 +84,6 @@ Security: 12 approval, split and chart creation only through their endpoints; th
 - One FastAPI process, sync endpoints, one pool (`pool_size=10`, `max_overflow=5`, `pool_timeout=5`, `pool_pre_ping=True`), `statement_timeout = 5s`; a connection is never held across a model call or a poll wait. No module-level mutable domain state.
 - Same origin: the browser calls `/api/v1` on the Next.js origin, rewritten to FastAPI. CORS allow-list from `CORS_ORIGINS` (default `http://localhost:3000,http://127.0.0.1:3000`), never `*`, headers `Content-Type, Idempotency-Key, Authorization`, exposed `X-Request-Id`.
 - SQL values are bound parameters; identifiers come from closed maps in code.
-- Every list endpoint takes `limit` (default 50, max 200, clamped) and an opaque keyset `cursor`, returns `nextCursor`.
+- Every list endpoint takes `limit` (default 50, max 200; a larger value is a 422 at the boundary, as the frozen schema says) and an opaque keyset `cursor`, returns `nextCursor`.
 - Gemini: schema-only function declarations, automatic function calling off, temperature 0, 8 s timeout, SDK retries off, one retry only on timeout/429/5xx; two degraded turns in a row switch the session to the template; a turn still `IN_PROGRESS` 40 s after its claim is marked FAILED.
 - Phonetics install order: `metaphone` 0.6, then `phonetics` 1.0.5, then jellyfish `metaphone`+`nysiis`. scikit-learn ≥ 1.6 pinned.
