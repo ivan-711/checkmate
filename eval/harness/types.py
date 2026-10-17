@@ -71,6 +71,9 @@ class Corpus:
     truth: list[TruthRow]
     dependency_edges: list[tuple[str, str]] = field(default_factory=list)
     person_language: dict[str, str] = field(default_factory=dict)
+    assignment: Any = None
+    """The generator's own split (eval.harness.splits.Assignment), assigned before any record was generated
+    (eval plan section 3 step 2). None: the harness assigns it from the dependency graph."""
 
     def record_by_id(self) -> dict[str, Record]:
         return {r["record_id"]: r for r in self.records}
