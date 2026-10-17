@@ -1,0 +1,12 @@
+{
+  "synthea_sample_data_fhir_r4_nov2021.zip": {
+    "url": "https://synthetichealth.github.io/synthea-sample-data/downloads/synthea_sample_data_fhir_r4_nov2021.zip",
+    "bytes": 94887125,
+    "sha256": "6d3c5433bcae4791bc5c30469d1445b430fb4894d5c13bda15fee0584bbd7778"
+  },
+  "synthea_sample_data_csv_nov2021.zip": {
+    "url": "https://synthetichealth.github.io/synthea-sample-data/downloads/synthea_sample_data_csv_nov2021.zip",
+    "bytes": 58771261,
+    "sha256": "870b68a127f3570ca964e89e49dd3433cf3e7a27cc4079d2bff5f094be0a43c2"
+  }
+}
