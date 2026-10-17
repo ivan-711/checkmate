@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { scenario } from "@/data/scenario";
-import { actorName, differingFields, formatCt, rankContributions, sourceLabel } from "./display";
+import {
+  actorName,
+  differingFields,
+  formatCt,
+  goldenValueText,
+  rankContributions,
+  sourceLabel,
+} from "./display";
 
 describe("rankContributions", () => {
   it("orders by absolute weight and puts missing features last as no evidence", () => {
@@ -49,5 +56,28 @@ describe("formatting", () => {
     const { recordA, recordB } = scenario.pair;
     expect(sourceLabel("CLINIC_CSV", [recordA, recordB])).toBe("Clinic CSV");
     expect(sourceLabel("SPECIALIST", [recordA, recordB])).toBe("SPECIALIST");
+  });
+});
+
+describe("goldenValueText", () => {
+  it("shows plain values as they are and a missing value as null", () => {
+    expect(goldenValueText("PLACEHOLDER-GIVEN")).toBe("PLACEHOLDER-GIVEN");
+    expect(goldenValueText(54311)).toBe("54311");
+    expect(goldenValueText(null)).toBeNull();
+    expect(goldenValueText(undefined)).toBeNull();
+  });
+
+  it("shows a coded clinical value by its display name and status, never [object Object]", () => {
+    const allergy = { code: "7984", display: "Penicillin V", status: "active", resourceId: "a-1" };
+    expect(goldenValueText(allergy)).toBe("Penicillin V (active)");
+    expect(goldenValueText({ code: "308192", status: "active" })).toBe("308192 (active)");
+    expect(goldenValueText({ code: "308192", display: "Amoxicillin 500 MG" })).toBe("Amoxicillin 500 MG");
+  });
+
+  it("falls back to key: value pairs for an object without a code, and joins lists", () => {
+    expect(goldenValueText({ line: "100 Placeholder St", city: "Madison" })).toBe(
+      "line: 100 Placeholder St, city: Madison",
+    );
+    expect(goldenValueText(["a", { display: "B" }])).toBe("a, B");
   });
 });

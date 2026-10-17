@@ -84,6 +84,21 @@ test("case path: reject keeps the rule silent, then approve links and flags", as
   await expect(page.locator('main [role="alert"]')).toHaveCount(0);
 });
 
+test("after Approve the flag card is on screen, under the golden record and above the timeline", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await resolved(page);
+  await review(page, "approve");
+  const golden = await page.getByTestId("golden-record").boundingBox();
+  const flag = page.getByTestId("flag-card");
+  await expect(flag).toBeInViewport();
+  const flagBox = await flag.boundingBox();
+  const timelineBox = await page.getByTestId("timeline").boundingBox();
+  expect(flagBox!.y).toBeGreaterThan(golden!.y);
+  expect(flagBox!.y).toBeLessThan(timelineBox!.y);
+});
+
 test("reject without a reason asks for one and records nothing", async ({ page }) => {
   await resolved(page);
   await page.getByTestId("reject-button").click();

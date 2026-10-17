@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Entity, SourceCard } from "@/api/types";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
-import { sourceLabel } from "@/lib/display";
+import { goldenValueText, sourceLabel } from "@/lib/display";
 
 const FIELD_LABELS: Record<string, string> = {
   givenName: "Given name",
@@ -12,6 +12,9 @@ const FIELD_LABELS: Record<string, string> = {
   sex: "Sex",
   address: "Address",
   phone: "Phone",
+  zip5: "ZIP code",
+  allergy: "Allergy",
+  activeMedicationOrder: "Active order",
 };
 
 function CrosswalkChip({
@@ -70,29 +73,33 @@ export function GoldenRecord({ entity, cards, focusOnMount, onFocused }: Props) 
         ))}
       </p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-        {golden.map((g) => (
-          <div key={g.field} className="contents">
-            <dt className="text-[16px] text-ink-3">{FIELD_LABELS[g.field] ?? g.field}</dt>
-            <dd className="flex flex-wrap items-center gap-2 break-words">
-              {g.value == null ? <span className="text-ink-3">not given</span> : String(g.value)}
-              <CrosswalkChip
-                system={g.crosswalk.sourceSystem}
-                recordId={g.crosswalk.sourceRecordId}
-                cards={cards}
-              />
-              {g.alternates?.map((alt) => (
-                <span key={alt.crosswalk.sourceRecordId} className="text-[16px] text-ink-3">
-                  also {String(alt.value)}{" "}
-                  <CrosswalkChip
-                    system={alt.crosswalk.sourceSystem}
-                    recordId={alt.crosswalk.sourceRecordId}
-                    cards={cards}
-                  />
-                </span>
-              ))}
-            </dd>
-          </div>
-        ))}
+        {golden.map((g, i) => {
+          // Clinical fields repeat (one row per allergy or order), so the field name alone is not a key.
+          const value = goldenValueText(g.value);
+          return (
+            <div key={`${g.field}-${g.crosswalk.sourceRecordId}-${i}`} className="contents">
+              <dt className="text-[16px] text-ink-3">{FIELD_LABELS[g.field] ?? g.field}</dt>
+              <dd className="flex flex-wrap items-center gap-2 break-words">
+                {value == null ? <span className="text-ink-3">not given</span> : value}
+                <CrosswalkChip
+                  system={g.crosswalk.sourceSystem}
+                  recordId={g.crosswalk.sourceRecordId}
+                  cards={cards}
+                />
+                {g.alternates?.map((alt) => (
+                  <span key={alt.crosswalk.sourceRecordId} className="text-[16px] text-ink-3">
+                    also {goldenValueText(alt.value) ?? "not given"}{" "}
+                    <CrosswalkChip
+                      system={alt.crosswalk.sourceSystem}
+                      recordId={alt.crosswalk.sourceRecordId}
+                      cards={cards}
+                    />
+                  </span>
+                ))}
+              </dd>
+            </div>
+          );
+        })}
       </dl>
       {entity.allLinksReviewerApproved && (
         <p className="mt-3 text-[16px] text-ink-3">
