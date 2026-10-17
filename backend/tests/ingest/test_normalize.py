@@ -77,3 +77,41 @@ def test_parse_date_returns_a_full_date_or_none():
     assert parse_date("1990") is None  # year only is not a date to re-render
     assert parse_date("March 7 1990") is None
     assert parse_date(None) is None
+
+
+def test_normalized_row_keeps_the_registration_spelling_where_it_is_shown():
+    from backend.ingest.normalize import normalized_row
+
+    row = normalized_row(JOSE)
+    assert (row["given_name"], row["family_name"], row["address_line"], row["sex"]) == (
+        "José",
+        "Núñez-García",
+        "857 Kling Arcade",
+        "MALE",
+    )
+    assert (row["given_name_folded"], row["family_name_folded"], row["zip5"]) == ("jose", "nunez garcia", "01604")
+    assert normalized_row(Identity(sex="F"))["sex"] == "FEMALE" and normalized_row(Identity())["sex"] is None
+
+
+def test_generation_suffix_rides_on_the_surname_and_a_professional_one_does_not():
+    from backend.ingest.normalize import normalized_row
+
+    assert normalized_row(Identity(given="Robert", family="Smith", suffix="Jr."))["family_name"] == "Smith Jr."
+    assert normalized_row(Identity(given="Ana", family="Ruiz", suffix="MD"))["family_name"] == "Ruiz"
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        JOSE,
+        Identity(given="Robert", family="Smith", suffix="Jr.", birth_date="1985-11-02", sex="M"),
+        Identity(given="Ana", family="Ruiz", suffix="MD", sex="F", phone="(617) 555-2368"),
+        Identity(family="de la Cruz López"),
+        Identity(),
+    ],
+)
+def test_core_reads_the_stored_row_as_it_reads_the_identity(identity):
+    """The row is display spelling plus core's columns; core must not see a different record."""
+    from backend.ingest.normalize import normalized_row
+
+    assert normalize_record(normalized_row(identity)) == normalize_record(identity_fields(identity))
