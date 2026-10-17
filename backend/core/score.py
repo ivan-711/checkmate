@@ -1,0 +1,166 @@
+"""S5 score: a logistic scorer whose evidence is the per-feature logit contribution.
+
+``raw_score`` (the logit) is what decides bands (section 6). ``p`` is display-only: either the
+plain sigmoid of the logit or, once Q5 fits one, the development Platt map. ``is_calibrated``
+is False on every result; "calibrated" is a word the UI may use only beside a held-out ECE
+interval (evaluation plan section 5), never because a fit succeeded.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from backend.core.features import FEATURE_NAMES, MISSING_NAMES, MISSING_PREFIX, FeatureVector
+from contracts.models.common import Contribution
+
+ALL_WEIGHT_NAMES: tuple[str, ...] = FEATURE_NAMES + MISSING_NAMES
+WEIGHTS_DIR = Path(__file__).resolve().parent / "weights"
+HANDSET_SCORER_VERSION = "handset-0"
+
+
+@dataclass(frozen=True)
+class Weights:
+    """Feature weights + intercept under one ``scorer_version``; every weight name is required."""
+
+    scorer_version: str
+    intercept: float
+    weights: Mapping[str, float]
+    # scikit-learn's sigmoid calibrator convention: p = expit(-(a * s + b)); a < 0 means monotone.
+    platt_a: float | None = None
+    platt_b: float | None = None
+    trained_on: Mapping[str, Any] = field(default_factory=dict, compare=False)
+
+    def __post_init__(self) -> None:
+        expected, got = set(ALL_WEIGHT_NAMES), set(self.weights)
+        if got != expected:
+            missing, unknown = sorted(expected - got), sorted(got - expected)
+            raise ValueError(f"weights for {self.scorer_version}: missing {missing}, unknown {unknown}")
+        if (self.platt_a is None) != (self.platt_b is None):
+            raise ValueError("platt_a and platt_b must be set together")
+        object.__setattr__(self, "weights", dict(self.weights))
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "scorer_version": self.scorer_version,
+            "intercept": self.intercept,
+            "weights": {name: self.weights[name] for name in ALL_WEIGHT_NAMES},
+            "platt_a": self.platt_a,
+            "platt_b": self.platt_b,
+            "trained_on": dict(self.trained_on),
+        }
+
+    @classmethod
+    def from_json_dict(cls, data: Mapping[str, Any]) -> Weights:
+        return cls(
+            scorer_version=str(data["scorer_version"]),
+            intercept=float(data["intercept"]),
+            weights={k: float(v) for k, v in data["weights"].items()},
+            platt_a=None if data.get("platt_a") is None else float(data["platt_a"]),
+            platt_b=None if data.get("platt_b") is None else float(data["platt_b"]),
+            trained_on=dict(data.get("trained_on") or {}),
+        )
+
+
+def save_weights(weights: Weights, path: Path) -> None:
+    path.write_text(json.dumps(weights.to_json_dict(), indent=2, sort_keys=True) + "\n")
+
+
+def load_weights(path_or_version: str | Path) -> Weights:
+    """A path, or a version name resolved to ``backend/core/weights/<version>.json``."""
+    path = Path(path_or_version)
+    if not path.exists():
+        path = WEIGHTS_DIR / f"{path_or_version}.json"
+    return Weights.from_json_dict(json.loads(path.read_text()))
+
+
+@dataclass(frozen=True)
+class ScoreResult:
+    raw_score: float
+    p: float  # display-only
+    contributions: tuple[Contribution, ...]
+    scorer_version: str
+    is_calibrated: bool = False
+    p_is_display_only: bool = True
+
+
+def sigmoid(x: float) -> float:
+    # Split at zero so neither branch overflows for a large |x|.
+    if x >= 0:
+        return 1.0 / (1.0 + math.exp(-x))
+    e = math.exp(x)
+    return e / (1.0 + e)
+
+
+def display_probability(raw_score: float, weights: Weights) -> float:
+    if weights.platt_a is None or weights.platt_b is None:
+        return sigmoid(raw_score)
+    return sigmoid(-(weights.platt_a * raw_score + weights.platt_b))
+
+
+def score_pair(fv: FeatureVector, weights: Weights) -> ScoreResult:
+    """Contributions are weight x value in logit space and sum to ``raw_score - intercept``."""
+    contributions: list[Contribution] = []
+    for name in FEATURE_NAMES:
+        value = fv.values.get(name)
+        logit = 0.0 if value is None else weights.weights[name] * value
+        contributions.append(Contribution(feature=name, logit=logit, value=value))
+    for group, flag in fv.missing.items():
+        name = MISSING_PREFIX + group
+        value = 1.0 if flag else 0.0
+        contributions.append(Contribution(feature=name, logit=weights.weights[name] * value, value=value))
+    raw = weights.intercept + math.fsum(c.logit for c in contributions)
+    return ScoreResult(
+        raw_score=raw,
+        p=display_probability(raw, weights),
+        contributions=tuple(contributions),
+        scorer_version=weights.scorer_version,
+    )
+
+
+# Hand-set weights for the 15:30 checkpoint. Logit units, chosen so an identical full record
+# scores about +6 and two different people with the same surname score below 0; the trained
+# scorer replaces them and they are never called calibrated.
+HANDSET_WEIGHTS = Weights(
+    scorer_version=HANDSET_SCORER_VERSION,
+    intercept=-12.0,
+    weights={
+        # The folded forms carry more weight than the accented ones so an accent or hyphen
+        # variant loses little; the nickname table is the only way "Paco" reaches "Francisco".
+        "given_jw": 1.0,
+        "given_jw_folded": 1.5,
+        "given_dl": 0.5,
+        "given_dmeta": 0.5,
+        "given_nickname": 1.5,
+        "given_initial": 0.3,
+        "given_token_overlap": 0.5,
+        "family_jw": 1.0,
+        "family_jw_folded": 1.5,
+        "family_dl": 0.5,
+        "family_dmeta": 0.7,
+        "family_token_overlap": 0.8,
+        # The named DOB edits keep most of the exact-match credit: the engine has a feature for
+        # each, which is the point of the what-if buttons.
+        "dob_exact": 3.0,
+        "dob_day_month_swap": 2.2,
+        "dob_one_digit_edit": 1.8,
+        "dob_one_component_off": 1.2,
+        "dob_year_match": 0.8,
+        "sex_match": 0.6,
+        "phone_match": 1.5,
+        "address_jaccard": 1.2,
+        "zip_match": 0.6,
+        # Missing evidence costs a little, so an empty record cannot ride on a shared surname.
+        "missing_given_name": -0.5,
+        "missing_family_name": -0.5,
+        "missing_dob": -1.0,
+        "missing_sex": -0.1,
+        "missing_phone": -0.3,
+        "missing_address": -0.3,
+        "missing_zip": -0.2,
+    },
+)
