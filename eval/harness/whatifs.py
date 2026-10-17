@@ -1,0 +1,86 @@
+"""The four what-if transforms on an in-memory copy of a record (architecture section 9, ADR-013).
+
+Used by the hero selector and fixture check. Each returns a new record; nothing stored changes.
+"""
+from __future__ import annotations
+
+import unicodedata
+from collections.abc import Callable
+
+from eval.harness.types import Record
+
+REMOVE_ADDRESS = "REMOVE_ADDRESS"
+CHANGE_BIRTH_YEAR = "CHANGE_BIRTH_YEAR"
+SWAP_DOB_DAY_MONTH = "SWAP_DOB_DAY_MONTH"
+ACCENT_HYPHEN_SURNAME = "ACCENT_HYPHEN_SURNAME"
+BUTTONS = (REMOVE_ADDRESS, CHANGE_BIRTH_YEAR, SWAP_DOB_DAY_MONTH, ACCENT_HYPHEN_SURNAME)
+
+# The held-out category each button reads (eval plan section 5, per-button recall)
+BUTTON_CATEGORIES = {REMOVE_ADDRESS: ("L7",), CHANGE_BIRTH_YEAR: ("D3",), SWAP_DOB_DAY_MONTH: ("D1",),
+                     ACCENT_HYPHEN_SURNAME: ("S1", "S5")}
+BUTTON_KIND = {REMOVE_ADDRESS: "band_changer", CHANGE_BIRTH_YEAR: "band_changer",
+               SWAP_DOB_DAY_MONTH: "robustness", ACCENT_HYPHEN_SURNAME: "robustness"}
+
+
+def remove_address(rec: Record) -> Record:
+    out = dict(rec)
+    out["address_line"] = None
+    out["zip5"] = None
+    return out
+
+
+def change_birth_year(rec: Record, delta: int) -> Record:
+    out = dict(rec)
+    if not rec.get("birth_date"):
+        return out
+    y, m, d = rec["birth_date"].split("-")
+    out["birth_date"] = f"{int(y) + delta:04d}-{m}-{d}"
+    return out
+
+
+def swap_dob_day_month(rec: Record) -> Record:
+    """Applicable only when day <= 12 and day != month; otherwise the record is unchanged."""
+    out = dict(rec)
+    if not rec.get("birth_date"):
+        return out
+    y, m, d = rec["birth_date"].split("-")
+    if int(d) <= 12 and d != m:
+        out["birth_date"] = f"{y}-{d}-{m}"
+    return out
+
+
+def _strip_accents(text: str) -> str:
+    return "".join(ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch))
+
+
+def accent_plus_hyphen(rec: Record) -> Record:
+    """Fold accents and toggle the hyphen between two surname tokens (S1 plus S5)."""
+    out = dict(rec)
+    family = rec.get("family_name") or ""
+    folded = _strip_accents(family)
+    if "-" in folded:
+        folded = folded.replace("-", " ")
+    elif " " in folded.strip():
+        head, _, tail = folded.strip().partition(" ")
+        folded = f"{head}-{tail}"
+    out["family_name"] = folded
+    if rec.get("given_name"):
+        out["given_name"] = _strip_accents(rec["given_name"])
+    return out
+
+
+def is_applicable(button: str, rec: Record) -> bool:
+    if button == SWAP_DOB_DAY_MONTH:
+        return swap_dob_day_month(rec) != rec
+    if button == ACCENT_HYPHEN_SURNAME:
+        return accent_plus_hyphen(rec) != rec
+    if button == REMOVE_ADDRESS:
+        return bool(rec.get("address_line"))
+    return bool(rec.get("birth_date"))
+
+
+TRANSFORMS: dict[str, Callable[[Record], Record]] = {
+    REMOVE_ADDRESS: remove_address,
+    SWAP_DOB_DAY_MONTH: swap_dob_day_month,
+    ACCENT_HYPHEN_SURNAME: accent_plus_hyphen,
+}

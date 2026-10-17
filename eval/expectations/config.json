@@ -1,0 +1,25 @@
+{
+  "alpha": 0.01,
+  "beta": 0.02,
+  "minComponents": 50,
+  "reviewBurdenMax": 0.2,
+  "supportFloorComponents": 50,
+  "doNotRead": {
+    "components": 30,
+    "pairs": 100
+  },
+  "bootstrapResamples": 1000,
+  "bootstrapSeed": 20261017,
+  "fastConfig": {
+    "families": "P0",
+    "seeds": 1,
+    "partition": "development",
+    "folds": 5
+  },
+  "heldOutFamilies": {
+    "seed": 20261017,
+    "drawn": [],
+    "note": "5 P1 families drawn without replacement by seed (at least one of S4/S7/S8, one N, one D or L); W1 fills the drawn list at the 19:00 P1 commit via a fork; held out from training, not unseen"
+  },
+  "wording": "design choices, not guarantees; development numbers are descriptive"
+}

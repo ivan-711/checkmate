@@ -1,0 +1,7 @@
+{
+  "ruleId": "BL-AMOX-01",
+  "ruleVersion": "v1",
+  "expectedCases": 18,
+  "cases": [],
+  "status": "PLACEHOLDER: lane W3b fills the 18 cases from the Synthea file via a fork; the harness counts them as T13"
+}
