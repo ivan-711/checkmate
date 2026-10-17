@@ -24,7 +24,7 @@ export function EvidenceRail({ detail }: { detail: CandidatePairDetail }) {
       <div>
         <div className="flex items-center gap-3">
           <span className="text-[56px] font-bold leading-[60px] tabular-nums">{decision.p.toFixed(2)}</span>
-          <span data-testid="pair-band" className="contents">
+          <span data-testid="pair-band" className="inline-flex">
             <BandChip band={decision.band} />
           </span>
         </div>
