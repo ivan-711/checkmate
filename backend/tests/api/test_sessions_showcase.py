@@ -116,3 +116,19 @@ def test_current_session_is_404_before_the_first_reset(client):
     assert r.headers["X-Request-Id"]
     assert client.post(f"{API}/sessions", json={"scenarioId": "hero"}).status_code == 201
     assert client.get(f"{API}/sessions/current").status_code == 200
+
+
+def test_hero_pair_is_bound_by_record_id_in_corpus_mode(client, corpus, monkeypatch):
+    """The UI's one request: GET /candidate-pairs?recordId=<first hero card>, then the pair whose other
+    record is the second hero card. Found wherever the pair sits in the whole queue."""
+    monkeypatch.setenv("CHECKMATE_HERO_OVERLAY_DIR", str(_overlay(corpus)))
+    first, second = (
+        c["record"]["id"] for c in client.post(f"{API}/sessions", json={"scenarioId": "hero"}).json()["sources"]
+    )
+    assert client.post(f"{API}/match-runs").status_code == 201
+    items = client.get(f"{API}/candidate-pairs", params={"recordId": first}).json()["items"]
+    hero = [p for p in items if {p["recordAId"], p["recordBId"]} == {first, second}]
+    assert len(hero) == 1, items
+    assert all(first in (p["recordAId"], p["recordBId"]) for p in items)
+    queue = client.get(f"{API}/candidate-pairs", params={"limit": 200}).json()["items"]
+    assert len(queue) > len(items), "the filter narrows the whole queue to this record's pairs"
