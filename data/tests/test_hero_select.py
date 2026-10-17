@@ -33,6 +33,9 @@ class FakeCorpus:
     def record_by_id(self):
         return {r["record_id"]: r for r in self.records}
 
+    def entity_of(self):
+        return {r["record_id"]: r["entity_id"] for r in self.records}
+
 
 class FakeAssignment:
     def __init__(self, partition):
@@ -46,7 +49,7 @@ def _table_match(scores: dict[str, float], drops: dict[str, float]):
     """A match() whose raw score is a per-entity table, minus a drop per transform (keyed by what changed)."""
 
     def match(a: Record, b: Record, weights, thresholds) -> MatchResult:
-        s = scores[a["entity_id"]]
+        s = scores[a["person_id"]]  # person == entity in this fake; the intake rendering carries no entity id
         if a.get("address_line") is None:
             s -= drops.get("address", 0.0)
         if a["birth_date"][:4] != "1985":  # a year change; the day/month swap is a named feature and moves nothing

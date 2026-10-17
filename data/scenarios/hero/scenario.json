@@ -135,12 +135,12 @@
         "thresholdSetId": "oof-d0ad2e9a590c",
         "evidenceSnapshot": {
           "features": {
-            "given_name_jw": 1.0,
-            "family_name_jw": 1.0,
+            "given_name_jw": 0.545455,
+            "family_name_jw": 0.888889,
             "family_metaphone": 1.0,
-            "dob_exact": null,
-            "dob_day_month_swap": null,
-            "dob_one_digit_edit": null,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
             "sex_match": 1.0,
             "phone_match": 1.0,
             "address_jaccard": 1.0,
@@ -150,9 +150,9 @@
             "given_name_jw": false,
             "family_name_jw": false,
             "family_metaphone": false,
-            "dob_exact": true,
-            "dob_day_month_swap": true,
-            "dob_one_digit_edit": true,
+            "dob_exact": false,
+            "dob_day_month_swap": false,
+            "dob_one_digit_edit": false,
             "sex_match": false,
             "phone_match": false,
             "address_jaccard": false,
@@ -175,12 +175,12 @@
             {
               "feature": "given_name_jw",
               "logit": 0.763636,
-              "value": 1.0
+              "value": 0.545455
             },
             {
               "feature": "family_name_jw",
               "logit": 1.422222,
-              "value": 1.0
+              "value": 0.888889
             },
             {
               "feature": "family_metaphone",
@@ -190,17 +190,17 @@
             {
               "feature": "dob_exact",
               "logit": 0.0,
-              "value": null
+              "value": 0.0
             },
             {
               "feature": "dob_day_month_swap",
               "logit": 0.0,
-              "value": null
+              "value": 0.0
             },
             {
               "feature": "dob_one_digit_edit",
               "logit": 0.0,
-              "value": null
+              "value": 0.0
             },
             {
               "feature": "sex_match",
@@ -292,12 +292,12 @@
       {
         "feature": "given_name_jw",
         "logit": 0.763636,
-        "value": 1.0
+        "value": 0.545455
       },
       {
         "feature": "family_name_jw",
         "logit": 1.422222,
-        "value": 1.0
+        "value": 0.888889
       },
       {
         "feature": "family_metaphone",
@@ -307,17 +307,17 @@
       {
         "feature": "dob_exact",
         "logit": 0.0,
-        "value": null
+        "value": 0.0
       },
       {
         "feature": "dob_day_month_swap",
         "logit": 0.0,
-        "value": null
+        "value": 0.0
       },
       {
         "feature": "dob_one_digit_edit",
         "logit": 0.0,
-        "value": null
+        "value": 0.0
       },
       {
         "feature": "sex_match",
@@ -359,12 +359,12 @@
         "thresholdSetId": "oof-d0ad2e9a590c",
         "evidenceSnapshot": {
           "features": {
-            "given_name_jw": 1.0,
-            "family_name_jw": 1.0,
+            "given_name_jw": 0.545455,
+            "family_name_jw": 0.888889,
             "family_metaphone": 1.0,
-            "dob_exact": null,
-            "dob_day_month_swap": null,
-            "dob_one_digit_edit": null,
+            "dob_exact": 0.0,
+            "dob_day_month_swap": 0.0,
+            "dob_one_digit_edit": 0.0,
             "sex_match": 1.0,
             "phone_match": 1.0,
             "address_jaccard": 1.0,
@@ -374,9 +374,9 @@
             "given_name_jw": false,
             "family_name_jw": false,
             "family_metaphone": false,
-            "dob_exact": true,
-            "dob_day_month_swap": true,
-            "dob_one_digit_edit": true,
+            "dob_exact": false,
+            "dob_day_month_swap": false,
+            "dob_one_digit_edit": false,
             "sex_match": false,
             "phone_match": false,
             "address_jaccard": false,
@@ -399,12 +399,12 @@
             {
               "feature": "given_name_jw",
               "logit": 0.763636,
-              "value": 1.0
+              "value": 0.545455
             },
             {
               "feature": "family_name_jw",
               "logit": 1.422222,
-              "value": 1.0
+              "value": 0.888889
             },
             {
               "feature": "family_metaphone",
@@ -414,17 +414,17 @@
             {
               "feature": "dob_exact",
               "logit": 0.0,
-              "value": null
+              "value": 0.0
             },
             {
               "feature": "dob_day_month_swap",
               "logit": 0.0,
-              "value": null
+              "value": 0.0
             },
             {
               "feature": "dob_one_digit_edit",
               "logit": 0.0,
-              "value": null
+              "value": 0.0
             },
             {
               "feature": "sex_match",
@@ -714,12 +714,12 @@
           {
             "feature": "given_name_jw",
             "logit": 0.763636,
-            "value": 1.0
+            "value": 0.545455
           },
           {
             "feature": "family_name_jw",
             "logit": 1.422222,
-            "value": 1.0
+            "value": 0.888889
           },
           {
             "feature": "family_metaphone",
@@ -729,17 +729,17 @@
           {
             "feature": "dob_exact",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_day_month_swap",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_one_digit_edit",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "sex_match",
@@ -772,12 +772,12 @@
           {
             "feature": "given_name_jw",
             "logit": 0.763636,
-            "value": 1.0
+            "value": 0.545455
           },
           {
             "feature": "family_name_jw",
             "logit": 1.422222,
-            "value": 1.0
+            "value": 0.888889
           },
           {
             "feature": "family_metaphone",
@@ -787,17 +787,17 @@
           {
             "feature": "dob_exact",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_day_month_swap",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_one_digit_edit",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "sex_match",
@@ -888,12 +888,12 @@
           {
             "feature": "given_name_jw",
             "logit": 0.763636,
-            "value": 1.0
+            "value": 0.545455
           },
           {
             "feature": "family_name_jw",
             "logit": 1.422222,
-            "value": 1.0
+            "value": 0.888889
           },
           {
             "feature": "family_metaphone",
@@ -903,17 +903,17 @@
           {
             "feature": "dob_exact",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_day_month_swap",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_one_digit_edit",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "sex_match",
@@ -946,12 +946,12 @@
           {
             "feature": "given_name_jw",
             "logit": 0.763636,
-            "value": 1.0
+            "value": 0.545455
           },
           {
             "feature": "family_name_jw",
             "logit": 1.422222,
-            "value": 1.0
+            "value": 0.888889
           },
           {
             "feature": "family_metaphone",
@@ -961,17 +961,17 @@
           {
             "feature": "dob_exact",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_day_month_swap",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_one_digit_edit",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "sex_match",
@@ -1005,7 +1005,7 @@
       ],
       "caption": "A different birth year: not enough to link.",
       "counterfactualFields": {
-        "dob_exact": "2000-04-12"
+        "dob_exact": "1998-04-12"
       },
       "alertWouldBeHidden": false,
       "heldOutRecall": [
@@ -1057,12 +1057,12 @@
           {
             "feature": "given_name_jw",
             "logit": 0.763636,
-            "value": 1.0
+            "value": 0.545455
           },
           {
             "feature": "family_name_jw",
             "logit": 1.422222,
-            "value": 1.0
+            "value": 0.888889
           },
           {
             "feature": "family_metaphone",
@@ -1072,17 +1072,17 @@
           {
             "feature": "dob_exact",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_day_month_swap",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_one_digit_edit",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "sex_match",
@@ -1115,12 +1115,12 @@
           {
             "feature": "given_name_jw",
             "logit": 0.763636,
-            "value": 1.0
+            "value": 0.545455
           },
           {
             "feature": "family_name_jw",
             "logit": 1.422222,
-            "value": 1.0
+            "value": 0.888889
           },
           {
             "feature": "family_metaphone",
@@ -1130,17 +1130,17 @@
           {
             "feature": "dob_exact",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_day_month_swap",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_one_digit_edit",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "sex_match",
@@ -1226,12 +1226,12 @@
           {
             "feature": "given_name_jw",
             "logit": 0.763636,
-            "value": 1.0
+            "value": 0.545455
           },
           {
             "feature": "family_name_jw",
             "logit": 1.422222,
-            "value": 1.0
+            "value": 0.888889
           },
           {
             "feature": "family_metaphone",
@@ -1241,17 +1241,17 @@
           {
             "feature": "dob_exact",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_day_month_swap",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_one_digit_edit",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "sex_match",
@@ -1284,12 +1284,12 @@
           {
             "feature": "given_name_jw",
             "logit": 0.763636,
-            "value": 1.0
+            "value": 0.545455
           },
           {
             "feature": "family_name_jw",
             "logit": 1.422222,
-            "value": 1.0
+            "value": 0.888889
           },
           {
             "feature": "family_metaphone",
@@ -1299,17 +1299,17 @@
           {
             "feature": "dob_exact",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_day_month_swap",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "dob_one_digit_edit",
             "logit": 0.0,
-            "value": null
+            "value": 0.0
           },
           {
             "feature": "sex_match",

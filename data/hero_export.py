@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
-import unicodedata
 import uuid
 from dataclasses import asdict
 from pathlib import Path
@@ -21,8 +19,9 @@ from typing import TYPE_CHECKING
 from contracts.fixtures.build_fixtures import FEATURES, T0, build_scenario
 from contracts.models.common import Band
 from contracts.models.whatifs import WhatIfButton
+from data.hero_select import whatif_year_direction
 from eval.harness import whatifs
-from eval.harness.standin import block_keys
+from eval.harness.standin import block_keys, display_p, fold
 from eval.harness.types import BAND_KEEP_SEPARATE, Record
 
 if TYPE_CHECKING:
@@ -48,12 +47,6 @@ def record_uuid(record_id: str) -> str:
     return str(uuid.uuid5(NAMESPACE, record_id))
 
 
-def _fold(text: str | None) -> str | None:
-    if text is None:
-        return None
-    return "".join(ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch)).lower()
-
-
 def source_card(rec: Record, label: str, constructed: bool) -> dict:
     rid = record_uuid(rec["record_id"])
     return {
@@ -62,16 +55,23 @@ def source_card(rec: Record, label: str, constructed: bool) -> dict:
                    "payloadSha256": hashlib.sha256(json.dumps(rec, sort_keys=True).encode()).hexdigest(),
                    "isConstructed": constructed, "ingestedAt": T0.isoformat().replace("+00:00", "Z"), "rawPayload": None},
         "normalized": {"recordId": rid, "givenName": rec.get("given_name"), "familyName": rec.get("family_name"),
-                       "givenNameFolded": _fold(rec.get("given_name")), "familyNameFolded": _fold(rec.get("family_name")),
+                       "givenNameFolded": fold(rec.get("given_name")) or None,
+                       "familyNameFolded": fold(rec.get("family_name")) or None,
                        "birthDate": rec.get("birth_date"), "sex": rec.get("sex"), "phoneE164": rec.get("phone"),
                        "addressLine": rec.get("address_line"), "zip5": rec.get("zip5")},
         "displayLabel": label,
     }
 
 
+def feature_value(s: Scored, f: str) -> float | None:
+    """The feature value when the scorer reports it; otherwise inferred from the logit (0 reads as missing)."""
+    if s.features:
+        return s.features.get(f)
+    return None if s.contributions.get(f, 0.0) == 0.0 else 1.0
+
+
 def contributions(s: Scored) -> list[dict]:
-    return [{"feature": f, "logit": s.contributions.get(f, 0.0), "value": None if s.contributions.get(f, 0.0) == 0.0 else 1.0}
-            for f in FEATURES]
+    return [{"feature": f, "logit": s.contributions.get(f, 0.0), "value": feature_value(s, f)} for f in FEATURES]
 
 
 def score_state(s: Scored) -> dict:
@@ -91,9 +91,7 @@ def held_out_recall(numbers: dict) -> list[dict]:
 
 def _whatif_key(button: WhatIfButton, hero: Candidate) -> str:
     if button is WhatIfButton.CHANGE_BIRTH_YEAR:
-        # sign from the server seed: both drop for a level-0..2 hero; export the one that drops furthest
-        plus, minus = hero.what_ifs[f"{whatifs.CHANGE_BIRTH_YEAR}:+1"], hero.what_ifs[f"{whatifs.CHANGE_BIRTH_YEAR}:-1"]
-        return f"{whatifs.CHANGE_BIRTH_YEAR}:{'+1' if plus.raw_score <= minus.raw_score else '-1'}"
+        return f"{whatifs.CHANGE_BIRTH_YEAR}:{'+1' if whatif_year_direction(hero) > 0 else '-1'}"
     return button.value
 
 
@@ -152,8 +150,8 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
     base = hero.baseline
     decision = pair["pair"]["decision"]
     snapshot = decision["evidenceSnapshot"]
-    snapshot.update(features={f: (None if base.contributions.get(f, 0.0) == 0.0 else 1.0) for f in FEATURES},
-                    missingFlags={f: base.contributions.get(f, 0.0) == 0.0 for f in FEATURES},
+    snapshot.update(features={f: feature_value(base, f) for f in FEATURES},
+                    missingFlags={f: feature_value(base, f) is None for f in FEATURES},
                     weights={f: result.weights.get(f, 0.0) for f in FEATURES}, intercept=result.weights.get("intercept", 0.0),
                     contributions=contributions(base), rawScore=base.raw_score, cLow=c_low, cHigh=c_high,
                     negativeRulesFired=list(base.negative_rules_fired), scorerVersion=scorer, thresholdSetId=thresholds_id)
@@ -197,7 +195,7 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
     alert["cardText"] = (alert["cardText"].replace("allergies.csv row PLACEHOLDER", f"allergies.csv row {clinic['record_id']}")
                          .replace("MedicationRequest/PLACEHOLDER", order_ref))
     scenario["thresholds"].update(thresholdsId=thresholds_id, cLow=c_low, cHigh=c_high,
-                                  tLowDisplay=round(_sigmoid(c_low), 6), tHighDisplay=round(_sigmoid(c_high), 6),
+                                  tLowDisplay=round(display_p(c_low, {}), 6), tHighDisplay=round(display_p(c_high, {}), 6),
                                   autoLinkEnabled=False, isCalibrated=False, sourceRunId=None)  # the selector's run dir is temporary
     recall = held_out_recall(result.numbers)
     baseline_state = score_state(base)
@@ -210,7 +208,7 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
             "deltas": [{"feature": f, "logit": round(s.contributions.get(f, 0.0) - base.contributions.get(f, 0.0), 6), "value": None}
                        for f in FEATURES if abs(s.contributions.get(f, 0.0) - base.contributions.get(f, 0.0)) > 1e-9] or
                       [{"feature": feat, "logit": 0.0, "value": None}],
-            "caption": CAPTIONS[button], "counterfactualFields": {feat: _counterfactual(button, er)},
+            "caption": CAPTIONS[button], "counterfactualFields": {feat: _counterfactual(button, er, hero)},
             "alertWouldBeHidden": s.band == BAND_KEEP_SEPARATE, "heldOutRecall": recall, "seed": selection.seed,
         }
     intake = utterances(er)
@@ -242,15 +240,12 @@ def export(selection: HeroSelection, result: RunResult, out: Path, provisional: 
     }, indent=2, ensure_ascii=False) + "\n")
 
 
-def _sigmoid(x: float) -> float:
-    return 1.0 / (1.0 + math.exp(-x))
-
-
-def _counterfactual(button: WhatIfButton, er: Record) -> str | None:
+def _counterfactual(button: WhatIfButton, er: Record, hero: Candidate) -> str | None:
+    """The field value the exported what-if actually scored (the same birth-year direction as the score)."""
     if button is WhatIfButton.REMOVE_ADDRESS:
         return None
     if button is WhatIfButton.CHANGE_BIRTH_YEAR:
-        return whatifs.change_birth_year(er, 1)["birth_date"]
+        return whatifs.change_birth_year(er, whatif_year_direction(hero))["birth_date"]
     if button is WhatIfButton.SWAP_DOB_DAY_MONTH:
         return whatifs.swap_dob_day_month(er)["birth_date"]
     return whatifs.accent_plus_hyphen(er)["family_name"]

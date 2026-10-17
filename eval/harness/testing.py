@@ -25,7 +25,8 @@ def _cached(seed: int, out_dir: str) -> RunResult:
 
 
 def fast_run(seed: int = TEST_SEED, out_dir: Path | None = None) -> RunResult:
-    return _cached(seed, str(out_dir or fresh_run_dir()) if out_dir else _default_dir())
+    """Cached per (seed, out_dir); a fresh ``out_dir`` forces a second real run."""
+    return _cached(seed, str(out_dir) if out_dir else _default_dir())
 
 
 @lru_cache(maxsize=1)

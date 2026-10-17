@@ -49,6 +49,8 @@ class MatchResult:
     band: str
     contributions: tuple[tuple[str, float], ...] = ()
     negative_rules_fired: tuple[str, ...] = ()
+    features: tuple[tuple[str, float | None], ...] = ()
+    """Feature values in [0, 1], None when missing; optional (the evidence rail reads them)."""
 
 
 MatchFn = Callable[[Record, Record, Mapping[str, float], Mapping[str, float]], MatchResult]

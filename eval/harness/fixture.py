@@ -14,6 +14,7 @@ import json
 import random
 from dataclasses import dataclass
 
+from eval.harness.standin import fold
 from eval.harness.types import Corpus, Record, TruthRow
 
 ER_FHIR = "ER_FHIR"
@@ -59,9 +60,7 @@ def _rng_for(root_seed: int, key: str) -> random.Random:
 
 
 def _fold(text: str) -> str:
-    import unicodedata
-
-    return "".join(ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch)).lower()
+    return fold(text)
 
 
 def _base_person(pid: int, rng: random.Random, spanish: bool) -> Record:
@@ -256,11 +255,11 @@ def build_fixture(cfg: FixtureConfig | None = None) -> Corpus:
             y, m, d = p1["birth_date"].split("-")
             graft["birth_date"] = f"{int(y) + rng.choice((-30, -25, 25, 30)):04d}-{m}-{d}"
             graft["sex"] = p1["sex"]
-        # the same corruption process is applied to both sides of a negative (section 2)
-        for side in (graft,):
-            fam = rng.choice(tm_families) if tm_families and rng.random() < 0.5 else None
-            if fam:
-                _apply_family(side, fam, rng)
+        # the graft side gets the same corruption draw the true-match fragments get; P1's own fragments
+        # already carry theirs, so "looks mangled" does not separate matches from negatives (section 2)
+        fam = rng.choice(tm_families) if tm_families and rng.random() < 0.5 else None
+        if fam:
+            _apply_family(graft, fam, rng)
         entity_id = f"E{cfg.entities + j:04d}"
         system = rng.choice(SYSTEMS)
         _emit(records, truth, graft, entity_id, system, [family], [p1["person_id"]], 0)

@@ -70,8 +70,7 @@ def test_summary_renders_bands_with_n():
 
 def test_compare_flags_a_recall_drop_and_passes_inside_tolerance():
     result = fast_run()
-    tolerance = json.loads((Path(result.run_dir).parents[0].parent / "tolerance.json").read_text()) \
-        if False else json.loads((Path(__file__).parents[1] / "expectations" / "tolerance.json").read_text())
+    tolerance = json.loads((Path(__file__).parents[1] / "expectations" / "tolerance.json").read_text())
     metrics = {"invariants": result.metrics["invariants"], "scorerVersion": "trained-scorer-1"}
     worse = json.loads(json.dumps(result.numbers))
     worse["recall.lenient.end_to_end"]["value"] -= 0.05

@@ -34,12 +34,11 @@ from contracts.models.sessions import SessionResponse
 from contracts.models.thresholds import ThresholdSet
 from contracts.models.tiles import TilesResponse
 from contracts.models.whatifs import WhatIfResponse
+from data.hero_select import P_RAISE_BOUND, ROBUSTNESS_TOLERANCE, intake_rendering
 from eval.harness import standin, whatifs
 from eval.harness.types import BAND_AUTO_LINK, BAND_KEEP_SEPARATE, BAND_REVIEW, band_for
 
 DEFAULT_DIR = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "hero"
-P_RAISE_BOUND = 0.005
-ROBUSTNESS_TOLERANCE = 0.05
 NEVER_SAY = ("prevented", "would have died", "the ai caught", "contraindicated for this patient", "fatal",
              "they look like two people", "typical patient")
 PASS, WARN, SKIP, FAIL = "PASS", "WARN", "SKIP", "FAIL"
@@ -111,8 +110,6 @@ def run_checks(d: Path, strict: bool = False) -> list[Check]:
             whatifs.SWAP_DOB_DAY_MONTH: _as_dict(match(whatifs.swap_dob_day_month(er), clinic, weights, thresholds)),
             whatifs.ACCENT_HYPHEN_SURNAME: _as_dict(match(whatifs.accent_plus_hyphen(er), clinic, weights, thresholds)),
         }
-        from data.hero_select import intake_rendering
-
         intake = _as_dict(match(intake_rendering(er), clinic, weights, thresholds))
         drift = abs(base["raw_score"] - hero["baseline"]["raw_score"]) > 1e-6
         checks.append(Check("re-scored baseline equals the export", FAIL if drift else PASS,

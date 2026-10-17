@@ -91,11 +91,13 @@ class Scored:
     band: str
     negative_rules_fired: list[str]
     contributions: dict[str, float]
+    features: dict[str, float | None] = field(default_factory=dict)
 
     @classmethod
     def of(cls, r: MatchResult) -> Scored:
         return cls(round(r.raw_score, 6), round(r.p, 6), r.band, list(r.negative_rules_fired),
-                   {k: round(v, 6) for k, v in r.contributions})
+                   {k: round(v, 6) for k, v in r.contributions},
+                   {k: (None if v is None else round(v, 6)) for k, v in r.features})
 
 
 @dataclass
@@ -148,11 +150,17 @@ class HeroSelection:
         return d
 
 
+def whatif_year_direction(c: Candidate) -> int:
+    """The CHANGE_BIRTH_YEAR direction the UI shows: the one that drops the raw score furthest (+1 on ties)."""
+    plus, minus = c.what_ifs[f"{whatifs.CHANGE_BIRTH_YEAR}:+1"], c.what_ifs[f"{whatifs.CHANGE_BIRTH_YEAR}:-1"]
+    return 1 if plus.raw_score <= minus.raw_score else -1
+
+
 def intake_rendering(er: Record) -> Record:
     """The fields a patient would type, passed through as propose_new_chart arguments would be."""
     out: Record = {k: er.get(k) for k in INTAKE_FIELDS}
     out.update(record_id=f"{er['record_id']}-intake", person_id=er["person_id"], source_system=INTAKE_SOURCE,
-               language=er.get("language"), categories=[], donor_person_ids=[], entity_id=er.get("entity_id"))
+               language=er.get("language"), categories=[], donor_person_ids=[])
     return out
 
 
@@ -196,10 +204,11 @@ def evaluate(c: Candidate, level: Level, midpoint: float) -> Candidate:
 def _entities_in(corpus: Corpus, assignment: Assignment, partition: str) -> dict[str, dict[str, list[Record]]]:
     """entity id -> source system -> records, for entities whose person sits in the partition."""
     out: dict[str, dict[str, list[Record]]] = {}
+    entity_of = corpus.entity_of()
     for rec in corpus.records:
         if assignment.partition_of_person(rec["person_id"]) != partition:
             continue
-        out.setdefault(rec["entity_id"], {}).setdefault(rec["source_system"], []).append(rec)
+        out.setdefault(entity_of[rec["record_id"]], {}).setdefault(rec["source_system"], []).append(rec)
     return out
 
 

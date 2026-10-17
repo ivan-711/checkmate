@@ -42,6 +42,7 @@ PLACEHOLDER_DOBS = frozenset({"1900-01-01", "1800-01-01", "0001-01-01"})
 PLACEHOLDER_PHONES = frozenset({"+15555555555", "5555555555"})
 PLACEHOLDER_NAMES = frozenset({"unknown", "test", "patient", "baby", "doe"})
 PARENT_CHILD_YEARS = 18
+TWIN_GIVEN_NAME_MAX_SIM = 0.6     # same DOB, surname and address with clearly different given names
 BIRTH_YEAR_GAP_MAX = 2
 
 
@@ -119,8 +120,9 @@ def negative_rules(a: Record, b: Record) -> tuple[str, ...]:
             fired.append("BIRTH_YEAR_GAP_GT_2")
         if gap >= PARENT_CHILD_YEARS and same_name and same_address:
             fired.append("PARENT_CHILD")
+        given_sim = _sim(a.get("given_name"), b.get("given_name"))
         if da == db and same_address and fold(a.get("family_name")) == fold(b.get("family_name")) \
-                and fold(a.get("given_name")) != fold(b.get("given_name")) and _sim(a.get("given_name"), b.get("given_name")) < 0.6:
+                and given_sim is not None and given_sim < TWIN_GIVEN_NAME_MAX_SIM:
             fired.append("TWIN")
     for rec in (a, b):
         placeholder_name = (fold(rec.get("given_name")) in PLACEHOLDER_NAMES
@@ -153,7 +155,8 @@ def match(a: Record, b: Record, weights: Mapping[str, float], thresholds: Mappin
     rules = negative_rules(a, b)
     band = band_for(raw, thresholds["c_low"], thresholds["c_high"], rules)
     return MatchResult(raw_score=raw, p=display_p(raw, thresholds), band=band,
-                       contributions=tuple(contributions), negative_rules_fired=rules)
+                       contributions=tuple(contributions), negative_rules_fired=rules,
+                       features=tuple((name, feats[name]) for name in FEATURES))
 
 
 class FitRecorder:
@@ -180,9 +183,9 @@ def block_keys(rec: Record) -> list[str]:
     family, given = fold(rec.get("family_name")), fold(rec.get("given_name"))
     if family and family not in PLACEHOLDER_NAMES and dob:
         keys.append(f"metaphone_surname_birth_year:{_skeleton(family)}:{dob[0]}")
-    if dob:
-        keys.append(f"dob_exact:{'-'.join(dob)}")
-        keys.append(f"dob_swapped:{dob[0]}-{dob[2]}-{dob[1]}")
+    if dob:  # one prefix: the swapped rendering must share a bucket with the partner's literal DOB
+        keys.append(f"dob:{'-'.join(dob)}")
+        keys.append(f"dob:{dob[0]}-{dob[2]}-{dob[1]}")
     phone = rec.get("phone")
     if phone and phone not in PLACEHOLDER_PHONES:
         keys.append(f"phone_last7:{phone[-7:]}")

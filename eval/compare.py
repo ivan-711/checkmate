@@ -28,14 +28,17 @@ def _value(numbers: dict, key: str) -> float | None:
 
 
 def compare(baseline: dict, candidate: dict, tolerance: dict, baseline_metrics: dict | None,
-            candidate_metrics: dict | None) -> tuple[list[str], list[str]]:
-    """Returns (breaches, notes)."""
+            candidate_metrics: dict | None, invariants_only: bool = False) -> tuple[list[str], list[str]]:
+    """Returns (breaches, notes). ``invariants_only`` skips the tolerance checks (no baseline yet)."""
     breaches: list[str] = []
     notes: list[str] = []
     inv = (candidate_metrics or {}).get("invariants", {})
     for name, ok in inv.items():
         if ok is not True:
             breaches.append(f"invariant {name} failed")
+    if invariants_only:
+        notes.append("no baseline run: invariants checked, tolerance not applied")
+        return breaches, notes
     scorer = (candidate_metrics or {}).get("scorerVersion")
     before = tolerance.get("beforeFirstTrainedScorer", {})
     if before.get("invariantsOnly") and scorer in before.get("standInScorerVersions", []):
@@ -91,11 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     candidate_metrics = _load(args.candidate, "metrics.json")
     baseline = _load(args.baseline, "numbers.json")
     if baseline is None:
-        breaches, notes = compare({}, candidate, {"keys": tolerance["keys"], "beforeFirstTrainedScorer":
-                                                  {"invariantsOnly": True, "standInScorerVersions": [
-                                                      candidate_metrics.get("scorerVersion") if candidate_metrics else None]}},
-                                  None, candidate_metrics)
-        print("no baseline run: invariants checked, tolerance not applied")
+        breaches, notes = compare({}, candidate, tolerance, None, candidate_metrics, invariants_only=True)
         for n in notes:
             print(f"note: {n}")
         for b in breaches:

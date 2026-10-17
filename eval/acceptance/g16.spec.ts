@@ -60,15 +60,27 @@ async function submitReview(page: Page, kind: 'approve' | 'reject', note: string
 }
 
 async function eventCounts(request: APIRequestContext): Promise<Record<string, number>> {
-  const res = await request.get(`${API_BASE}/api/v1/events?limit=200`);
-  expect(res.status(), 'GET /events must answer 200').toBe(200);
-  const body = (await res.json()) as { items: Array<{ eventType: string }> };
+  // Event rows are append-only and the database is reused (CLAUDE.md rule 4), so counts are read in
+  // full (cursor pagination, clamped limit) and the assertions below compare deltas against a snapshot.
   const counts: Record<string, number> = {};
-  for (const row of body.items) {
-    const key = row.eventType.toLowerCase();
-    counts[key] = (counts[key] ?? 0) + 1;
+  let cursor: string | null = null;
+  for (let page = 0; page < 50; page++) {
+    const url = `${API_BASE}/api/v1/events?limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
+    const res = await request.get(url);
+    expect(res.status(), 'GET /events must answer 200').toBe(200);
+    const body = (await res.json()) as { items: Array<{ eventType: string }>; nextCursor: string | null };
+    for (const row of body.items) {
+      const key = row.eventType.toLowerCase();
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    cursor = body.nextCursor;
+    if (!cursor) break;
   }
   return counts;
+}
+
+function delta(after: Record<string, number>, before: Record<string, number>, key: string): number {
+  return (after[key] ?? 0) - (before[key] ?? 0);
 }
 
 test.describe('G16 demo path', () => {
@@ -81,6 +93,7 @@ test.describe('G16 demo path', () => {
       if (res.status() >= 500) serverErrors.push(`${res.status()} ${res.request().method()} ${res.url()}`);
     });
 
+    const before = await eventCounts(request);
     await page.goto('/');
     await expect(byId(page, T.modeBadge)).toBeVisible();
 
@@ -127,13 +140,13 @@ test.describe('G16 demo path', () => {
     const flagText = (await flag.innerText()).toLowerCase();
     for (const banned of NEVER_SAY) expect(flagText, `flag card must never say "${banned}"`).not.toContain(banned);
 
-    // 7. GET /events has one row per action
-    const counts = await eventCounts(request);
-    expect(counts['demo_reset'] ?? 0).toBeGreaterThanOrEqual(1);
-    expect(counts['match_run_completed'] ?? 0).toBeGreaterThanOrEqual(2);
-    expect(counts['link_rejected']).toBe(1);
-    expect(counts['link_approved']).toBe(1);
-    expect(counts['alert_raised']).toBe(1);
+    // 7. GET /events has one row per action (deltas since the pre-run snapshot)
+    const after = await eventCounts(request);
+    expect(delta(after, before, 'demo_reset')).toBe(1);
+    expect(delta(after, before, 'match_run_completed')).toBe(2);
+    expect(delta(after, before, 'link_rejected')).toBe(1);
+    expect(delta(after, before, 'link_approved')).toBe(1);
+    expect(delta(after, before, 'alert_raised')).toBe(1);
 
     // 8. the human-review tile is non-zero, in the API and on screen
     const tiles = await request.get(`${API_BASE}/api/v1/metrics/tiles`);

@@ -27,8 +27,9 @@ the G16 path is live) and then asserts zero non-501 5xx lines in the API request
 5. Cards collapse into one golden record with crosswalk chips; the timeline shows both sources.
 6. The neutral flag card carries `BL-AMOX-01`, the constructed-scenario chip, the words
    "flagged for clinician review", no `role="alert"`, none of the never-say words.
-7. `GET /api/v1/events` has one row per action (`demo_reset`, `match_run_completed` x2,
-   `link_rejected` x1, `link_approved` x1, `alert_raised` x1; event types compared case-insensitively).
+7. `GET /api/v1/events` has one row per action, as deltas against a snapshot taken before the run
+   (`demo_reset` +1, `match_run_completed` +2, `link_rejected` +1, `link_approved` +1, `alert_raised` +1;
+   the feed is read in full through `nextCursor`; event types compared case-insensitively).
 8. The human-review tile is non-zero in `GET /api/v1/metrics/tiles` (`HUMAN_REVIEW.total`) and on screen.
 9. No API response seen by the page has a 5xx status.
 
