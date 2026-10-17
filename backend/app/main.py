@@ -167,7 +167,9 @@ def health() -> Health:  # sync: db_is_up blocks, so it runs in the threadpool, 
 # same documented errors as the frozen stubs; ``limit`` above LIST_LIMIT_MAX is a 422, as the
 # frozen schema says.
 Limit = Annotated[int, Query(ge=1, le=LIST_LIMIT_MAX)]
-_ENTITY_ERRORS = error_responses(ErrorCode.NOT_FOUND) | common_error_responses()
+# 503 listed here because the contract documents it on every route (2d6ff68) and the shared
+# common_error_responses() helper does not include it yet.
+_ENTITY_ERRORS = error_responses(ErrorCode.NOT_FOUND, ErrorCode.UPSTREAM_UNAVAILABLE) | common_error_responses()
 
 
 @app.get(API_PREFIX + "/entities/{entity_id}", response_model=Entity, tags=["core"], responses=_ENTITY_ERRORS,
