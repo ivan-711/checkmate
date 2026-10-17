@@ -1,0 +1,9 @@
+{
+  "showcasePoolComponents": 20,
+  "developmentFraction": 0.7,
+  "folds": 5,
+  "stratifyByLanguage": true,
+  "assignmentKey": "sha256 of the component's smallest person id; showcase pool first, then development/test, development components to folds round-robin in hash order within each language stratum",
+  "ordinaryNegatives": "pair only within the same partition; the same CV fold within development",
+  "note": "the per-run component-to-partition map is written to eval/runs/<run_id>/splits.json"
+}
