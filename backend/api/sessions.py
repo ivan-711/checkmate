@@ -19,7 +19,7 @@ from backend.app.errors import ApiError
 from backend.app.openapi_meta import common_error_responses, error_responses
 from backend.events.writer import write_event
 from backend.match.seam import MatchCore, resolve_core
-from backend.scenarios.loader import ScenarioNotFound, load_scenario
+from backend.scenarios.loader import HeroNotFound, ScenarioNotFound, load_scenario
 from contracts.models.common import ActorType, ErrorCode, EventType
 from contracts.models.events import Versions
 from contracts.models.records import SourceCard
@@ -130,6 +130,8 @@ def insert_source_card(conn: Connection, card: SourceCard, core: MatchCore) -> N
 def create_session(body: CreateSessionRequest, engine: EngineDep) -> SessionResponse:
     try:
         scenario = load_scenario(body.scenario_id)
+    except HeroNotFound as exc:
+        raise ApiError(ErrorCode.NOT_FOUND, str(exc)) from None
     except ScenarioNotFound:
         raise ApiError(ErrorCode.NOT_FOUND, "unknown scenario") from None
     core = resolve_core()

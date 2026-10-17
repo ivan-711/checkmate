@@ -2,108 +2,120 @@
 corpus; GET /sessions/current answers with the same response the reset gave, so a reload rebinds the
 hero without a reset (G16 step 1). 404 before the first reset.
 
-Corpus mode runs on W1's real loaders over its committed fixtures, laid out like W5's hero export: a
-raw sample (fhir/ + csv/) and an overlay holding one ER registration and one Clinic patient row.
+Corpus mode (evaluation doc §5): W5's constructed overlay is applied to the hero's own two records
+named in hero.json; clinical content only, ids and identity exactly as selected; no overlay record is
+inserted, so the hero exists once, as two records. Fixtures: see hero_corpus.py.
 """
 
 from __future__ import annotations
 
-import json
-import shutil
+import uuid
 
-import pytest
 from sqlalchemy import text
 
-from backend.scenarios import loader
 from backend.tests.api.conftest import API, engine
+from backend.tests.api.hero_corpus import OVERLAY_PATIENT_IDS, W5_OVERLAY, write_hero_dir
 
-W1_FIXTURES = loader.REPO_ROOT / "backend" / "tests" / "ingest" / "fixtures"
-OVERLAY_PATIENT = "aaaaaaaa-0000-4000-8000-000000000001"  # bundle_a's person, as W5's overlay copies the hero
-
-
-def _raw_sample(root):
-    raw = root / "raw"
-    (raw / "fhir").mkdir(parents=True)
-    shutil.copytree(W1_FIXTURES / "csv", raw / "csv")
-    for name in ("bundle_a.json", "bundle_b.json"):
-        shutil.copy(W1_FIXTURES / name, raw / "fhir" / name)
-    return raw
+CONSTRUCTED_TAG = {"system": "urn:chartguard:provenance", "code": "constructed-scenario"}
 
 
-def _overlay(root):
-    overlay = root / "overlay"
-    (overlay / "fhir").mkdir(parents=True)
-    (overlay / "csv").mkdir()
-    shutil.copy(W1_FIXTURES / "bundle_a.json", overlay / "fhir" / "hero_er.json")
-    rows = (W1_FIXTURES / "csv" / "patients.csv").read_text().splitlines()
-    (overlay / "csv" / "patients.csv").write_text(
-        "\n".join([rows[0], *[r for r in rows if r.startswith(OVERLAY_PATIENT)]]) + "\n"
-    )
-    return overlay
+def _payload(conn, record_id: str) -> dict:
+    return conn.execute(text("SELECT raw_payload FROM source_record WHERE id = :id"), {"id": record_id}).scalar_one()
 
 
-@pytest.fixture
-def corpus(tmp_path, monkeypatch):
-    pytest.importorskip("backend.ingest.cli")
-    raw = _raw_sample(tmp_path)
-    monkeypatch.setenv("CHECKMATE_HERO_SOURCE", "corpus")
-    monkeypatch.setenv("CHECKMATE_RAW_DIR", str(raw))
-    loader._corpus_cards.cache_clear()
-    yield tmp_path
-    loader._corpus_cards.cache_clear()
-
-
-def _stored_record_count(conn) -> int:
-    return conn.execute(text("SELECT count(*) FROM source_record")).scalar_one()
-
-
-def test_corpus_reset_returns_only_the_hero_overlay_cards(client, corpus, monkeypatch, db_conn):
-    monkeypatch.setenv("CHECKMATE_HERO_OVERLAY_DIR", str(_overlay(corpus)))
+def _reset(client) -> dict:
     r = client.post(f"{API}/sessions", json={"scenarioId": "hero"})
     assert r.status_code == 201, r.text
-    cards = r.json()["sources"]
-    assert sorted(c["record"]["sourceSystem"] for c in cards) == ["CLINIC_CSV", "ER_FHIR"]
-    assert all(c["record"]["isConstructed"] for c in cards), "the showcase is the constructed scenario"
-    assert all(c["record"]["sourceLocalId"] == OVERLAY_PATIENT for c in cards)
-    assert _stored_record_count(db_conn) > len(cards), "the whole corpus is loaded for matching"
-    run = client.post(f"{API}/match-runs").json()
-    assert run["records"] == _stored_record_count(db_conn), "candidate pairs come from the whole corpus"
-    assert len(r.content) < 20_000, "the reset response no longer carries the corpus"
+    return r.json()
 
 
-def test_without_an_overlay_the_hero_json_records_are_the_showcase(client, corpus, monkeypatch):
-    drafts = loader._w1_corpus_drafts(20261017, corpus / "raw")
-    er = next(d for d in drafts if d.source_system == "ER_FHIR")
-    clinic = next(d for d in drafts if d.source_system == "CLINIC_CSV")
-    hero_dir = corpus / "hero-only"
-    hero_dir.mkdir()
-    (hero_dir / "hero.json").write_text(
-        json.dumps({"records": {"ER_FHIR": {"record_id": str(er.id)}, "CLINIC_CSV": {"record_id": str(clinic.id)}}})
+def test_corpus_sources_are_the_hero_json_records_marked_constructed(client, hero_corpus, db_conn):
+    body = _reset(client)
+    assert [c["record"]["id"] for c in body["sources"]] == [hero_corpus.er_id, hero_corpus.clinic_id]
+    assert all(c["record"]["isConstructed"] for c in body["sources"])
+    stored = db_conn.execute(text("SELECT count(*) FROM source_record")).scalar_one()
+    assert stored == hero_corpus.corpus_size, "no overlay record is inserted"
+    overlay_rows = db_conn.execute(
+        text("SELECT count(*) FROM source_record WHERE source_local_id = ANY(:ids)"), {"ids": list(OVERLAY_PATIENT_IDS)}
+    ).scalar_one()
+    assert overlay_rows == 0
+    assert len(client.post(f"{API}/sessions", json={"scenarioId": "hero"}).content) < 20_000
+
+
+def test_overlay_items_land_in_the_hero_payloads_with_ids_and_identity_kept(client, hero_corpus, db_conn):
+    body = _reset(client)
+    er = _payload(db_conn, hero_corpus.er_id)
+    orders = er["medicationRequests"]
+    constructed = [o for o in orders if CONSTRUCTED_TAG in (o.get("meta") or {}).get("tag", [])]
+    assert [o["medicationCodeableConcept"]["coding"][0]["code"] for o in constructed] == ["308192"]
+    assert er["allergyIntolerances"] == [], "the ER registration carries no allergy history"
+    patient_ref = f"urn:uuid:{er['patient']['id']}"
+    assert constructed[0]["subject"]["reference"] == patient_ref, "the order names the hero's own ER record"
+    assert not any(pid in str(er) for pid in OVERLAY_PATIENT_IDS)
+    clinic = _payload(db_conn, hero_corpus.clinic_id)
+    rows = [a for a in clinic["allergies"] if a.get("CONSTRUCTED") == "true"]
+    assert [(a["CODE"], a["SEVERITY1"]) for a in rows] == [("7984", "SEVERE")]
+    assert (
+        rows[0]["PATIENT"]
+        == next(c for c in body["sources"] if c["record"]["id"] == hero_corpus.clinic_id)["record"]["sourceLocalId"]
     )
-    monkeypatch.setenv("CHECKMATE_HERO_OVERLAY_DIR", str(hero_dir))
-    cards = client.post(f"{API}/sessions", json={"scenarioId": "hero"}).json()["sources"]
-    assert [c["record"]["id"] for c in cards] == [str(er.id), str(clinic.id)]
+    names = {c["normalized"]["givenName"] for c in body["sources"]}
+    assert names == {hero_corpus.hero_given}, "identity exactly as selected"
 
 
-def test_frontdesk_hero_showcase_leaves_out_the_er_card(client, corpus, monkeypatch):
-    monkeypatch.setenv("CHECKMATE_HERO_OVERLAY_DIR", str(_overlay(corpus)))
+def test_the_hero_exists_once_and_approving_raises_bl_amox_01_tier_a(client, hero_corpus, db_conn):
+    _reset(client)
+    same_person = (
+        db_conn.execute(
+            text("SELECT record_id::text FROM normalized_record WHERE given_name = :g AND birth_date = :d"),
+            {"g": hero_corpus.hero_given, "d": hero_corpus.hero_birth_date},
+        )
+        .scalars()
+        .all()
+    )
+    assert sorted(same_person) == sorted([hero_corpus.er_id, hero_corpus.clinic_id]), (
+        "no record with the hero's identity outside the two"
+    )
+    assert client.post(f"{API}/match-runs").status_code == 201
+    pairs = client.get(f"{API}/candidate-pairs", params={"recordId": hero_corpus.er_id, "limit": 200}).json()["items"]
+    hero_pairs = [p for p in pairs if {p["recordAId"], p["recordBId"]} == {hero_corpus.er_id, hero_corpus.clinic_id}]
+    assert len(hero_pairs) == 1, "exactly one pair for the hero"
+    approve = client.post(
+        f"{API}/candidate-pairs/{hero_pairs[0]['id']}/reviews",
+        json={"action": "APPROVE", "actor": "Registrar A"},
+        headers={"Idempotency-Key": str(uuid.uuid4())},
+    )
+    assert approve.status_code == 201, approve.text
+    alerts = approve.json()["alerts"]
+    assert [(a["ruleId"], a["tier"]) for a in alerts] == [("BL-AMOX-01", "A")]
+    assert alerts[0]["revealedByMerge"] is True
+    assert alerts[0]["constructedScenario"] is True
+
+
+def test_without_overlay_files_the_hero_records_are_served_as_loaded(client, hero_corpus, monkeypatch):
+    bare = write_hero_dir(hero_corpus.hero_dir.parent / "bare", hero_corpus.er_id, hero_corpus.clinic_id, overlay=False)
+    monkeypatch.setenv("CHECKMATE_HERO_OVERLAY_DIR", str(bare))
+    cards = _reset(client)["sources"]
+    assert [c["record"]["id"] for c in cards] == [hero_corpus.er_id, hero_corpus.clinic_id]
+    assert not any(c["record"]["isConstructed"] for c in cards)
+
+
+def test_frontdesk_hero_showcase_leaves_out_the_er_card(client, hero_corpus):
     cards = client.post(f"{API}/sessions", json={"scenarioId": "frontdesk-hero"}).json()["sources"]
-    assert [c["record"]["sourceSystem"] for c in cards] == ["CLINIC_CSV"]
+    assert [c["record"]["id"] for c in cards] == [hero_corpus.clinic_id]
 
 
 def test_current_session_equals_the_reset_response(client, monkeypatch):
     monkeypatch.delenv("CHECKMATE_HERO_SOURCE", raising=False)
-    reset = client.post(f"{API}/sessions", json={"scenarioId": "hero"})
-    assert reset.status_code == 201, reset.text
-    assert len(reset.json()["sources"]) == 2
+    reset = _reset(client)
+    assert len(reset["sources"]) == 2
     current = client.get(f"{API}/sessions/current")
     assert current.status_code == 200, current.text
-    assert current.json() == reset.json()
+    assert current.json() == reset
 
 
-def test_current_session_in_corpus_mode_equals_the_reset_response(client, corpus, monkeypatch):
-    monkeypatch.setenv("CHECKMATE_HERO_OVERLAY_DIR", str(_overlay(corpus)))
-    reset = client.post(f"{API}/sessions", json={"scenarioId": "hero"}).json()
+def test_current_session_in_corpus_mode_equals_the_reset_response(client, hero_corpus):
+    reset = _reset(client)
     assert client.get(f"{API}/sessions/current").json() == reset
 
 
@@ -118,17 +130,54 @@ def test_current_session_is_404_before_the_first_reset(client):
     assert client.get(f"{API}/sessions/current").status_code == 200
 
 
-def test_hero_pair_is_bound_by_record_id_in_corpus_mode(client, corpus, monkeypatch):
+def test_hero_pair_is_bound_by_record_id_in_corpus_mode(client, hero_corpus):
     """The UI's one request: GET /candidate-pairs?recordId=<first hero card>, then the pair whose other
     record is the second hero card. Found wherever the pair sits in the whole queue."""
-    monkeypatch.setenv("CHECKMATE_HERO_OVERLAY_DIR", str(_overlay(corpus)))
-    first, second = (
-        c["record"]["id"] for c in client.post(f"{API}/sessions", json={"scenarioId": "hero"}).json()["sources"]
-    )
+    first, second = (c["record"]["id"] for c in _reset(client)["sources"])
     assert client.post(f"{API}/match-runs").status_code == 201
     items = client.get(f"{API}/candidate-pairs", params={"recordId": first}).json()["items"]
-    hero = [p for p in items if {p["recordAId"], p["recordBId"]} == {first, second}]
-    assert len(hero) == 1, items
+    assert len([p for p in items if {p["recordAId"], p["recordBId"]} == {first, second}]) == 1, items
     assert all(first in (p["recordAId"], p["recordBId"]) for p in items)
-    queue = client.get(f"{API}/candidate-pairs", params={"limit": 200}).json()["items"]
-    assert len(queue) > len(items), "the filter narrows the whole queue to this record's pairs"
+
+
+def test_corpus_reset_without_a_hero_fails_loudly_and_changes_nothing(
+    client, hero_corpus, monkeypatch, db_conn, caplog
+):
+    """R3a: a reset that cannot find the hero is a 404 envelope naming the missing hero scenario (no file
+    paths), one log line naming the directory it looked in, and no state change."""
+    import logging
+
+    _reset(client)  # a good session to compare against
+    before = db_conn.execute(text("SELECT count(*) FROM source_record")).scalar_one()
+    sessions = db_conn.execute(text("SELECT count(*) FROM demo_session")).scalar_one()
+    empty = hero_corpus.hero_dir.parent / "no-hero"
+    empty.mkdir()
+    monkeypatch.setenv("CHECKMATE_HERO_OVERLAY_DIR", str(empty))
+    with caplog.at_level(logging.WARNING, logger="checkmate.scenarios"):
+        r = client.post(f"{API}/sessions", json={"scenarioId": "hero"})
+    assert r.status_code == 404, r.text
+    error = r.json()["error"]
+    assert error["code"] == "NOT_FOUND"
+    assert "hero scenario" in error["message"]
+    assert str(empty) not in r.text and "/" not in error["message"], "no file paths in the response"
+    lines = [rec.getMessage() for rec in caplog.records if rec.name == "checkmate.scenarios"]
+    assert len(lines) == 1 and str(empty) in lines[0]
+    assert db_conn.execute(text("SELECT count(*) FROM source_record")).scalar_one() == before
+    assert db_conn.execute(text("SELECT count(*) FROM demo_session")).scalar_one() == sessions
+
+
+def test_sources_are_exactly_the_hero_json_pair_however_many_overlay_records(client, hero_corpus, db_conn):
+    """R3a: an overlay holding many records (extra bundles, extra patient rows) still yields exactly the
+    hero.json pair, and none of its records is inserted."""
+    import shutil
+
+    for n in range(3):
+        shutil.copy(W5_OVERLAY / "fhir" / "hero_er.json", hero_corpus.hero_dir / "fhir" / f"extra_{n}.json")
+    patients = hero_corpus.hero_dir / "csv" / "patients.csv"
+    rows = patients.read_text().splitlines()
+    patients.write_text(
+        "\n".join([*rows, *[rows[1].replace(rows[1].split(",")[0], f"extra-{n}") for n in range(2)]]) + "\n"
+    )
+    body = _reset(client)
+    assert [c["record"]["id"] for c in body["sources"]] == [hero_corpus.er_id, hero_corpus.clinic_id]
+    assert db_conn.execute(text("SELECT count(*) FROM source_record")).scalar_one() == hero_corpus.corpus_size
