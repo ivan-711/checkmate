@@ -50,6 +50,7 @@ IMPLEMENTED = frozenset(
     {
         ("GET", API_PREFIX + "/health"),
         ("POST", API_PREFIX + "/sessions"),  # W3a (loader seam: W1)
+        ("GET", API_PREFIX + "/sessions/current"),  # W3a (additive contract route 5a44f29, reload)
         ("POST", API_PREFIX + "/match-runs"),  # W3a (core seam: W2)
         ("GET", API_PREFIX + "/candidate-pairs"),  # W3a
         ("GET", API_PREFIX + "/candidate-pairs/{pair_id}"),  # W3a

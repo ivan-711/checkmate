@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Query
@@ -33,6 +34,8 @@ _CURRENT_JOIN = (
     "FROM candidate_pair cp JOIN LATERAL (SELECT * FROM match_decision md WHERE md.pair_id = cp.id "
     "ORDER BY md.version DESC LIMIT 1) d ON true"
 )
+# A pair holds the record on either side (record_a_id < record_b_id, so the side depends on the ids).
+_WITH_RECORD = "(cp.record_a_id = :record_id OR cp.record_b_id = :record_id)"
 # Filter columns are a closed map: the request picks a key, never an identifier.
 FILTER_COLUMNS = {"band": "d.band", "status": "d.status", "origin": "cp.origin"}
 _PAIR_FOR_DETAIL = text(f"SELECT {PAIR_COLUMNS} FROM candidate_pair cp WHERE cp.id = :pair_id")
@@ -54,11 +57,16 @@ def pair_from_row(row: Row, decision: MatchDecision) -> CandidatePair:
     )
 
 
-def list_query(filters: dict[str, str], after: tuple[float, UUID] | None, limit: int) -> tuple[str, dict]:
+def list_query(
+    filters: dict[str, str], after: tuple[float, UUID] | None, limit: int, record_id: UUID | None = None
+) -> tuple[str, dict]:
     clauses, params = [], {"limit_plus_one": limit + 1}
     for name, value in filters.items():
         clauses.append(f"{FILTER_COLUMNS[name]} = :{name}")
         params[name] = value
+    if record_id is not None:
+        clauses.append(_WITH_RECORD)
+        params["record_id"] = record_id
     if after is not None:
         clauses.append("(abs(d.p - 0.5), cp.id) > (CAST(:after_distance AS double precision), CAST(:after_id AS uuid))")
         params["after_distance"], params["after_id"] = after
@@ -74,25 +82,33 @@ def list_query(filters: dict[str, str], after: tuple[float, UUID] | None, limit:
     "/candidate-pairs",
     response_model=Page[CandidatePair],
     responses=common_error_responses(),
-    description="Lane W3a. Review queue ordered by |p-0.5|. Bounded list.",
+    description="Lane W3a. Review queue ordered by |p-0.5|. Bounded list. `recordId` (additive) keeps only "
+    "pairs that include that source record, so the UI binds the hero pair in one request.",
 )
 def list_candidate_pairs(
     engine: EngineDep,
     band: Band | None = None,
     status: DecisionStatus | None = None,
     origin: PairOrigin | None = None,
+    record_id: Annotated[UUID | None, Query(alias="recordId")] = None,
     limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX),
     cursor: str | None = None,
 ) -> Page[CandidatePair]:
     limit = min(limit, LIST_LIMIT_MAX)
-    after = decode_cursor(cursor) if cursor else None
+    after = None
+    if cursor:
+        distance, after_id, cursor_record = decode_cursor(cursor)
+        after = (distance, after_id)
+        if record_id is not None and record_id != cursor_record:
+            raise ApiError(ErrorCode.VALIDATION_ERROR, "recordId differs from the filter the cursor was issued for")
+        record_id = cursor_record
     filters = {k: v.value for k, v in {"band": band, "status": status, "origin": origin}.items() if v is not None}
-    sql, params = list_query(filters, after, limit)
+    sql, params = list_query(filters, after, limit, record_id)
     with engine.connect() as conn:
         rows = conn.execute(text(sql), params).all()
     page = rows[:limit]
     items = [pair_from_row(r, decision_from_row(r)) for r in page]
-    next_cursor = encode_cursor(page[-1].distance, page[-1].cp_id) if len(rows) > limit else None
+    next_cursor = encode_cursor(page[-1].distance, page[-1].cp_id, record_id) if len(rows) > limit else None
     return Page[CandidatePair](items=items, next_cursor=next_cursor)
 
 
