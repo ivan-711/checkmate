@@ -37,7 +37,7 @@ from contracts.models.tiles import TilesResponse
 from contracts.models.whatifs import WhatIfResponse
 from data import hero_overlay as overlay
 from data.hero_select import P_RAISE_BOUND, ROBUSTNESS_TOLERANCE, intake_rendering
-from eval.harness import standin, whatifs
+from eval.harness import product, standin, whatifs
 from eval.harness.types import BAND_AUTO_LINK, BAND_KEEP_SEPARATE, BAND_REVIEW, band_for
 
 DEFAULT_DIR = Path(__file__).resolve().parents[1] / "data" / "scenarios" / "hero"
@@ -97,13 +97,12 @@ def run_checks(d: Path, strict: bool = False) -> list[Check]:
     er, clinic = hero["records"]["ER_FHIR"], hero["records"]["CLINIC_CSV"]
     c_low, c_high = float(hero["cLow"]), float(hero["cHigh"])
     thresholds = {"c_low": c_low, "c_high": c_high}
-    weights = hero.get("weights") or standin.DEFAULT_WEIGHTS
-    if hero["scorerVersion"] != standin.SCORER_VERSION:
-        checks.append(Check("re-score with the named scorer", SKIP,
-                            f"export names scorer {hero['scorerVersion']}; wire W2's match() here"))
+    engine, reason = _engine_for(hero["scorerVersion"])
+    if engine is None:
+        checks.append(Check("re-score with the named scorer", _skip(strict), reason))
         base, what, intake = hero["baseline"], hero["whatIfs"], hero["intake"]
     else:
-        match = standin.match
+        match, weights = engine.match, engine.shipped_weights
         base = _as_dict(match(er, clinic, weights, thresholds))
         what = {
             whatifs.REMOVE_ADDRESS: _as_dict(match(whatifs.remove_address(er), clinic, weights, thresholds)),
@@ -257,6 +256,19 @@ def _caption_checks(scenario: dict, hero: dict, strict: bool) -> list[Check]:
     out.append(Check("band-changers change the band", status,
                      ", ".join(unchanged) + (" (best partial; listed in unmetCriteria)" if unchanged and honest else "")))
     return out
+
+
+def _engine_for(scorer_version: str):
+    """The engine that produced the export: the stand-in for harness self-tests, else W2's engine."""
+    if scorer_version == standin.SCORER_VERSION:
+        return product.standin_engine(), ""
+    try:
+        engine = product.load_engine()
+    except product.ProductUnavailable as exc:
+        return None, f"export names scorer {scorer_version}; {exc}"
+    if engine.scorer_version != scorer_version:
+        return None, f"export names scorer {scorer_version} but the engine ships {engine.scorer_version}; re-export"
+    return engine, ""
 
 
 def _policy_check(scenario: dict, strict: bool) -> Check:

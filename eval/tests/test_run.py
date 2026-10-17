@@ -102,3 +102,28 @@ def test_second_seed_changes_metrics_but_keeps_shape():
     base = fast_run()
     assert set(other.numbers) == set(base.numbers)
     assert other.metrics["numbers"] != base.metrics["numbers"]
+
+
+def test_operating_point_is_the_current_migration_row_and_bands_use_it(tmp_path: Path):
+    from eval.harness.current_thresholds import from_migrations
+
+    op = from_migrations()
+    assert (op.thresholds_id, op.c_low, op.c_high) == ("provisional-1", 0.0, 4.0)
+    result = run(RunConfig(name="fast", seed=3, fast=True, out_dir=tmp_path, operating_point=op,
+                           fixture=FixtureConfig(seed=3, entities=120, hard_negative_pairs=12)))
+    assert result.numbers["thresholds.c_high"]["value"] == 4.0
+    assert result.numbers["thresholds.operating_point"]["value"] == "provisional-1"
+    assert "thresholds.proposed.c_high" in result.numbers
+    doc = json.loads((result.run_dir / "thresholds.json").read_text())
+    assert doc["thresholdsId"] == "provisional-1" and doc["proposed"]["thresholdsId"].startswith("oof-")
+
+
+def test_category_recall_counts_blocking_misses():
+    from eval.harness.metrics import ScoredPair
+    from eval.harness.run import category_numbers
+
+    found = ScoredPair("a", "b", "E1", "E1", "C1", "C1", 9.0, 0.9, (), ("T1",))
+    missed = ScoredPair("c", "d", "E2", "E2", "C2", "C2", float("-inf"), 0.0, (), ("T1",))
+    out = category_numbers([found], [missed], 0.0, 4.0, ["T1"], seed=1, resamples=20)
+    assert out["category.T1.recall.strict"]["value"] == 0.5
+    assert out["category.T1.blocking_recall"]["value"] == 0.5

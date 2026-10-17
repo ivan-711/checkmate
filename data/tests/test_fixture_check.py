@@ -31,10 +31,17 @@ def test_strict_mode_turns_skips_and_warns_into_failures():
     assert failed and all(c.status in (fc.PASS, fc.FAIL) for c in checks)
 
 
+def _plant(hero: dict) -> None:
+    """An unknown scorer version makes fixture_check read the exported scores instead of re-scoring them."""
+    hero["scorerVersion"] = "planted-scorer"
+
+
 def test_planted_auto_link_and_banned_word_fail(tmp_path: Path):
     for name in ("scenario.json", "hero.json", "selection.json"):
         shutil.copy(HERO_DIR / name, tmp_path / name)
     hero = json.loads((tmp_path / "hero.json").read_text())
+    _plant(hero)
+    hero["baseline"]["band"] = "AUTO_LINK"
     hero["cHigh"] = hero["baseline"]["raw_score"] - 0.1  # the baseline now sits above c_high
     (tmp_path / "hero.json").write_text(json.dumps(hero))
     scenario = json.loads((tmp_path / "scenario.json").read_text())
@@ -87,11 +94,16 @@ def test_unchanged_band_changer_fails_when_the_hero_claims_to_qualify(tmp_path: 
     assert _statuses(fc.run_checks(tmp_path))["band-changers change the band"] == fc.FAIL
 
 
-def test_unshipped_birth_year_auto_link_warns_and_strict_fails():
-    loose = _statuses(fc.run_checks(HERO_DIR))
-    strict = _statuses(fc.run_checks(HERO_DIR, strict=True))
+def test_unshipped_birth_year_auto_link_warns_and_strict_fails(tmp_path: Path):
+    _, hero = _copy(tmp_path)
+    _plant(hero)
+    unshipped = next(k for k in hero["whatIfs"] if k.startswith("CHANGE_BIRTH_YEAR")
+                     and k != hero["exportedWhatIfKeys"]["CHANGE_BIRTH_YEAR"])
+    hero["whatIfs"][unshipped]["band"] = "AUTO_LINK"
+    (tmp_path / "hero.json").write_text(json.dumps(hero))
     name = "no AUTO_LINK anywhere (both birth-year directions)"
-    assert loose[name] == fc.WARN and strict[name] == fc.FAIL
+    assert _statuses(fc.run_checks(tmp_path))[name] == fc.WARN
+    assert _statuses(fc.run_checks(tmp_path, strict=True))[name] == fc.FAIL
 
 
 OVERLAY = "constructed overlay present, labeled and placed (Synthea data plan section 4)"
@@ -121,8 +133,9 @@ def test_untagged_order_and_er_allergy_history_fail(tmp_path: Path):
 
 def test_overlay_must_not_touch_identity_or_drop_the_manifest_sentence(tmp_path: Path):
     _copy(tmp_path)
+    given = json.loads((tmp_path / "hero.json").read_text())["records"]["CLINIC_CSV"]["given_name"]
     patients = tmp_path / "csv" / "patients.csv"
-    patients.write_text(patients.read_text().replace(",Mike,", ",Michael,"))
+    patients.write_text(patients.read_text().replace(f",{given},", f",{given}x,"))
     manifest = tmp_path / "scenario_manifest.json"
     m = json.loads(manifest.read_text())
     m["provenance"] = "constructed"

@@ -20,18 +20,21 @@ the G16 path is live) and then asserts zero non-501 5xx lines in the API request
 
 ## Steps the script asserts
 
-1. Reset, then two source cards render (`ER_FHIR` and `CLINIC_CSV`), each showing the hero's given and
-   family name as exported in `data/scenarios/hero/scenario.json` (override with `CHECKMATE_SCENARIO`).
+1. Reset, then two source cards render (`ER_FHIR` and `CLINIC_CSV`), each showing that source's given and
+   family name from `data/scenarios/hero/hero.json` (override with `CHECKMATE_HERO`). Names match case-,
+   accent-, space- and punctuation-insensitively (NFKD, combining marks stripped).
 2. Resolve shows the hero pair in `REVIEW` with the evidence rail.
 3. Reject with reason `INSUFFICIENT_EVIDENCE` and a note: no flag card; an event row `link_rejected`.
 4. Resolve again, Approve with a note (and the reason control if shown).
-5. Cards collapse into one golden record (showing the exported golden given and family name) with
-   crosswalk chips; the timeline shows both sources.
+5. Cards collapse into one golden record (showing the hero's given name and one of the two source family
+   names; survivorship is W3b's) with crosswalk chips; the timeline shows both sources.
 6. The neutral flag card carries `BL-AMOX-01`, the constructed-scenario chip, the words
    "flagged for clinician review", no `role="alert"`, none of the never-say words.
-7. `GET /api/v1/events` has one row per action, as deltas against a snapshot taken before the run
-   (`demo_reset` +1, `match_run_completed` +2, `link_rejected` +1, `link_approved` +1, `alert_raised` +1;
-   the feed is read in full through `nextCursor`; event types compared case-insensitively).
+7. `GET /api/v1/events?since=<API clock>` has one row per action, as deltas against a snapshot taken
+   before the run (`demo_reset` +1, `match_run_completed` +2, `link_rejected` +1, `link_approved` +1,
+   `alert_raised` +1). The clock is the `Date` header of `GET /health` with an explicit UTC offset; the
+   same `since` goes on every page; the feed is read in full through `nextCursor` up to 250 pages of 200
+   and fails loudly beyond that; event types are compared case-insensitively.
 8. The human-review tile is non-zero in `GET /api/v1/metrics/tiles` (`HUMAN_REVIEW.total`) and on screen.
 9. No API response seen by the page has a 5xx status.
 

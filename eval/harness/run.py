@@ -32,6 +32,7 @@ from pathlib import Path
 
 from eval.harness import latency as latency_mod
 from eval.harness import standin
+from eval.harness.current_thresholds import CurrentThresholds, from_database, from_migrations
 from eval.harness.fixture import P0_FAMILIES, FixtureConfig, build_fixture, corpus_hashes
 from eval.harness.metrics import (
     ScoredPair,
@@ -93,6 +94,9 @@ class RunConfig:
     latency_calls: tuple[int, int] | None = None
     extra_manifest: dict = field(default_factory=dict)
     provenance: dict = field(default_factory=dict)  # engine and corpus versions and hashes, into run.json
+    operating_point: CurrentThresholds | None = None
+    """The app's current threshold row (fork #12). When set, every band number is published at it and the
+    harness's own out-of-fold selection is reported beside it as a proposal; None (unit tests): the selection."""
 
 
 @dataclass
@@ -342,16 +346,29 @@ def run(cfg: RunConfig) -> RunResult:
                   == candidate_pair_hash(second, second_assignment, cfg, held_out))
     scored, meta = out_of_fold(corpus, assignment, cfg, held_out)
     selection = select_thresholds(scored, threshold_cfg)
-    c_low, c_high = selection.c_low, selection.c_high
-    thresholds_id = thresholds_id_for(selection, cfg.scorer_version, fixture_hashes)
+    proposed_id = thresholds_id_for(selection, cfg.scorer_version, fixture_hashes)
+    if cfg.operating_point is not None:
+        c_low, c_high = cfg.operating_point.c_low, cfg.operating_point.c_high
+        thresholds_id = cfg.operating_point.thresholds_id
+    else:
+        c_low, c_high = selection.c_low, selection.c_high
+        thresholds_id = proposed_id
 
     numbers: dict[str, dict] = {}
     numbers.update(band_metrics(scored, meta["missedTrue"], c_low, c_high, bootstrap_seed, resamples))
     numbers.update(blocking_metrics(meta["truePairs"], meta["blockedPairs"], meta["allPairsN"], bootstrap_seed,
                                     resamples))
     numbers.update(category_numbers(scored, meta["missedTrue"], c_low, c_high, families, bootstrap_seed, resamples))
-    numbers["thresholds.c_low"] = {"value": c_low}
-    numbers["thresholds.c_high"] = {"value": c_high}
+    numbers["thresholds.c_low"] = {"value": c_low, "thresholds_id": thresholds_id}
+    numbers["thresholds.c_high"] = {"value": c_high, "thresholds_id": thresholds_id}
+    numbers["thresholds.operating_point"] = {
+        "value": thresholds_id,
+        "source": cfg.operating_point.source if cfg.operating_point else "harness out-of-fold selection",
+        "note": "every band number above is computed at this row"}
+    numbers["thresholds.proposed.c_low"] = {"value": selection.c_low, "thresholds_id": proposed_id,
+                                            "note": "out-of-fold selection, development, descriptive"}
+    numbers["thresholds.proposed.c_high"] = {"value": selection.c_high, "thresholds_id": proposed_id,
+                                             "note": "out-of-fold selection, development, descriptive"}
     numbers["thresholds.alpha_target_reachable"] = {"value": selection.c_high_reachable,
                                                     "fallback_used": selection.c_high_fallback_used}
     numbers["thresholds.envelope_at_c_high"] = {"value": selection.envelope_at_c_high,
@@ -413,6 +430,8 @@ def run(cfg: RunConfig) -> RunResult:
     }
     thresholds_doc = {
         "thresholdsId": thresholds_id, "cLow": c_low, "cHigh": c_high, "tLowDisplay": t_low, "tHighDisplay": t_high,
+        "operatingPoint": cfg.operating_point.as_dict() if cfg.operating_point else None,
+        "proposed": {"thresholdsId": proposed_id, "cLow": selection.c_low, "cHigh": selection.c_high},
         "autoLinkEnabled": False, "isCalibrated": False, "sourceRunId": run_id,
         "selection": selection.as_json(), "scorerVersion": cfg.scorer_version,
         "wording": ("demo cutoffs chosen on development data against a 1% auto-link error target on synthetic data; "
@@ -482,7 +501,8 @@ def product_config(args: argparse.Namespace) -> RunConfig:
     return RunConfig(name="fast" if args.fast else "development", seed=args.seed, fast=args.fast,
                      include_test_pass=args.test_pass, out_dir=args.out, corpus_loader=loader,
                      match=engine.match, fit=engine.fit, block=engine.block, scorer_version=engine.scorer_version,
-                     provenance={"engine": engine.provenance, "corpus": corpus_provenance})
+                     provenance={"engine": engine.provenance, "corpus": corpus_provenance},
+                     operating_point=from_database(args.database_url) if args.database_url else from_migrations())
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -494,6 +514,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--test-pass", action="store_true", help="the single 20:00 test pass (never per merge)")
     parser.add_argument("--out", type=Path, default=RUNS_DIR)
     parser.add_argument("--raw", type=Path, default=DEFAULT_RAW_DIR, help="extracted Synthea sample (data/download.py)")
+    parser.add_argument("--thresholds-from-database", dest="database_url", default=None,
+                        help="read the current threshold row from this DATABASE_URL instead of the migrations")
     args = parser.parse_args(argv)
     try:
         cfg = product_config(args)

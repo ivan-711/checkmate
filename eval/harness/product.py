@@ -20,7 +20,7 @@ import hashlib
 import importlib
 import json
 import os
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -66,7 +66,20 @@ class Engine:
     fit: FitFn
     block: BlockFn
     scorer_version: str
+    shipped_weights: Mapping[str, float]  # the weights the app scores with (hero selection, fixture_check)
+    block_keys: Callable[[Record], list[str]]
+    display_p: Callable[[float], float]
     provenance: dict = field(default_factory=dict)
+
+
+def standin_engine() -> Engine:
+    """The harness's own stand-in, for its unit tests and explicit self-test runs only (never published)."""
+    from eval.harness import standin
+
+    return Engine(match=standin.match, fit=standin.fit, block=standin.block, scorer_version=standin.SCORER_VERSION,
+                  shipped_weights=dict(standin.DEFAULT_WEIGHTS), block_keys=standin.block_keys,
+                  display_p=lambda raw: standin.display_p(raw, {}),
+                  provenance={"engine": "eval.harness.standin", "note": "harness self-test; not a product measurement"})
 
 
 def engine_input(rec: Record) -> dict:
@@ -96,6 +109,7 @@ def load_engine(package_name: str | None = None) -> Engine:
         band = importlib.import_module(f"{name}.band")
         block = importlib.import_module(f"{name}.block")
         normalize = importlib.import_module(f"{name}.normalize")
+        score = importlib.import_module(f"{name}.score")
     except ImportError as exc:
         raise ProductUnavailable(f"{name} (W2's engine) is not importable: {exc}. The production evaluation "
                                  "command measures the product and never falls back to the stand-in.") from exc
@@ -142,7 +156,12 @@ def load_engine(package_name: str | None = None) -> Engine:
         "block": f"{name}.block.candidate_pairs (blocks over {BLOCK_MAX_RECORDS} records skipped)",
         "match": f"{name}.band.match",
     }
-    return Engine(match=match, fit=fit, block=block_fn, scorer_version=shipped.scorer_version, provenance=provenance)
+    def keys_of(rec: Record) -> list[str]:
+        return sorted(str(k) for k in block.block_keys(normalize.coerce_normalized(engine_input(rec))))
+
+    return Engine(match=match, fit=fit, block=block_fn, scorer_version=shipped.scorer_version,
+                  shipped_weights=EngineWeights(shipped), block_keys=keys_of,
+                  display_p=lambda raw: float(score.display_probability(raw, shipped)), provenance=provenance)
 
 
 def _language(identity: Any, corruptor: Any) -> str:
@@ -178,6 +197,8 @@ def load_corpus(seed: int, raw_dir: Path = DEFAULT_RAW_DIR) -> tuple[Corpus, dic
             "address_line": ident.address_line, "zip5": ident.postal_code, "language": language,
             "categories": [] if rec.family in NO_EDIT_FAMILIES else [rec.family],
             "donor_person_ids": sorted(donors.get(rec.synthea_id, [])),
+            "allergies": [dict(row) for row in getattr(rec.share, "allergies", None) or []]
+            if rec.draft.source_system == "CLINIC_CSV" else [],
         })
         truth.append(TruthRow(entity_id=rec.entity_id, record_id=rid, source_system=rec.draft.source_system,
                               synthea_patient_id=rec.synthea_id))
