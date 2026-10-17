@@ -19,7 +19,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -48,8 +48,9 @@ GENERATION_SUFFIXES: dict[str, str] = {
 # the last family token; as the last token it is the generation suffix.
 _TITLES: frozenset[str] = frozenset({"mr", "mrs", "ms", "miss", "dr", "sr", "sra", "srta", "don", "dona"})
 # Surname particles never stand for the family on their own ("de la Cruz" is Cruz).
+# "le", "van", "da", "di" are left out on purpose: they are common surnames on their own.
 _PARTICLES: frozenset[str] = frozenset(
-    {"de", "del", "la", "las", "los", "da", "di", "du", "van", "von", "der", "den", "le", "st", "san", "y", "e"}
+    {"de", "del", "la", "las", "los", "du", "von", "der", "den", "st", "san", "y", "e"}
 )
 
 # Street-type abbreviations expanded so "Main St" and "Main Street" share tokens (taxonomy L2).
@@ -111,9 +112,10 @@ class Normalized:
     given_tokens: tuple[str, ...] = ()
     family_tokens: tuple[str, ...] = ()
     suffix: str | None = None  # JR, SR, II, III, IV, V
-    # Derived in __post_init__ from the folded tokens, whichever constructor built the record.
-    family_codes: tuple[str, ...] = ()  # Double Metaphone codes of the non-particle family tokens
-    name_is_placeholder: bool = False
+    # Derived in __post_init__ from the folded tokens, whichever constructor built the record;
+    # init=False so nobody can pass a stale value and dataclasses.replace recomputes them.
+    family_codes: tuple[str, ...] = field(init=False, default=())  # DM codes of the non-particle family tokens
+    name_is_placeholder: bool = field(init=False, default=False)
     birth_year: int | None = None
     birth_month: int | None = None
     birth_day: int | None = None
@@ -149,8 +151,10 @@ class Normalized:
         (``smith jr``) where re-normalizing splits it off again.
         """
         family = self.family_name
-        if self.suffix:
-            family = f"{family} {self.suffix.lower()}" if family else self.suffix.lower()
+        if self.suffix and family:
+            # A suffix with no family name has nowhere to ride and is dropped rather than
+            # becoming a surname.
+            family = f"{family} {self.suffix.lower()}"
         return {
             "record_id": self.record_id,
             "given_name": self.given_name,
@@ -204,41 +208,61 @@ def strip_synthea_digits(text: str | None) -> str | None:
     return _DIGITS.sub("", str(text)) or None
 
 
-def _remove_tokens_from_accented(accented: str | None, removed: list[str]) -> str | None:
-    """Drop the title/suffix words from the accented form too, matching each word by its fold.
+_SEPARATORS = re.compile(r"([\-\u2010-\u2015'`\u2019.,/_]+)")
 
-    A word glued to its title with no space (``Dr.Robert``) is one word whose fold is two
-    tokens; it is kept whole rather than guessed at.
-    """
-    if not accented or not removed:
-        return accented
-    pending = list(removed)
-    kept = []
-    for word in accented.split(" "):
-        folded = fold_text(word)
-        if folded in pending:
-            pending.remove(folded)
+
+def _drop_subword(word: str, token: str) -> str | None:
+    """Remove the part of a punctuation-glued word (``smith-jr``, ``dr.robert``) whose fold is ``token``."""
+    parts = _SEPARATORS.split(word)
+    kept: list[str] = []
+    for i in range(0, len(parts), 2):
+        part = parts[i]
+        separator = parts[i - 1] if i else ""
+        if fold_text(part) == token:
             continue
-        kept.append(word)
-    out = " ".join(kept).strip(" ,")
+        kept.append((separator if kept else "") + part)
+    return "".join(kept) or None
+
+
+def _remove_tokens_from_accented(accented: str | None, titles: list[str], suffix_token: str | None) -> str | None:
+    """Drop the same title and suffix words from the accented form, matching each word by its fold.
+
+    Titles are removed from the front and the suffix from the end, mirroring where
+    ``_split_name_tokens`` found them, so both forms keep the same tokens.
+    """
+    if not accented or not (titles or suffix_token):
+        return accented
+    words = accented.split(" ")
+    if suffix_token:
+        for i in range(len(words) - 1, -1, -1):
+            if suffix_token in (fold_text(words[i]) or "").split():
+                words[i] = _drop_subword(words[i], suffix_token) or ""
+                break
+    pending = list(titles)
+    for i, word in enumerate(words):
+        for tok in list(pending):
+            if tok in (fold_text(word) or "").split():
+                words[i] = _drop_subword(word, tok) or ""
+                pending.remove(tok)
+                break
+    out = " ".join(w for w in words if w).strip(" ,")
     return out or None
 
 
 def _split_name_tokens(tokens: list[str], suffix_allowed: bool) -> tuple[list[str], str | None, list[str]]:
-    """(kept tokens, suffix, removed tokens). A suffix is only the last family token."""
-    removed: list[str] = []
+    """(kept tokens, suffix, removed title tokens). A suffix is only the last family token."""
     suffix = None
     if suffix_allowed and len(tokens) > 1 and tokens[-1] in GENERATION_SUFFIXES:
-        suffix = GENERATION_SUFFIXES[tokens[-1]]
-        removed.append(tokens[-1])
+        suffix = tokens[-1]
         tokens = tokens[:-1]
+    titles: list[str] = []
     kept = []
     for tok in tokens:
         if tok in _TITLES and len(tokens) > 1:
-            removed.append(tok)
+            titles.append(tok)
         else:
             kept.append(tok)
-    return kept, suffix, removed
+    return kept, suffix, titles
 
 
 def surname_codes(tokens: tuple[str, ...]) -> tuple[str, ...]:
@@ -264,7 +288,7 @@ def parse_dob_parts(value: Any) -> tuple[int | None, int | None, int | None]:
     if value is None:
         return None, None, None
     if isinstance(value, date):
-        return value.year, value.month, value.day
+        return parse_dob_parts_from_components(value.year, value.month, value.day)
     text = str(value).strip()
     if not text:
         return None, None, None
@@ -349,10 +373,10 @@ def normalize_name_part(
     folded = fold_text(text)
     if not folded:
         return accented, None, (), None
-    tokens, suffix, removed = _split_name_tokens(folded.split(), suffix_allowed)
-    accented = _remove_tokens_from_accented(accented, removed)
+    tokens, suffix_token, titles = _split_name_tokens(folded.split(), suffix_allowed)
+    accented = _remove_tokens_from_accented(accented, titles, suffix_token)
     folded_clean = " ".join(tokens) or None
-    return accented, folded_clean, tuple(tokens), suffix
+    return accented, folded_clean, tuple(tokens), GENERATION_SUFFIXES.get(suffix_token or "")
 
 
 # --- record ------------------------------------------------------------------------------

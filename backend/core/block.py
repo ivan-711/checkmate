@@ -10,7 +10,7 @@ skipped block there would fail open toward a new chart.
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass, field
 from itertools import combinations
@@ -73,7 +73,8 @@ class BlockingResult:
     n_excluded_not_a_match: int
     oversized_blocks: tuple[OversizedBlock, ...] = ()
     pairs_skipped_oversized: int = 0
-    # True only when more hot blocks overlap than the exact count covers (MAX_EXACT_HOT_BLOCKS).
+    # True when there are more than MAX_EXACT_HOT_BLOCKS hot blocks: the total is then the sum of
+    # the per-block counts, which double-counts a pair inside two of them. Per-block counts stay exact.
     pairs_skipped_is_upper_bound: bool = False
     block_sizes: Mapping[str, int] = field(default_factory=dict)
 
@@ -94,8 +95,9 @@ def _dob_keys(n: Normalized) -> list[BlockKey]:
 def block_keys(n: Normalized) -> list[BlockKey]:
     """Every block key one record contributes; placeholders contribute nothing.
 
-    One surname key per Double Metaphone code of every family token, so a dropped maternal
-    surname (S3) or a swapped surname order (S4) still shares a block with the full name.
+    One surname key per Double Metaphone code of each non-particle family token (see
+    ``normalize.surname_codes``), so a dropped maternal surname (S3) or a swapped surname
+    order (S4) still shares a block with the full name.
     """
     keys: list[BlockKey] = []
     dob_is_placeholder = is_placeholder_dob(n.birth_year, n.birth_month, n.birth_day)
@@ -129,6 +131,8 @@ def normalize_exclusions(exclusions: Iterable[Iterable[RecordId]] | None) -> fro
     out = set()
     for pair in exclusions:
         a, b = tuple(pair)
+        if str(a) == str(b):
+            continue  # a self-pair is never a candidate, so it must not be subtracted anywhere
         out.add(_ordered(a, b))
     return frozenset(out)
 
@@ -157,37 +161,49 @@ def candidate_pairs(
                 excluded_seen.add(pair)
                 continue
             keys_by_pair[pair].append(str(key))
-    # An oversized block is never expanded, not even to count. Pairs inside it that an expanded
-    # block also produced, or that are excluded, are found by scanning the bounded candidate and
-    # exclusion sets, so the cost is O(|B|) per hot block instead of O(n^2). The total across hot
-    # blocks is the exact union by inclusion-exclusion while there are few of them.
+    # An oversized block is never expanded, not even to count. The candidate and exclusion sets
+    # (both bounded) are scanned once, tagging each pair with the bitmask of hot blocks holding
+    # it; everything else is arithmetic on member-set intersections, so the cost is O(|B| + n)
+    # per run rather than O(n^2) per hot block.
     member_sets = [{str(m) for m in members} for _, members in skipped]
 
-    def pairs_only_within(member_set: set[str]) -> int:
-        size = len(member_set)
-        in_block = size * (size - 1) // 2
-        produced = sum(1 for a, b in keys_by_pair if a in member_set and b in member_set)
-        excluded_here = sum(1 for a, b in excluded if a in member_set and b in member_set)
-        return in_block - produced - excluded_here
+    def hot_mask(pair: PairKey) -> int:
+        a, b = pair
+        return sum(1 << i for i, ms in enumerate(member_sets) if a in ms and b in ms)
+
+    produced_masks = Counter(hot_mask(pair) for pair in keys_by_pair)
+    excluded_masks = Counter(hot_mask(pair) for pair in excluded)
+
+    def pairs_in(member_set: set[str]) -> int:
+        return len(member_set) * (len(member_set) - 1) // 2
+
+    def removed_with_bit(bit: int) -> int:
+        return sum(c for m, c in produced_masks.items() if m & bit) + sum(
+            c for m, c in excluded_masks.items() if m & bit
+        )
 
     oversized = [
         OversizedBlock(
             key=str(key),
             size=len(members),
-            pairs_in_block=len(members) * (len(members) - 1) // 2,
-            pairs_skipped=pairs_only_within(member_set),
+            pairs_in_block=pairs_in(member_set),
+            pairs_skipped=pairs_in(member_set) - removed_with_bit(1 << i),
         )
-        for (key, members), member_set in zip(skipped, member_sets, strict=True)
+        for i, ((key, members), member_set) in enumerate(zip(skipped, member_sets, strict=True))
     ]
     is_upper_bound = len(member_sets) > MAX_EXACT_HOT_BLOCKS
     if is_upper_bound or len(member_sets) <= 1:
         total_skipped = sum(block.pairs_skipped for block in oversized)
     else:
-        total_skipped = 0
+        # Union of the hot blocks' pair sets by inclusion-exclusion on member-set intersections,
+        # minus every produced or excluded pair that sits in at least one hot block.
+        union_pairs = 0
         for size in range(1, len(member_sets) + 1):
             sign = 1 if size % 2 else -1
             for subset in combinations(member_sets, size):
-                total_skipped += sign * pairs_only_within(set.intersection(*subset))
+                union_pairs += sign * pairs_in(set.intersection(*subset))
+        removed_any = sum(c for m, c in produced_masks.items() if m) + sum(c for m, c in excluded_masks.items() if m)
+        total_skipped = union_pairs - removed_any
     n = len(records)
     n_total = n * (n - 1) // 2
     pairs = tuple(

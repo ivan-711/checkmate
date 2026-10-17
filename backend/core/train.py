@@ -161,12 +161,12 @@ def fit_weights(
         intercept=float(final.intercept_[0]),
         weights={name: float(w) for name, w in zip(ALL_WEIGHT_NAMES, final.coef_[0], strict=True)},
         trained_on={
+            **dict(provenance or {}),  # provenance first: the computed keys below always win
             "n_pairs": len(pairs),
             "n_positive": int(y.sum()),
             "n_components": n_groups,
             "n_folds": folds,
             "C": c,
-            **dict(provenance or {}),
         },
     )
     predicted_positive = oof >= 0.0

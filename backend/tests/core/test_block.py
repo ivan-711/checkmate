@@ -149,3 +149,45 @@ def test_particle_surnames_do_not_share_a_surname_block():
         if k.key_type == KEY_DMETA_FAMILY_YEAR
     }
     assert cruz and torre and not (cruz & torre)
+
+
+def test_more_hot_blocks_than_the_exact_cap_reports_a_flagged_bound():
+    from backend.core.block import MAX_EXACT_HOT_BLOCKS
+
+    n = BLOCK_MAX_RECORDS + 1
+    # Five surname codes + exact DOB + swap + phone + zip/initial = nine hot blocks on one group.
+    records = {
+        f"r{i:03d}": rec(
+            given_name="g",
+            family_name="Garcia Lopez Martinez Perez Diaz",
+            dob="1990-03-07",
+            phone="617-555-2368",
+            zip="02139",
+        )
+        for i in range(n)
+    }
+    result = candidate_pairs(records)
+    assert len(result.oversized_blocks) > MAX_EXACT_HOT_BLOCKS
+    assert result.pairs_skipped_is_upper_bound is True
+    assert result.pairs_skipped_oversized == sum(b.pairs_skipped for b in result.oversized_blocks)
+
+
+def test_self_pair_exclusion_is_ignored():
+    n = BLOCK_MAX_RECORDS + 1
+    records = {f"r{i:03d}": rec(given_name="g", dob="1990-03-25") for i in range(n)}
+    result = candidate_pairs(records, exclusions=[("r000", "r000")])
+    assert result.oversized_blocks[0].pairs_skipped == n * (n - 1) // 2
+
+
+def test_hot_block_total_is_fast_with_a_real_candidate_set():
+    import time
+
+    n = BLOCK_MAX_RECORDS + 1
+    records = {f"r{i:03d}": rec(given_name="g", dob="1990-03-25", phone="617-555-2368") for i in range(n)}
+    # Plus a few thousand ordinary candidates in small blocks.
+    for i in range(3000):
+        records[f"x{i:04d}"] = rec(given_name="g", family_name="fam", dob=f"19{50 + i % 50}-01-0{1 + i % 9}")
+    start = time.perf_counter()
+    result = candidate_pairs(records)
+    assert time.perf_counter() - start < 5.0  # generous: the point is no O(n^2 x 2^k) path
+    assert result.pairs_skipped_oversized == n * (n - 1) // 2

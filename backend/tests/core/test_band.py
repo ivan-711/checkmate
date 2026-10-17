@@ -106,5 +106,6 @@ def test_handset_demo_claims_hold():
     assert swap.band is Band.AUTO_LINK and day_edit.band is Band.AUTO_LINK
     assert year_edit.band is Band.REVIEW
     for given, dob in (("Carmen", "1992-03-07"), ("Zachary", "1988-11-20"), ("Carmen", "1990-03-07")):
-        sibling = match(BASE, {**BASE, "given_name": given, "dob": dob, "sex": "F"}, HANDSET_WEIGHTS, DEMO_THRESHOLDS)
-        assert sibling.band is not Band.AUTO_LINK
+        sibling = match(BASE, {**BASE, "given_name": given, "dob": dob}, HANDSET_WEIGHTS, DEMO_THRESHOLDS)
+        # The weights alone keep a sibling out of AUTO_LINK; the rules are not what saves it.
+        assert sibling.band_before_rules is not Band.AUTO_LINK

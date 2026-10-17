@@ -160,3 +160,37 @@ def test_placeholder_dates_outside_the_year_window_are_kept_whole_for_the_rules(
 def test_accented_title_is_removed_from_the_accented_form_too():
     n = normalize_record({"given_name": "Doña María"})
     assert n.given_name == "maría" and n.given_name_folded == "maria"
+
+
+def test_suffix_without_family_name_does_not_become_a_surname():
+    n = normalize_record({"given_name": "Robert", "suffix": "Jr"})
+    assert n.suffix == "JR" and n.to_contract_dict()["family_name"] is None
+
+
+def test_glued_suffix_and_title_leave_both_forms_in_step():
+    n = normalize_record({"family_name": "Smith-Jr"})
+    assert (n.family_name, n.family_name_folded, n.suffix) == ("smith", "smith", "JR")
+    again = coerce_normalized(n.to_contract_dict())
+    assert (again.family_name_folded, again.suffix) == ("smith", "JR")
+    assert normalize_record({"given_name": "Dr.Robert"}).given_name == "robert"
+    odd = normalize_record({"family_name": "V Smith V"})
+    assert odd.family_name == "v smith" and odd.family_name_folded == "v smith" and odd.suffix == "V"
+
+
+def test_date_objects_get_the_same_window_as_strings():
+    assert parse_dob_parts(date(1500, 1, 1)) == (None, None, None)
+    assert parse_dob_parts(date(1900, 1, 1)) == (1900, 1, 1)
+
+
+def test_standalone_surnames_that_look_like_particles_still_share_codes():
+    assert (
+        normalize_record({"family_name": "Le"}).family_codes[0]
+        in normalize_record({"family_name": "Le Tran"}).family_codes
+    )
+
+
+def test_derived_fields_cannot_be_passed_in():
+    import pytest
+
+    with pytest.raises(TypeError):
+        Normalized(name_is_placeholder=True)
