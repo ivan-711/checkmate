@@ -109,7 +109,7 @@ export function ReviewPanel({ detail, onDecided }: Props) {
   const approving = intent?.action === "APPROVE";
 
   return (
-    <section aria-labelledby={`${ids}-h`} className="space-y-3 border-t border-border-subtle pt-4">
+    <section aria-labelledby={`${ids}-h`} className="space-y-2 border-t border-border-subtle pt-3">
       <h2 id={`${ids}-h`} className="text-[18px] font-semibold uppercase tracking-wider">
         Review
       </h2>
@@ -143,7 +143,7 @@ export function ReviewPanel({ detail, onDecided }: Props) {
                 onClick={() => open("APPROVE")}
                 aria-expanded={false}
                 disabled={decide.isPending}
-                className="h-14 rounded-md bg-accent px-6 font-semibold text-on-accent hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-3"
+                className="h-12 rounded-md bg-accent px-6 font-semibold text-on-accent hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-3"
               >
                 Approve link
               </button>
@@ -153,7 +153,7 @@ export function ReviewPanel({ detail, onDecided }: Props) {
                 onClick={() => open("REJECT")}
                 aria-expanded={false}
                 disabled={decide.isPending}
-                className="h-14 rounded-md border border-border-strong bg-surface px-6 font-semibold text-ink-1 hover:bg-sunken disabled:text-ink-3"
+                className="h-12 rounded-md border border-border-strong bg-surface px-6 font-semibold text-ink-1 hover:bg-sunken disabled:text-ink-3"
               >
                 Reject link
               </button>
