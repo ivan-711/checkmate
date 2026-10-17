@@ -8,7 +8,6 @@
       "Bash(git push * main)",
       "Bash(git push * HEAD:main*)",
       "Bash(git push * :main*)",
-      "Bash(gh pr merge*)",
       "Bash(git branch -D main*)",
       "Bash(rm -rf *)",
       "Bash(sudo rm *)",
