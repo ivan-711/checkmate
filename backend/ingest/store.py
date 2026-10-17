@@ -39,12 +39,15 @@ ON CONFLICT (source_system, source_local_id) DO NOTHING
 RETURNING id
 """
 SELECT_EXISTING_HASH = "SELECT payload_sha256 FROM source_record WHERE source_system = %s AND source_local_id = %s"
-INSERT_NORMALIZED = """
-INSERT INTO normalized_record (record_id, given_name, family_name, given_name_folded, family_name_folded,
-  birth_date, birth_year, birth_month, birth_day, sex, phone_e164, address_line, zip5)
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-ON CONFLICT (record_id) DO NOTHING
-"""
+# The normalized_record columns, in one place: the statement and the values are both built from it.
+NORMALIZED_COLUMNS = (
+    "given_name", "family_name", "given_name_folded", "family_name_folded", "birth_date",
+    "birth_year", "birth_month", "birth_day", "sex", "phone_e164", "address_line", "zip5",
+)
+INSERT_NORMALIZED = (
+    f"INSERT INTO normalized_record (record_id, {', '.join(NORMALIZED_COLUMNS)}) "
+    f"VALUES ({', '.join(['%s'] * (len(NORMALIZED_COLUMNS) + 1))}) ON CONFLICT (record_id) DO NOTHING"
+)
 INSERT_BLOCK_KEY = "INSERT INTO block_key (key_type, key_value, record_id) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING"
 
 
@@ -59,13 +62,10 @@ def _write_one(cur: psycopg.Cursor, draft: SourceRecordDraft, result: IngestResu
             raise ImmutablePayloadConflict(f"{draft.source_system}:{draft.source_local_id} already exists with a different payload")
         result.records_skipped += 1
         return
-    fields = normalize_identity(draft.identity)
-    cur.execute(INSERT_NORMALIZED, (
-        draft.id, fields.given_name, fields.family_name, fields.given_name_folded, fields.family_name_folded,
-        fields.birth_date, fields.birth_year, fields.birth_month, fields.birth_day, fields.sex,
-        fields.phone_e164, fields.address_line, fields.zip5,
-    ))
-    keys = block_keys(fields)
+    # core's normalized_record row; the keys come from that row exactly as the gate re-reads it
+    row = normalize_identity(draft.identity).to_row_dict()
+    cur.execute(INSERT_NORMALIZED, (draft.id, *(row[column] for column in NORMALIZED_COLUMNS)))
+    keys = block_keys(row)
     if keys:
         cur.executemany(INSERT_BLOCK_KEY, [(key_type, key_value, draft.id) for key_type, key_value in keys])
     result.keys_inserted += len(keys)
