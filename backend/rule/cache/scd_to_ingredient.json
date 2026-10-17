@@ -1,0 +1,18 @@
+{
+  "source": "RxNorm /rxcui/{code}/related.json?tty=IN (verified=true) or folded by the team from the drug name in the Nov 2021 Synthea CSV sample (verified=false)",
+  "fetched": "2026-10-17",
+  "note": "Every penicillin-class order code found in the corpus census plus the spec's verified list. Codes absent here fall back to pin_to_in, then to the code itself.",
+  "codes": {
+    "562251": {"name": "Amoxicillin 250 MG / Clavulanate 125 MG Oral Tablet", "ingredients": ["723", "48203"], "verified": true},
+    "308192": {"name": "Amoxicillin 500 MG Oral Tablet", "ingredients": ["723"], "verified": true},
+    "308182": {"name": "Amoxicillin 250 MG Oral Capsule", "ingredients": ["723"], "verified": true},
+    "617296": {"name": "Amoxicillin / Clavulanate", "ingredients": ["723", "48203"], "verified": true},
+    "562508": {"name": "Amoxicillin / Clavulanate", "ingredients": ["723", "48203"], "verified": true},
+    "834061": {"name": "Penicillin V Potassium 250 MG Oral Tablet", "ingredients": ["7984"], "verified": true},
+    "834102": {"name": "Penicillin V Potassium 500 MG Oral Tablet", "ingredients": ["7984"], "verified": false},
+    "789980": {"name": "Ampicillin 100 MG/ML Injectable Solution", "ingredients": ["733"], "verified": false},
+    "105078": {"name": "Penicillin G 375 MG/ML Injectable Solution", "ingredients": ["7980"], "verified": false},
+    "1659131": {"name": "piperacillin 2000 MG / tazobactam 250 MG Injection", "ingredients": ["8339", "37617"], "verified": false},
+    "1659149": {"name": "Piperacillin 4000 MG / tazobactam 500 MG Injection", "ingredients": ["8339", "37617"], "verified": false}
+  }
+}

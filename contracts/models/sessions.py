@@ -21,7 +21,7 @@ class SessionResponse(ContractModel):
     scorer_version: str
     threshold_set_id: str
     created_at: datetime
-    sources: list[SourceCard]
+    sources: list[SourceCard] = Field(description="the scenario's showcase source cards (the hero pair's records), never the whole loaded corpus")
     hero_provisional: bool = Field(description='true until the 20:00 selection; UI badge "provisional"')
     hero_constructed_floor: bool = Field(default=False, description="the labeled hand-built hero is in use")
     previous_session_id: UUID | None = Field(default=None, description="for POST /sessions/{previousId}/restore")
