@@ -84,13 +84,11 @@ async def _api_error(_: Request, exc: ApiError):
 
 @app.exception_handler(CannotLinkConflict)
 async def _cannot_link(_: Request, exc: CannotLinkConflict):
-    """The link service found a not_a_match pair inside the would-be entity (architecture §7). The
-    review route checks the crossing pairs first; this is the service's own refusal, so it gets the
-    same 409 instead of surfacing as a 500. Record ids stay out of the message."""
-    log.info("cannot link: not_a_match inside the would-be entity request_id=%s", request_context.current().request_id)
-    return error_envelope(
-        ErrorCode.CANNOT_LINK_CONFLICT, "the link would join records a registrar marked as different people"
-    )
+    """The link service refused: a not_a_match pair inside the would-be entity (architecture §7), or a
+    DIFFERENT_PERSON reject of records already linked through another approval. Same 409 as the
+    review route's own check, never a 500; the client gets the class's public message, no record ids."""
+    log.info("cannot link: %s request_id=%s", type(exc).__name__, request_context.current().request_id)
+    return error_envelope(ErrorCode.CANNOT_LINK_CONFLICT, exc.public_message)
 
 
 @app.exception_handler(PoolTimeout)

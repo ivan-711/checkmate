@@ -118,6 +118,9 @@ def test_routes_bad_cursor_and_limit_over_max_are_422(client, committed_entity):
     big = client.get(f"/api/v1/entities/{entity.id}/timeline", params={"limit": 201})
     assert big.status_code == 422 and big.json()["error"]["code"] == "VALIDATION_ERROR"
     assert client.get(f"/api/v1/entities/{entity.id}/timeline", params={"limit": 200}).status_code == 200
+    over = client.get("/api/v1/alerts", params={"entityId": str(entity.id), "limit": 201})
+    assert over.status_code == 422 and over.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert client.get("/api/v1/alerts", params={"entityId": str(entity.id), "limit": 200}).status_code == 200
     assert client.get("/api/v1/alerts", params={"entityId": str(uuid4())}).status_code == 404
 
 

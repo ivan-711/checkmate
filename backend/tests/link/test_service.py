@@ -6,8 +6,16 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import text
 
-from backend.golden.service import load_members, read_alerts
-from backend.link.service import CannotLinkConflict, LinkError, apply_approve, apply_reject, apply_revoke, apply_split
+from backend.golden.service import load_members, read_alerts, read_entity
+from backend.link.service import (
+    AlreadyLinked,
+    CannotLinkConflict,
+    LinkError,
+    apply_approve,
+    apply_reject,
+    apply_revoke,
+    apply_split,
+)
 from backend.rule.bl_amox_01 import evaluate
 from backend.tests.link.seed import (
     T0,
@@ -263,3 +271,35 @@ def test_system_written_linked_row_never_links_or_fires(conn):
     human = insert_decision(conn, pair, 2, DecisionStatus.LINKED)
     entity, _ = apply_approve(conn, pair, human)
     assert {m.source_record_id for m in entity.members} == {clinic, er}
+
+
+def _chain_with_unreviewed_shortcut(conn):
+    """A-B and B-C approved (A clinic allergy, C ER order), A-C still PROPOSED: A and C already share an entity."""
+    a, c = hero_records(conn)
+    b = insert_record(conn, system="ER_FHIR", local_id="ER-MRN-B", kind=SourceKind.FHIR_PATIENT,
+                      raw_payload={"resourceType": "Patient", "id": "b"}, ingested_at=T0 + timedelta(minutes=5))
+    apply_approve(conn, *linked_pair(conn, a, b))
+    entity, alerts = apply_approve(conn, *linked_pair(conn, b, c))
+    shortcut = insert_pair(conn, a, c)
+    insert_decision(conn, shortcut, 1, DecisionStatus.PROPOSED, actor="system:scorer", actor_type="SYSTEM")
+    return a, b, c, shortcut, entity, alerts
+
+
+def test_different_person_reject_of_already_linked_records_is_refused(conn):
+    a, b, c, shortcut, entity, alerts = _chain_with_unreviewed_shortcut(conn)
+    assert [x.tier for x in alerts] == [AlertTier.A]
+    rejected = insert_decision(conn, shortcut, 2, DecisionStatus.REJECTED, reason_code=ReasonCode.DIFFERENT_PERSON.value)
+    with pytest.raises(AlreadyLinked) as refused:
+        apply_reject(conn, shortcut, rejected)
+    assert "already linked" in refused.value.public_message and str(a) not in refused.value.public_message
+    assert rows_touching(conn, "not_a_match", [a, b, c]) == 0
+    after = read_entity(conn, entity.id)
+    assert (after.version, len(after.members)) == (entity.version, 3)
+
+
+def test_insufficient_evidence_reject_of_already_linked_records_is_not_refused(conn):
+    a, b, c, shortcut, entity, _ = _chain_with_unreviewed_shortcut(conn)
+    rejected = insert_decision(conn, shortcut, 2, DecisionStatus.REJECTED, reason_code=ReasonCode.INSUFFICIENT_EVIDENCE.value)
+    apply_reject(conn, shortcut, rejected)  # no suppression is written, so nothing can poison the entity
+    assert rows_touching(conn, "not_a_match", [a, b, c]) == 0
+    assert read_entity(conn, entity.id).version == entity.version

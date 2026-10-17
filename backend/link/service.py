@@ -41,7 +41,19 @@ class LinkError(ValueError):
 
 
 class CannotLinkConflict(LinkError):
-    """A not_a_match row sits inside the would-be entity: the API answers 409 CANNOT_LINK_CONFLICT."""
+    """A not_a_match row sits inside the would-be entity: the API answers 409 CANNOT_LINK_CONFLICT.
+    ``public_message`` is what the client sees; the exception text (record ids) stays server-side."""
+
+    public_message = "the link would join records a registrar marked as different people"
+
+
+class AlreadyLinked(CannotLinkConflict):
+    """A DIFFERENT_PERSON reject of a pair whose records already share an entity through another
+    approved link. Recording not_a_match there would leave the entity linked and make every later
+    approve in it a conflict, so the reject is refused (lead decision) and nothing is written."""
+
+    public_message = ("the two records are already linked through another approved link; "
+                      "undoing that is a split, not a reject")
 
 
 @dataclass(frozen=True)
@@ -289,10 +301,15 @@ def apply_approve(conn: Connection, pair_id: UUID, decision_id: UUID) -> tuple[E
 
 def apply_reject(conn: Connection, pair_id: UUID, decision_id: UUID) -> None:
     """A REJECTED decision changes no entity and the rule stays silent. DIFFERENT_PERSON
-    remembers the pair in not_a_match (idempotent); INSUFFICIENT_EVIDENCE writes nothing."""
+    remembers the pair in not_a_match (idempotent); INSUFFICIENT_EVIDENCE writes nothing.
+    Raises AlreadyLinked for a DIFFERENT_PERSON reject of records that already share an entity:
+    the caller's transaction rolls back, so the decision and its not_a_match row are not written."""
     lock_link_graph(conn)
     row = _decision(conn, pair_id, decision_id, DecisionStatus.REJECTED)
     if row["reason_code"] == ReasonCode.DIFFERENT_PERSON.value:
+        membership = _membership(conn, {row["record_a_id"], row["record_b_id"]})
+        if len(membership) == 2 and len(set(membership.values())) == 1:
+            raise AlreadyLinked(f"pair {pair_id}: both records are members of entity {next(iter(membership.values()))}")
         conn.execute(_INSERT_NOT_A_MATCH, {"a": row["record_a_id"], "b": row["record_b_id"],
                                            "decision_id": decision_id, "actor": row["actor"]})
 
