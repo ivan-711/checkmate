@@ -1,0 +1,7 @@
+{
+  "entityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
+  "decidedBy": "lead session, 2026-10-17 (R5 round 2 on PR #5)",
+  "reason": "keep the current provisional hero until the 20:00 selection run picks the final hero under the fixed criteria; the export is re-rendered with captions computed from what each button does",
+  "removeAt": "the 20:00 selection run: python -m data.hero_select --ignore-pin",
+  "author": "Christian Flores (lane W5)"
+}

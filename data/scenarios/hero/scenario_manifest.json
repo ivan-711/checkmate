@@ -1,0 +1,46 @@
+{
+  "heroEntityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
+  "provenance": "added by the ChartGuard team; not produced by Synthea",
+  "metaTag": {
+    "system": "urn:chartguard:provenance",
+    "code": "constructed-scenario"
+  },
+  "placement": {
+    "allergy": "Clinic CSV (allergies.csv row)",
+    "order": "ER FHIR (MedicationRequest)",
+    "erAllergyHistory": "absent by construction"
+  },
+  "identity": "identity fields exactly as selected by data/hero_select.py; the overlay touches clinical content only",
+  "naturalAllergyRowsKept": 0,
+  "constructed": [
+    {
+      "item": "ER registration without the allergy history (no AllergyIntolerance in the ER source)",
+      "file": "fhir/hero_er.json",
+      "resource": "Patient/a6ca1cf3-951c-5f5a-91f6-ddf788b4aab1",
+      "label": "constructed scenario",
+      "provenance": "added by the ChartGuard team; not produced by Synthea"
+    },
+    {
+      "item": "ER emergency encounter",
+      "file": "fhir/hero_er.json",
+      "resource": "Encounter/481c3a69-14cf-5f71-bd6f-0056e8c97c3d",
+      "label": "constructed scenario",
+      "provenance": "added by the ChartGuard team; not produced by Synthea"
+    },
+    {
+      "item": "active order RxNorm 308192 Amoxicillin 500 MG Oral Tablet, authoredOn 2026-10-17T18:00:00Z",
+      "file": "fhir/hero_er.json",
+      "resource": "MedicationRequest/c3a0fc4f-e1ab-55b9-b01c-a0723f55d945",
+      "label": "constructed scenario",
+      "provenance": "added by the ChartGuard team; not produced by Synthea"
+    },
+    {
+      "item": "allergy row RxNorm 7984 (penicillin V), reaction Anaphylaxis SEVERE, START 2024-03-02",
+      "file": "csv/allergies.csv",
+      "resource": "allergies.csv:270d9b1e-1293-5791-947a-95c106c286af:7984:2024-03-02",
+      "label": "constructed scenario",
+      "provenance": "added by the ChartGuard team; not produced by Synthea"
+    }
+  ],
+  "wording": "the allergy reveal is a constructed demonstration, not a measured outcome"
+}
