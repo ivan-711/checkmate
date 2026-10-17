@@ -5,6 +5,7 @@ checklist item it covers. Tests marked "expected to FAIL on lane/w3a" document a
 rest cover gaps the builder's suite leaves (concurrency on one pair, claim rollback on an
 unhandled exception, payload hygiene, a locked pair row).
 """
+
 from __future__ import annotations
 
 import threading
@@ -21,23 +22,31 @@ NOTE_MARKER = "R3A-NOTE-MARKER-must-never-be-logged"
 
 
 def _versions(conn, pair_id: str) -> list[tuple[int, str]]:
-    rows = conn.execute(text("SELECT version, status FROM match_decision WHERE pair_id = :p ORDER BY version"),
-                        {"p": pair_id}).all()
+    rows = conn.execute(
+        text("SELECT version, status FROM match_decision WHERE pair_id = :p ORDER BY version"), {"p": pair_id}
+    ).all()
     return [(r.version, r.status) for r in rows]
 
 
 def _key_rows(conn, key: str) -> list[int]:
-    return [r.status_code for r in
-            conn.execute(text("SELECT status_code FROM idempotency_record WHERE key = :k"), {"k": key})]
+    return [
+        r.status_code
+        for r in conn.execute(text("SELECT status_code FROM idempotency_record WHERE key = :k"), {"k": key})
+    ]
 
 
 def _not_a_match_rows(conn, pair_id: str) -> int:
-    return conn.execute(text(
-        "SELECT count(*) FROM not_a_match n JOIN candidate_pair cp ON cp.record_a_id = n.record_a_id "
-        "AND cp.record_b_id = n.record_b_id WHERE cp.id = :p"), {"p": pair_id}).scalar_one()
+    return conn.execute(
+        text(
+            "SELECT count(*) FROM not_a_match n JOIN candidate_pair cp ON cp.record_a_id = n.record_a_id "
+            "AND cp.record_b_id = n.record_b_id WHERE cp.id = :p"
+        ),
+        {"p": pair_id},
+    ).scalar_one()
 
 
 # --- concurrency on one pair (checklist 9: decisions append-only; §5 explicit state behind the key) ---
+
 
 def test_concurrent_approves_with_different_keys_produce_one_version_and_one_event(client, pair_id, db_conn):
     """Eight registrars click Approve at once (eight keys). Exactly one effect; the rest see the
@@ -82,9 +91,11 @@ def test_concurrent_identical_requests_with_one_key_replay_one_effect(client, pa
 
 # --- claim rollback (§5: claim inserted in the same transaction as the effect) ---
 
+
 def test_unhandled_exception_inside_the_review_transaction_rolls_back_the_claim(client, pair_id, db_conn, monkeypatch):
     """The link seam blows up after the decision row is written: 500 INTERNAL in the envelope,
     no decision, no event, no idempotency row, and the same key succeeds on retry."""
+
     def boom(conn, pair_id, decision_id):
         raise RuntimeError("seam failure injected by R3a")
 
@@ -126,6 +137,7 @@ def test_review_while_the_pair_row_is_locked_is_a_clean_503_and_the_claim_is_rel
 
 # --- payload and log hygiene (checklist 16; §16 "note text is never logged") ---
 
+
 def test_event_log_carries_no_note_text_no_record_fields_and_no_long_strings(client, pair_id, db_conn):
     actor = "Registrar R3A-ACTOR-MARKER"
     review(client, pair_id, reject_body("INSUFFICIENT_EVIDENCE", actor=actor, note=NOTE_MARKER))
@@ -154,8 +166,13 @@ def _assert_short_strings(value, event_type: str) -> None:
 
 def test_event_writer_refuses_free_text_in_the_payload():
     with engine.begin() as conn, pytest.raises(PayloadNotStructured):
-        write_event(conn, event_type=EventType.LINK_REJECTED, actor="registrar:R3a", actor_type=ActorType.REGISTRAR,
-                    payload={"note": "x" * 65})
+        write_event(
+            conn,
+            event_type=EventType.LINK_REJECTED,
+            actor="registrar:R3a",
+            actor_type=ActorType.REGISTRAR,
+            payload={"note": "x" * 65},
+        )
 
 
 def test_nul_byte_in_note_is_rejected_at_the_boundary_not_a_500(client, pair_id):
@@ -172,24 +189,30 @@ def test_a_failing_review_never_writes_the_note_or_actor_to_the_log(client, pair
     import logging
 
     caplog.set_level(logging.DEBUG)
-    review(client, pair_id, reject_body("INSUFFICIENT_EVIDENCE", actor="Registrar R3A-ACTOR-MARKER",
-                                        note=NOTE_MARKER + "\x00"))
+    review(
+        client,
+        pair_id,
+        reject_body("INSUFFICIENT_EVIDENCE", actor="Registrar R3A-ACTOR-MARKER", note=NOTE_MARKER + "\x00"),
+    )
     assert NOTE_MARKER not in caplog.text, "note text reached the log"
     assert "R3A-ACTOR-MARKER" not in caplog.text, "actor text reached the log"
 
 
 # --- §7: DIFFERENT_PERSON suppression vs a later approve ---
 
-def test_approve_after_different_person_reject_is_refused_and_keeps_not_a_match(client, pair_id, db_conn):
-    """Expected to FAIL on lane/w3a (finding). §7: INSUFFICIENT_EVIDENCE rejects do not block a later
-    approve; DIFFERENT_PERSON writes not_a_match and APPROVE checks against not_a_match
-    (CANNOT_LINK_CONFLICT). The branch deletes the not_a_match row and links (201)."""
+
+def test_approve_after_different_person_reject_supersedes_and_lifts_its_own_not_a_match(client, pair_id, db_conn):
+    """Lead decision (14:28) on R3a finding 2 / Codex finding 2: the demo script rejects with
+    "different person" and then approves the same pair (pitch rev 8, G16 steps 5-6). A superseding
+    review on the SAME pair lifts that pair's own not_a_match row; both decisions stay in history.
+    CANNOT_LINK_CONFLICT applies only to other pairs' rows crossed by the link (test_link_conflict.py)."""
     assert review(client, pair_id, reject_body("DIFFERENT_PERSON")).status_code == 201
+    assert _not_a_match_rows(db_conn, pair_id) == 1
     r = review(client, pair_id, approve_body())
-    assert r.status_code == 409, r.text
-    assert r.json()["error"]["code"] in ("CANNOT_LINK_CONFLICT", "DECISION_NOT_PENDING")
-    assert _not_a_match_rows(db_conn, pair_id) == 1, "a steward's different-person decision was erased"
-    assert _versions(db_conn, pair_id) == [(1, "PROPOSED"), (2, "REJECTED")]
+    assert r.status_code == 201, r.text
+    assert r.json()["decision"]["status"] == "LINKED"
+    assert _not_a_match_rows(db_conn, pair_id) == 0
+    assert _versions(db_conn, pair_id) == [(1, "PROPOSED"), (2, "REJECTED"), (3, "LINKED")]
 
 
 def test_approve_after_insufficient_evidence_reject_supersedes(client, pair_id, db_conn):
@@ -203,6 +226,7 @@ def test_approve_after_insufficient_evidence_reject_supersedes(client, pair_id, 
 
 # --- request id hygiene (checklist 13: never trust the client; §16 structured logs) ---
 
+
 def test_client_supplied_request_id_is_bounded(client):
     """Expected to FAIL on lane/w3a (nit-level finding). A 5 KB or log-shaped X-Request-Id is echoed
     verbatim into the response, the log line and event_log.request_id. The server should mint its own
@@ -214,6 +238,7 @@ def test_client_supplied_request_id_is_bounded(client):
 
 
 # --- §5 bounded lists: a forged cursor never widens the page ---
+
 
 def test_forged_cursor_values_never_error_or_widen_the_page(client, match_run):
     import base64

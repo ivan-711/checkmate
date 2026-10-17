@@ -28,7 +28,8 @@ def test_list_is_ordered_by_distance_from_half(client, match_run):
 
 def test_list_limit_is_clamped_and_cursor_walks_the_queue(client, match_run):
     r = client.get(f"{API}/candidate-pairs", params={"limit": 1000})
-    assert r.status_code == 200, r.text
+    assert r.status_code == 422, "the served schema keeps the snapshot's maximum of 200"
+    assert len(client.get(f"{API}/candidate-pairs", params={"limit": 200}).json()["items"]) <= 200
     r = client.get(f"{API}/candidate-pairs", params={"limit": 1})
     page = r.json()
     assert len(page["items"]) == 1

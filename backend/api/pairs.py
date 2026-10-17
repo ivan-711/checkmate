@@ -81,7 +81,7 @@ def list_candidate_pairs(
     band: Band | None = None,
     status: DecisionStatus | None = None,
     origin: PairOrigin | None = None,
-    limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, description=f"clamped to {LIST_LIMIT_MAX}"),
+    limit: int = Query(LIST_LIMIT_DEFAULT, ge=1, le=LIST_LIMIT_MAX),
     cursor: str | None = None,
 ) -> Page[CandidatePair]:
     limit = min(limit, LIST_LIMIT_MAX)

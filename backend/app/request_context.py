@@ -9,6 +9,7 @@ that runs a sync endpoint, so the variable is visible there too.
 
 from __future__ import annotations
 
+import re
 import time
 import uuid
 from contextvars import ContextVar
@@ -40,8 +41,20 @@ def parse_mode(raw: str) -> Mode:
         return Mode.REPLAY
 
 
+REQUEST_ID_MAX_CHARS = 64
+_REQUEST_ID_RE = re.compile(rf"^[A-Za-z0-9-]{{1,{REQUEST_ID_MAX_CHARS}}}$")
+
+
+def accept_request_id(raw: str | None) -> str:
+    """A client id is kept only as a short opaque token (<= 64 chars of [A-Za-z0-9-]): it is
+    echoed into the response header, the log line and event_log, so it must never carry text."""
+    if raw and _REQUEST_ID_RE.match(raw):
+        return raw
+    return str(uuid.uuid4())
+
+
 def new_context(request_id: str | None, mode: Mode, entry_point: EntryPoint = EntryPoint.API) -> RequestContext:
-    return RequestContext(request_id=request_id or str(uuid.uuid4()), mode=mode, entry_point=entry_point)
+    return RequestContext(request_id=accept_request_id(request_id), mode=mode, entry_point=entry_point)
 
 
 def bind(ctx: RequestContext):

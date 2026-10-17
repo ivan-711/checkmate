@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import uuid
 from enum import StrEnum
 from uuid import UUID
@@ -70,6 +71,18 @@ _INSERT_NOT_A_MATCH = text(
     "ON CONFLICT (record_a_id, record_b_id) DO UPDATE SET decision_id = EXCLUDED.decision_id, actor = EXCLUDED.actor"
 )
 _DELETE_NOT_A_MATCH = text("DELETE FROM not_a_match WHERE record_a_id = :a AND record_b_id = :b")
+# Members of a record's entity, or the record alone while it is unlinked.
+_MEMBERS = (
+    "SELECT em2.source_record_id FROM entity_member em1 JOIN entity_member em2 ON em2.entity_id = em1.entity_id "
+    "WHERE em1.source_record_id = :{r} UNION SELECT CAST(:{r} AS uuid)"
+)
+_CROSSING_NOT_A_MATCH = text(
+    f"WITH side_a AS ({_MEMBERS.format(r='a')}), side_b AS ({_MEMBERS.format(r='b')}) "
+    "SELECT count(*) FROM not_a_match n WHERE NOT (n.record_a_id = :a AND n.record_b_id = :b) AND ("
+    "(n.record_a_id IN (SELECT source_record_id FROM side_a) AND n.record_b_id IN (SELECT source_record_id FROM side_b)) OR "
+    "(n.record_a_id IN (SELECT source_record_id FROM side_b) AND n.record_b_id IN (SELECT source_record_id FROM side_a)))"
+)
+_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")  # NUL and C0 controls except tab, LF, CR
 
 
 class Transition(StrEnum):
@@ -107,12 +120,26 @@ class _ConcurrentDuplicate(Exception):
 
 
 def _replay(stored: Row, sha: str) -> JSONResponse:
+    """The claim and the stored response are written in one transaction, so a visible row is complete."""
     if stored.request_sha256 != sha:
         raise ApiError(ErrorCode.IDEMPOTENCY_MISMATCH, "Idempotency-Key was used with a different request body")
-    if stored.status_code == 0:
-        # Claimed by a request still in flight (it holds the pair lock); the client retries.
-        raise ApiError(ErrorCode.DECISION_NOT_PENDING, "a review with this key is in progress")
     return JSONResponse(status_code=stored.status_code, content=stored.response)
+
+
+def reject_control_characters(body) -> None:
+    """Checklist 13: validate at the boundary. JSON allows NUL and other control characters;
+    Postgres text does not, and a note is never allowed to reach a log through a DB error."""
+    for field in ("actor", "note"):
+        value = getattr(body, field, None)
+        if value and _CONTROL_RE.search(value):
+            raise ApiError(ErrorCode.VALIDATION_ERROR, f"{field} contains control characters", {"field": field})
+
+
+def crossing_not_a_match(conn: Connection, pair: Row) -> int:
+    """Architecture §7: APPROVE checks the link against not_a_match rows of OTHER pairs that it would
+    cross: any member of A's entity against any member of B's entity, in either order. The pair's
+    own row (a superseded DIFFERENT_PERSON rejection) is not a conflict; the approve lifts it."""
+    return conn.execute(_CROSSING_NOT_A_MATCH, {"a": pair.record_a_id, "b": pair.record_b_id}).scalar_one()
 
 
 def apply_effect(conn: Connection, pair: Row, current: Row, body, action: ReviewAction) -> ReviewResponse:
@@ -135,7 +162,12 @@ def apply_effect(conn: Connection, pair: Row, current: Row, body, action: Review
     records = {"a": pair.record_a_id, "b": pair.record_b_id}
     entity, alerts = None, []
     if action == ReviewAction.APPROVE:
-        # A suppression written by the rejection this approve supersedes no longer applies.
+        if crossing_not_a_match(conn, pair):
+            raise ApiError(
+                ErrorCode.CANNOT_LINK_CONFLICT, "the link would cross a not_a_match decision of another pair"
+            )
+        # The pair's own suppression, written by the rejection this approve supersedes, is lifted;
+        # both decisions stay in the history.
         conn.execute(_DELETE_NOT_A_MATCH, records)
         entity, alerts = link.apply_approve(conn, pair.id, decision_id)
     else:
@@ -177,6 +209,7 @@ def _review(conn: Connection, scope: str, key: str, sha: str, pair_id: UUID, bod
     current = current_decision_row(conn, pair_id) if pair is not None else None
     if pair is None or current is None:
         raise ApiError(ErrorCode.NOT_FOUND, "candidate pair not found")
+    reject_control_characters(body)
     action = ReviewAction(body.action)
     reason = body.reason_code if action == ReviewAction.REJECT else None
     step = transition(
@@ -208,9 +241,17 @@ def _review(conn: Connection, scope: str, key: str, sha: str, pair_id: UUID, bod
         ErrorCode.DECISION_NOT_PENDING,
         ErrorCode.IDEMPOTENCY_MISMATCH,
     )
-    | common_error_responses(),
+    | common_error_responses()
+    | {
+        200: {
+            "model": ReviewResponse,
+            "description": "same-state request: the current decision, no new version, no event",
+        }
+    },
     description="Lane W3a (+W3b rule). The human decision; also the registrar's FrontDesk handoff decision. "
-    "Idempotency-Key required; only PROPOSED moves; same-state request returns 200 with no new version.",
+    "Idempotency-Key required; only PROPOSED moves; same-state request returns 200 with no new version. "
+    "A superseding review on the same pair (REJECTED then APPROVE) lifts that pair's own not_a_match row; "
+    "both decisions stay in the history.",
 )
 def create_review(pair_id: UUID, body: ReviewRequest, idempotency_key: IdempotencyKey, engine: EngineDep):
     scope = f"{ROUTE_TEMPLATE} {pair_id}"

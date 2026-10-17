@@ -11,7 +11,7 @@ import logging
 
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
 from starlette.responses import Response
 
@@ -69,6 +69,15 @@ async def _db_unavailable(_: Request, exc: Exception):
     """Pool exhausted or the database away: 503, never a stack trace (architecture §2, §15)."""
     log.warning("database unavailable: %s", type(exc).__name__)
     return error_envelope(ErrorCode.UPSTREAM_UNAVAILABLE, "database unavailable")
+
+
+@app.exception_handler(DBAPIError)
+async def _db_error(_: Request, exc: DBAPIError):
+    """A statement failed: class and request id only; the message may name the statement."""
+    log.error(
+        "database error exception_class=%s request_id=%s", type(exc).__name__, request_context.current().request_id
+    )
+    return error_envelope(ErrorCode.INTERNAL, "internal error")
 
 
 @app.middleware("http")
