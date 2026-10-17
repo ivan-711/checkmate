@@ -139,14 +139,19 @@ def invalid_cursor() -> ApiError:
     return ApiError(ErrorCode.VALIDATION_ERROR, "cursor is not valid")
 
 
-# Review queue: (|p-0.5|, pair id) of the last item served.
-def encode_cursor(distance: float, pair_id: UUID) -> str:
-    return pack_cursor({"d": distance, "id": str(pair_id)})
+# Review queue: (|p-0.5|, pair id) of the last item served, plus the recordId filter the page was cut
+# with, so a follow-up request that sends only the cursor keeps it (as the event feed keeps ``since``).
+def encode_cursor(distance: float, pair_id: UUID, record_id: UUID | None = None) -> str:
+    fields = {"d": distance, "id": str(pair_id)}
+    if record_id is not None:
+        fields["r"] = str(record_id)
+    return pack_cursor(fields)
 
 
-def decode_cursor(cursor: str) -> tuple[float, UUID]:
+def decode_cursor(cursor: str) -> tuple[float, UUID, UUID | None]:
     data = unpack_cursor(cursor)
     try:
-        return float(data["d"]), UUID(data["id"])
+        record_id = UUID(data["r"]) if data.get("r") is not None else None
+        return float(data["d"]), UUID(data["id"]), record_id
     except (ValueError, KeyError, TypeError, AttributeError):
         raise invalid_cursor() from None

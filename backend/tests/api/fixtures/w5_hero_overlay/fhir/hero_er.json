@@ -1,0 +1,110 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:a6ca1cf3-951c-5f5a-91f6-ddf788b4aab1",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "a6ca1cf3-951c-5f5a-91f6-ddf788b4aab1",
+        "meta": {
+          "tag": [
+            {
+              "system": "urn:chartguard:provenance",
+              "code": "constructed-scenario"
+            }
+          ]
+        },
+        "name": [
+          {
+            "use": "official",
+            "family": "Mesa-López",
+            "given": [
+              "Sofia"
+            ]
+          }
+        ],
+        "gender": "unknown",
+        "birthDate": "1964-05-16",
+        "telecom": [
+          {
+            "system": "phone",
+            "value": "555-757-3688",
+            "use": "home"
+          }
+        ],
+        "address": [
+          {
+            "line": [
+              "899 Sawayn Trafficway"
+            ],
+            "postalCode": "01915",
+            "country": "US"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:481c3a69-14cf-5f71-bd6f-0056e8c97c3d",
+      "resource": {
+        "resourceType": "Encounter",
+        "id": "481c3a69-14cf-5f71-bd6f-0056e8c97c3d",
+        "meta": {
+          "tag": [
+            {
+              "system": "urn:chartguard:provenance",
+              "code": "constructed-scenario"
+            }
+          ]
+        },
+        "status": "finished",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "EMER"
+        },
+        "subject": {
+          "reference": "urn:uuid:a6ca1cf3-951c-5f5a-91f6-ddf788b4aab1",
+          "display": "Sofia Mesa-López"
+        },
+        "period": {
+          "start": "2026-10-17T17:20:00Z"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:c3a0fc4f-e1ab-55b9-b01c-a0723f55d945",
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "c3a0fc4f-e1ab-55b9-b01c-a0723f55d945",
+        "meta": {
+          "tag": [
+            {
+              "system": "urn:chartguard:provenance",
+              "code": "constructed-scenario"
+            }
+          ]
+        },
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+              "code": "308192",
+              "display": "Amoxicillin 500 MG Oral Tablet"
+            }
+          ],
+          "text": "Amoxicillin 500 MG Oral Tablet"
+        },
+        "subject": {
+          "reference": "urn:uuid:a6ca1cf3-951c-5f5a-91f6-ddf788b4aab1",
+          "display": "Sofia Mesa-López"
+        },
+        "encounter": {
+          "reference": "urn:uuid:481c3a69-14cf-5f71-bd6f-0056e8c97c3d"
+        },
+        "authoredOn": "2026-10-17T18:00:00Z"
+      }
+    }
+  ]
+}
