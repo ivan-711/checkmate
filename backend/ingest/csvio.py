@@ -11,7 +11,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from backend.ingest.normalize import Identity, strip_synthea_digits
+from backend.core.normalize import strip_synthea_digits
+from backend.ingest.normalize import Identity
 
 CSV_FILES = ("patients", "allergies", "medications", "encounters")
 PATIENT_COLUMN = "patient"

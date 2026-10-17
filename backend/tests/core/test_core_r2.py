@@ -858,10 +858,6 @@ def test_gate_cases_stay_review_or_higher_under_the_provisional_1_row(edit_a, ed
     assert result.band is not Band.KEEP_SEPARATE, (result.logit, result.band)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="cross-lane: W1 writes block_key rows with backend.ingest.blocking's vocabulary; for the lead",
-)
 def test_ingest_block_keys_and_core_block_keys_share_a_vocabulary():
     """W1's ingest writes ``block_key`` rows from ``backend.ingest.blocking`` (``dob_exact``,
     ``metaphone_surname_birth_year`` ``KRS:1990``, ``zip5_initial`` ``02139:m``); W3a's seam keys

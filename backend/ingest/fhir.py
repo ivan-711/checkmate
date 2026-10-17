@@ -10,7 +10,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from backend.ingest.normalize import Identity, strip_synthea_digits
+from backend.core.normalize import strip_synthea_digits
+from backend.ingest.normalize import Identity
 
 PARSED_RESOURCE_TYPES = ("Patient", "AllergyIntolerance", "MedicationRequest", "Encounter")
 MOTHERS_MAIDEN_URL = "http://hl7.org/fhir/StructureDefinition/patient-mothersMaidenName"

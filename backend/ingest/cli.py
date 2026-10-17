@@ -14,9 +14,12 @@ import time
 from pathlib import Path
 
 import psycopg
+from psycopg.rows import dict_row
 
+from backend.core.block import BlockingResult, candidate_pairs
+from backend.core.normalize import coerce_normalized
 from backend.ingest.blocking import KEY_TYPES
-from backend.ingest.corruptor import build_corpus, write_outputs
+from backend.ingest.corruptor import LABEL_NOT_SAME, LABEL_SAME, CorpusOutput, build_corpus, write_outputs
 from backend.ingest.csvio import read_csv_dir
 from backend.ingest.fhir import iter_bundle_paths, load_bundle
 from backend.ingest.store import ingest, pair_candidates_by_key_type
@@ -63,18 +66,43 @@ def foreign_records(conn: psycopg.Connection, corpus) -> int:
     return sum(1 for row in rows if tuple(row) not in expected)
 
 
+def stale_key_rows(conn: psycopg.Connection) -> int:
+    """block_key rows outside backend.core's vocabulary: a database loaded before issue #10. A reload
+    skips records whose payload is already stored, so those rows would stay; refuse instead."""
+    return conn.execute("SELECT count(*) FROM block_key WHERE NOT (key_type = ANY(%s))", (list(KEY_TYPES),)).fetchone()[0]
+
+
+def match_run_blocking(conn: psycopg.Connection, corpus: CorpusOutput) -> BlockingResult:
+    """S3 over this corpus's stored rows, exactly as a match run expands them (hot-block cap on)."""
+    ids = [rec.draft.id for rec in corpus.records]
+    with conn.cursor(row_factory=dict_row) as cur:
+        rows = cur.execute("SELECT * FROM normalized_record WHERE record_id = ANY(%s)", (ids,)).fetchall()
+    return candidate_pairs({str(row["record_id"]): coerce_normalized(row) for row in rows})
+
+
+def truth_pairs_blocked(result: BlockingResult, corpus: CorpusOutput, label: str) -> tuple[int, int]:
+    """How many of the hidden truth pairs with ``label`` reach the scorer (blocking recall)."""
+    candidates = {(pair.record_a_id, pair.record_b_id) for pair in result.pairs}
+    truth = [tuple(sorted((p["record_a_id"], p["record_b_id"]))) for p in corpus.pairs if p["label"] == label]
+    return sum(pair in candidates for pair in truth), len(truth)
+
+
 def cmd_load(args: argparse.Namespace) -> int:
     started = time.monotonic()
     skipped: list[str] = []
     bundles, csv_patients = load_sample(args.raw, args.limit, skipped)
     corpus = build_corpus(args.seed, bundles, csv_patients)
     with psycopg.connect(args.database_url) as conn:
+        stale = stale_key_rows(conn)
+        if stale:
+            raise SystemExit(f"database holds {stale} block key row(s) from before issue #10; reload into a fresh database")
         foreign = foreign_records(conn, corpus)
         if foreign:
             raise SystemExit(f"database already holds {foreign} record(s) from another corpus or seed; use a fresh database")
         write_outputs(corpus, args.out / f"corruptor-{args.seed}")
         result = ingest(conn, (rec.draft for rec in corpus.records))
         counts = pair_candidates_by_key_type(conn)
+        blocking = match_run_blocking(conn, corpus)
         total_records = conn.execute("SELECT count(*) FROM source_record").fetchone()[0]
     print(f"bundles skipped as malformed: {len(skipped)}" + (f" ({', '.join(skipped)})" if skipped else ""))
     print(f"entities: {corpus.run['entities']}")
@@ -82,7 +110,11 @@ def cmd_load(args: argparse.Namespace) -> int:
     print(f"pairs: same={corpus.run['pairs_same']} not_same={corpus.run['pairs_not_same']} grafts={corpus.run['grafts']}")
     for key_type in KEY_TYPES:
         print(f"pair candidates [{key_type}]: {counts.get(key_type, 0)}")
-    print("reduction: pending W2")
+    print(f"candidate pairs: {blocking.n_candidate_pairs} of {blocking.n_total_pairs}  reduction: {blocking.reduction_ratio:.4f}"
+          f"  oversized blocks: {len(blocking.oversized_blocks)} (pairs skipped: {blocking.pairs_skipped_oversized})")
+    same_hit, same_n = truth_pairs_blocked(blocking, corpus, LABEL_SAME)
+    not_hit, not_n = truth_pairs_blocked(blocking, corpus, LABEL_NOT_SAME)
+    print(f"blocking recall: SAME {same_hit}/{same_n}  NOT_SAME (hard negatives reaching the scorer) {not_hit}/{not_n}")
     print("records per family: " + ", ".join(f"{f}={n}" for f, n in corpus.run["family_counts"].items()))
     print(f"heldout families: {', '.join(corpus.heldout_families)}")
     print(f"truth table sha256: {corpus.sha256['truth']}  ({corpus.files['truth']})")

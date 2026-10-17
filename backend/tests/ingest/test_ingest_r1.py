@@ -156,21 +156,25 @@ def test_bundles_without_birthdate_or_name_still_load(tmp_path):
     ("identity", "forbidden_key_types"),
     [
         (Identity(given="Ana", family="Garcia", birth_date="1900-01-01", phone="555-123-4567", postal_code="01604"),
-         {"dob_exact", "metaphone_surname_birth_year"}),
+         {"DOB_EXACT", "DOB_DAY_MONTH_SWAP", "DMETA_FAMILY_BIRTH_YEAR"}),
         (Identity(given="Unknown", family="Unknown", birth_date="1990-03-07", phone="555-123-4567", postal_code="01604"),
-         {"metaphone_surname_birth_year", "zip5_initial"}),
+         {"DMETA_FAMILY_BIRTH_YEAR", "ZIP5_FIRST_INITIAL"}),
         (Identity(given="Baby Boy", family="Doe", birth_date="1990-03-07", phone="555-123-4567", postal_code="01604"),
-         {"metaphone_surname_birth_year", "zip5_initial"}),
-        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-555-5555", postal_code="01604"), {"phone_last7"}),
-        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="617-555-0123", postal_code="01604"), {"phone_last7"}),
-        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="000-000-0000", postal_code="01604"), {"phone_last7"}),
-        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-123-4567", postal_code=""), {"zip5_initial"}),
-        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-123-4567", postal_code="016"), {"zip5_initial"}),
+         {"DMETA_FAMILY_BIRTH_YEAR", "ZIP5_FIRST_INITIAL"}),
+        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-555-5555", postal_code="01604"), {"PHONE_LAST7"}),
+        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="617-555-0123", postal_code="01604"), {"PHONE_LAST7"}),
+        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="000-000-0000", postal_code="01604"), {"PHONE_LAST7"}),
+        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-123-4567", postal_code=""), {"ZIP5_FIRST_INITIAL"}),
+        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-123-4567", postal_code="016"), {"ZIP5_FIRST_INITIAL"}),
     ],
 )
 def test_placeholder_values_never_form_a_block_key_in_the_database(db, bundles, csv_patients, identity, forbidden_key_types):
     """Gap coverage: the builder tests block_keys() in memory; this checks what lands in block_key through
-    both renderers (the ER Patient and the clinic row) for each placeholder family of the hot-block rule."""
+    both renderers (the ER Patient and the clinic row) for each placeholder family of the hot-block rule.
+    Key types are backend.core's (issue #10); the guard keeps a renamed type from passing vacuously."""
+    from backend.core.block import KEY_TYPES
+
+    assert forbidden_key_types <= set(KEY_TYPES)
     er = fhir_draft(identity, bundles[PATIENT_B], "ER-PH")
     cl = csv_draft(identity, csv_patients[PATIENT_B], "CL-PH", include_phone=True)
     ingest(db, [er, cl])

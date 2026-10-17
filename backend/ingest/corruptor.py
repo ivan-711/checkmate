@@ -19,6 +19,7 @@ import csv
 import hashlib
 import json
 import random
+import unicodedata
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
@@ -26,10 +27,9 @@ from datetime import date
 from pathlib import Path
 from uuid import UUID, uuid5
 
-from backend.ingest.blocking import SURNAME_PARTICLES, swapped_day_month
 from backend.ingest.csvio import CsvPatient
 from backend.ingest.fhir import FhirPatientBundle
-from backend.ingest.normalize import Identity, parse_date, strip_accents
+from backend.ingest.normalize import Identity, parse_date
 from backend.ingest.records import SOURCE_CLINIC_CSV, SOURCE_ER_FHIR, SourceRecordDraft, csv_draft, fhir_draft
 
 # Taxonomy rows (evaluation plan §2). Core = P0, implemented here; P1 rows land by 19:00 and are
@@ -93,6 +93,12 @@ STREET_NAMES = ("Maple", "Oak", "Elm", "Cedar", "Pine", "Birch", "Walnut", "Ches
 STREET_TYPES = ("St", "Ave", "Rd", "Ln", "Dr", "Ct")
 # Other Massachusetts ZIPs for L1 moves across ZIP; the sample is Massachusetts-only.
 OTHER_ZIPS = ("01002", "01040", "01201", "01420", "01545", "01602", "01702", "01803", "01905", "02021", "02118", "02301", "02460", "02571", "02740")
+# Generator-side surname particles for S3 ("de la Cruz López" keeps "de la Cruz"). Kept apart from
+# backend.core's particle set on purpose: the evaluation plan wants generator and scorer tables
+# written separately, so a scorer change can never silently reshape the corpus it is judged on.
+GENERATOR_SURNAME_PARTICLES = frozenset(
+    {"de", "del", "la", "las", "los", "y", "e", "van", "von", "der", "den", "di", "da", "du", "le", "st"}
+)
 GIVEN_NAME_FALLBACKS = ("Alex", "Sam", "Jordan", "Taylor", "Casey", "Morgan", "Riley", "Jamie")
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
 MARIA_ABBREVIATION = "Ma."
@@ -156,6 +162,20 @@ def rng_for(seed: int, *parts: str) -> random.Random:
 
 def _weighted(rng: random.Random, options: tuple[tuple[object, float], ...]) -> object:
     return rng.choices([o for o, _ in options], weights=[w for _, w in options], k=1)[0]
+
+
+def strip_accents(text: str) -> str:
+    """Case-preserving accent strip ('José' -> 'Jose') for S1/S6. Core's fold_text also casefolds,
+    which would make every S1 record a case change as well."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
+def swap_day_month(value: date) -> date | None:
+    """D1: MM/DD read as DD/MM, defined only when the day could be a month and differs from it."""
+    if value.day > 12 or value.day == value.month:
+        return None
+    return value.replace(month=value.day, day=value.month)
 
 
 def _shift_years(dob: date, years: int) -> date:
@@ -226,7 +246,7 @@ def edit_t3(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | N
 
 def edit_d1(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | None:
     dob = parse_date(identity.birth_date)
-    swapped = swapped_day_month(dob) if dob else None
+    swapped = swap_day_month(dob) if dob else None
     if swapped is None:
         return None
     after = swapped.isoformat()
@@ -278,7 +298,7 @@ def edit_s1(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | N
 def edit_s3(identity: Identity, rng: random.Random) -> tuple[Identity, Edit] | None:
     tokens = (identity.family or "").split()
     # the paternal surname is the leading particles plus the first real token ("de la Cruz" of "de la Cruz López")
-    end = next((i + 1 for i, t in enumerate(tokens) if t.lower() not in SURNAME_PARTICLES), len(tokens))
+    end = next((i + 1 for i, t in enumerate(tokens) if t.lower() not in GENERATOR_SURNAME_PARTICLES), len(tokens))
     if end >= len(tokens):
         return None
     after = " ".join(tokens[:end])
