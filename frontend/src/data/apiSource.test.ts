@@ -77,6 +77,7 @@ describe("ApiSource", () => {
     const other = { ...twin, recordAId: first, recordBId: "r-someone-else" };
     const calls = stubFetch({
       "POST /api/v1/sessions": () => ({ status: 201, body: scenario.session }),
+      "GET /api/v1/sessions/current": () => ({ body: scenario.session }),
       "GET /api/v1/candidate-pairs": (c) =>
         c.query.get("cursor")
           ? { body: { items: [{ ...hero.pair, recordAId: second, recordBId: first }], nextCursor: null } }
@@ -98,6 +99,7 @@ describe("ApiSource", () => {
     const [first] = scenario.session.sources.map((c) => c.record.id);
     const calls = stubFetch({
       "POST /api/v1/sessions": () => ({ status: 201, body: scenario.session }),
+      "GET /api/v1/sessions/current": () => ({ body: scenario.session }),
       "GET /api/v1/candidate-pairs": () => ({
         body: { items: [{ ...twin, recordAId: first }, twin], nextCursor: null },
       }),
@@ -115,6 +117,7 @@ describe("ApiSource", () => {
     const swapped = { ...hero, recordA: hero.recordB, recordB: hero.recordA };
     stubFetch({
       "POST /api/v1/sessions": () => ({ status: 201, body: scenario.session }),
+      "GET /api/v1/sessions/current": () => ({ body: scenario.session }),
       "GET /api/v1/candidate-pairs": () => ({ body: { items: [hero.pair], nextCursor: null } }),
       [`GET /api/v1/candidate-pairs/${hero.pair.id}`]: () => ({ body: swapped }),
     });
@@ -133,6 +136,55 @@ describe("ApiSource", () => {
     expect((await s.getSession())?.id).toBe(scenario.session.id);
     expect((await s.getCase()).detail!.pair.id).toBe(hero.pair.id);
     expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
+  it("follows a reset made elsewhere: the session is re-read, never kept from an earlier load", async () => {
+    const other = {
+      ...scenario.session,
+      id: "00000000-0000-4000-8000-000000000199",
+      sources: scenario.session.sources.map((c) => ({
+        ...c,
+        record: { ...c.record, id: `${c.record.id}-new` },
+      })),
+    };
+    let current = scenario.session;
+    const calls = stubFetch({
+      "GET /api/v1/sessions/current": () => ({ body: current }),
+      "GET /api/v1/candidate-pairs": () => ({ body: { items: [], nextCursor: null } }),
+    });
+    const s = new ApiSource(ORIGIN);
+    expect((await s.getCase()).sources).toEqual(scenario.session.sources);
+    current = other;
+    expect((await s.getCase()).sources).toEqual(other.sources);
+    const lists = calls.filter((c) => c.path === "/api/v1/candidate-pairs");
+    expect(lists.at(-1)?.query.get("recordId")).toBe(other.sources[0].record.id);
+  });
+
+  it("shares one GET /sessions/current between callers that ask at the same time", async () => {
+    const calls = stubFetch({ "GET /api/v1/sessions/current": () => ({ body: scenario.session }) });
+    const s = new ApiSource(ORIGIN);
+    await Promise.all([s.getSession(), s.getSession()]);
+    expect(calls.filter((c) => c.path === "/api/v1/sessions/current")).toHaveLength(1);
+  });
+
+  it("asks only for match-run pairs, so a FrontDesk handoff pair is never bound as the hero", async () => {
+    const calls = stubFetch({
+      "GET /api/v1/sessions/current": () => ({ body: scenario.session }),
+      "GET /api/v1/candidate-pairs": () => ({ body: { items: [], nextCursor: null } }),
+    });
+    await new ApiSource(ORIGIN).getCase();
+    expect(calls.find((c) => c.path === "/api/v1/candidate-pairs")?.query.get("origin")).toBe("MATCH_RUN");
+  });
+
+  it("asks for a reset when the pages run out without finding the session's pair", async () => {
+    const [first] = scenario.session.sources.map((c) => c.record.id);
+    stubFetch({
+      "GET /api/v1/sessions/current": () => ({ body: scenario.session }),
+      "GET /api/v1/candidate-pairs": () => ({
+        body: { items: [{ ...twin, recordAId: first }], nextCursor: "more" },
+      }),
+    });
+    await expect(new ApiSource(ORIGIN).getCase()).rejects.toMatchObject({ code: "NO_SESSION" });
   });
 
   it.each([404, 501])("asks for a reset when GET /sessions/current answers %i", async (status) => {
@@ -265,6 +317,7 @@ describe("ApiSource after a reset", () => {
   it("shows the session's source cards while the queue is empty, and resolved is false", async () => {
     stubFetch({
       "POST /api/v1/sessions": () => ({ status: 201, body: scenario.session }),
+      "GET /api/v1/sessions/current": () => ({ body: scenario.session }),
       "GET /api/v1/candidate-pairs": () => ({ body: { items: [], nextCursor: null } }),
     });
     const s = new ApiSource(ORIGIN);

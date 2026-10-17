@@ -66,8 +66,9 @@ export function ReviewPanel({ detail, onDecided }: Props) {
   const [reason, setReason] = useState<ReasonCode | "">("");
   const [note, setNote] = useState("");
   const [reasonMissing, setReasonMissing] = useState(false);
-  // Where keyboard focus goes once the step closes: back to its opener, or to the result.
-  const [returnTo, setReturnTo] = useState<Action | "DECISION" | null>(null);
+  // Where keyboard focus goes once the step closes: back to its opener, or to the line for the
+  // decision just recorded (by id, so no later render can pull focus to some other decision).
+  const [returnTo, setReturnTo] = useState<Action | { decisionId: string } | null>(null);
   const approveRef = useRef<HTMLButtonElement>(null);
   const rejectRef = useRef<HTMLButtonElement>(null);
   const decisionRef = useRef<HTMLParagraphElement>(null);
@@ -76,27 +77,33 @@ export function ReviewPanel({ detail, onDecided }: Props) {
     mutationFn: ({ body, key }: { body: ReviewRequest; key: string }) =>
       source.review(detail.pair.id, body, key),
     onSuccess: async (response) => {
+      // A recorded approve moves focus to the golden record (CaseScreen); a reject stays here.
+      if (response.decision.status === "REJECTED") setReturnTo({ decisionId: response.decision.id });
       setIntent(null);
       setReason("");
       setNote("");
       await queryClient.invalidateQueries({ queryKey: ["case"] });
       await queryClient.invalidateQueries({ queryKey: ["events"] });
       await queryClient.invalidateQueries({ queryKey: ["tiles"] });
-      // A recorded approve moves focus to the golden record (CaseScreen); a reject stays here.
-      if (response.decision.status === "REJECTED") setReturnTo("DECISION");
       onDecided(response);
     },
   });
 
   // The refreshed decision can arrive a render after the request, so the request waits until
   // its target is on screen.
+  const currentDecisionId = detail.pair.decision.id;
   useEffect(() => {
     if (intent || !returnTo) return;
-    const target = { APPROVE: approveRef, REJECT: rejectRef, DECISION: decisionRef }[returnTo].current;
+    const target =
+      typeof returnTo === "string"
+        ? { APPROVE: approveRef, REJECT: rejectRef }[returnTo].current
+        : returnTo.decisionId === currentDecisionId
+          ? decisionRef.current
+          : null;
     if (!target) return;
     target.focus();
     setReturnTo(null);
-  }, [intent, returnTo, detail.pair.decision.id]);
+  }, [intent, returnTo, currentDecisionId]);
 
   useEffect(() => {
     if (!intent) return;
@@ -107,6 +114,7 @@ export function ReviewPanel({ detail, onDecided }: Props) {
   const actor = `registrar:${registrar}`;
 
   function open(action: Action) {
+    setReturnTo(null); // a new step drops any focus request still waiting
     decide.reset();
     setReasonMissing(false);
     setIntent({ action, key: crypto.randomUUID() });
