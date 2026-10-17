@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type Ref } from "react";
 import type {
   CandidatePairDetail,
   MatchDecision,
@@ -31,13 +31,20 @@ interface Intent {
   key: string;
 }
 
-function DecisionLine({ decision }: { decision: MatchDecision }) {
+function DecisionLine({
+  decision,
+  lineRef,
+}: {
+  decision: MatchDecision;
+  lineRef: Ref<HTMLParagraphElement>;
+}) {
   const who = `${actorName(decision.actor)} at ${formatCt(decision.decidedAt)}`;
   if (decision.status === "LINKED") return <p>Approved by {who}.</p>;
   if (decision.status !== "REJECTED") return null;
   const reason = decision.reasonCode ? REASONS[decision.reasonCode] : "not recorded";
+  // Focusable so a keyboard user lands on the result after recording a reject.
   return (
-    <p>
+    <p ref={lineRef} tabIndex={-1} className="outline-none focus-visible:outline-2">
       Rejected by {who}. Reason: {reason}. Records kept separate.
     </p>
   );
@@ -59,6 +66,11 @@ export function ReviewPanel({ detail, onDecided }: Props) {
   const [reason, setReason] = useState<ReasonCode | "">("");
   const [note, setNote] = useState("");
   const [reasonMissing, setReasonMissing] = useState(false);
+  // Where keyboard focus goes once the step closes: back to its opener, or to the result.
+  const [returnTo, setReturnTo] = useState<Action | "DECISION" | null>(null);
+  const approveRef = useRef<HTMLButtonElement>(null);
+  const rejectRef = useRef<HTMLButtonElement>(null);
+  const decisionRef = useRef<HTMLParagraphElement>(null);
 
   const decide = useMutation({
     mutationFn: ({ body, key }: { body: ReviewRequest; key: string }) =>
@@ -70,9 +82,21 @@ export function ReviewPanel({ detail, onDecided }: Props) {
       await queryClient.invalidateQueries({ queryKey: ["case"] });
       await queryClient.invalidateQueries({ queryKey: ["events"] });
       await queryClient.invalidateQueries({ queryKey: ["tiles"] });
+      // A recorded approve moves focus to the golden record (CaseScreen); a reject stays here.
+      if (response.decision.status === "REJECTED") setReturnTo("DECISION");
       onDecided(response);
     },
   });
+
+  // The refreshed decision can arrive a render after the request, so the request waits until
+  // its target is on screen.
+  useEffect(() => {
+    if (intent || !returnTo) return;
+    const target = { APPROVE: approveRef, REJECT: rejectRef, DECISION: decisionRef }[returnTo].current;
+    if (!target) return;
+    target.focus();
+    setReturnTo(null);
+  }, [intent, returnTo, detail.pair.decision.id]);
 
   useEffect(() => {
     if (!intent) return;
@@ -113,33 +137,34 @@ export function ReviewPanel({ detail, onDecided }: Props) {
       <h2 id={`${ids}-h`} className="text-[18px] font-semibold uppercase tracking-wider">
         Review
       </h2>
-      <DecisionLine decision={decision} />
+      <DecisionLine decision={decision} lineRef={decisionRef} />
       {decision.status !== "LINKED" && (
         <>
           <div className="grid grid-cols-[8rem_1fr] items-center gap-x-3 gap-y-2">
-            <label htmlFor={`${ids}-registrar`}>Registrar</label>
-            <div>
-              <select
-                id={`${ids}-registrar`}
-                aria-describedby={`${ids}-fixture`}
-                value={registrar}
-                onChange={(e) => setRegistrar(e.target.value)}
-                className="h-11 w-full rounded-md border border-border-strong bg-surface px-2"
-              >
-                {REGISTRARS.map((name) => (
-                  <option key={name}>{name}</option>
-                ))}
-              </select>
-              <span id={`${ids}-fixture`} className="text-[14px] text-ink-3">
+            <label htmlFor={`${ids}-registrar`} className="leading-tight">
+              Registrar
+              <span id={`${ids}-fixture`} className="block text-[14px] text-ink-3">
                 Fixture name
               </span>
-            </div>
+            </label>
+            <select
+              id={`${ids}-registrar`}
+              aria-describedby={`${ids}-fixture`}
+              value={registrar}
+              onChange={(e) => setRegistrar(e.target.value)}
+              className="h-11 w-full rounded-md border border-border-strong bg-surface px-2"
+            >
+              {REGISTRARS.map((name) => (
+                <option key={name}>{name}</option>
+              ))}
+            </select>
           </div>
           {!intent && (
             <div className="flex gap-2">
               <button
                 type="button"
                 data-testid="approve-button"
+                ref={approveRef}
                 onClick={() => open("APPROVE")}
                 aria-expanded={false}
                 disabled={decide.isPending}
@@ -150,6 +175,7 @@ export function ReviewPanel({ detail, onDecided }: Props) {
               <button
                 type="button"
                 data-testid="reject-button"
+                ref={rejectRef}
                 onClick={() => open("REJECT")}
                 aria-expanded={false}
                 disabled={decide.isPending}
@@ -161,27 +187,24 @@ export function ReviewPanel({ detail, onDecided }: Props) {
           )}
           {intent && (
             <form
-              aria-labelledby={`${ids}-dialog-h`}
-              className="space-y-3 rounded-lg border border-border-strong bg-sunken p-3"
+              aria-label={approving ? "Approve this link" : "Reject this link"}
+              className="space-y-2 rounded-lg border border-border-strong bg-sunken p-3"
               onSubmit={(e) => {
                 e.preventDefault();
                 submit();
               }}
             >
-              <h3 id={`${ids}-dialog-h`} className="font-semibold">
-                {approving ? "Approve this link" : "Reject this link"}
-              </h3>
               <div className="grid grid-cols-[8rem_1fr] items-center gap-x-3 gap-y-2">
                 {!approving && (
                   <>
-                    <label htmlFor={`${ids}-reason`}>Reason</label>
+                    <label htmlFor={`${ids}-reason`}>Reason (required)</label>
                     <select
                       id={`${ids}-reason`}
                       data-testid="review-reason-select"
                       ref={reasonRef}
                       value={reason}
                       aria-invalid={reasonMissing}
-                      aria-describedby={reasonMissing ? `${ids}-reason-error` : `${ids}-reason-hint`}
+                      aria-describedby={reasonMissing ? `${ids}-reason-error` : undefined}
                       onChange={(e) => {
                         setReason(e.target.value as ReasonCode | "");
                         setReasonMissing(false);
@@ -195,13 +218,9 @@ export function ReviewPanel({ detail, onDecided }: Props) {
                         </option>
                       ))}
                     </select>
-                    {reasonMissing ? (
+                    {reasonMissing && (
                       <p id={`${ids}-reason-error`} className="col-start-2 text-[16px] text-error-ink">
                         Select a reason to reject the link.
-                      </p>
-                    ) : (
-                      <p id={`${ids}-reason-hint`} className="col-start-2 text-[14px] text-ink-3">
-                        Required to reject
                       </p>
                     )}
                   </>
@@ -234,7 +253,10 @@ export function ReviewPanel({ detail, onDecided }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIntent(null)}
+                  onClick={() => {
+                    setReturnTo(intent.action);
+                    setIntent(null);
+                  }}
                   disabled={decide.isPending}
                   className="h-11 rounded-md border border-border-strong bg-surface px-5 font-semibold text-ink-1 hover:bg-sunken disabled:text-ink-3"
                 >
@@ -251,6 +273,9 @@ export function ReviewPanel({ detail, onDecided }: Props) {
           )}
         </>
       )}
+      <p className="font-mono text-[14px] text-ink-3">
+        scorer {decision.scorerVersion} · thresholds {decision.thresholdSetId}
+      </p>
     </section>
   );
 }

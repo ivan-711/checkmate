@@ -2,15 +2,14 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useDataSource } from "@/data/DataSourceProvider";
+import { EVENT_FEED_ROWS } from "@/data/source";
 import { formatCt } from "@/lib/display";
-
-const ROWS_SHOWN = 12;
 
 /** The append-only event feed, newest first; one row per action the demo takes. */
 export function EventFeed() {
   const source = useDataSource();
   const events = useQuery({ queryKey: ["events"], queryFn: () => source.getEvents() });
-  const rows = events.data?.slice(0, ROWS_SHOWN) ?? [];
+  const rows = events.data?.slice(0, EVENT_FEED_ROWS) ?? [];
   return (
     <section
       aria-labelledby="events-heading"

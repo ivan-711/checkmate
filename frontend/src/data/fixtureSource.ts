@@ -10,7 +10,7 @@ import type {
   TimelineEvent,
 } from "@/api/types";
 import type { ScenarioFixture } from "./scenario";
-import { DataError, type CaseData, type DataSource } from "./source";
+import { DataError, EVENT_FEED_ROWS, type CaseData, type DataSource } from "./source";
 
 interface SessionState {
   session: SessionResponse;
@@ -53,7 +53,7 @@ export class FixtureSource implements DataSource {
     const { history, outcome, resolved } = this.current;
     const base = this.fixture.pair;
     const detail = { ...base, pair: { ...base.pair, decision: history[history.length - 1] }, history };
-    return { sources: this.current.session.sources, detail, outcome, resolved };
+    return { sources: this.current.session.sources, detail, outcome, resolved, alertsKnown: true };
   }
 
   /** The fixture is already scored; Resolve only re-queues the pair and logs the run. */
@@ -91,7 +91,7 @@ export class FixtureSource implements DataSource {
 
   async getEvents(): Promise<EventLogRow[]> {
     const all = [...(this.previous?.events ?? []), ...this.current.events];
-    return all.slice().reverse(); // newest first, like GET /events
+    return all.slice().reverse().slice(0, EVENT_FEED_ROWS); // one page, newest first, like GET /events
   }
 
   /** The fixture tiles with HUMAN_REVIEW counting this session's registrar decisions. */

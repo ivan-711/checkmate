@@ -3,12 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Tile } from "@/api/types";
 import { useDataSource } from "@/data/DataSourceProvider";
-import type { Mode } from "@/data/source";
 import { formatCt } from "@/lib/display";
 
 const TILE_POLL_MS = 2_000; // UX spec 3.13: the FrontDesk tile refreshes every 2 s
-
-const SOURCE_BY_MODE: Record<Mode, string> = { REPLAY: "recorded log", LOCAL: "local TimescaleDB" };
 
 function countsByBucket(tile: Tile) {
   const rows = new Map<string, { allowed: number; denied: number }>();
@@ -77,9 +74,7 @@ export function AuditTile() {
         </>
       )}
       {tile && (
-        <p className="mt-2 font-mono text-[14px] text-ink-3">
-          {tile.aggregate} · continuous aggregate · {SOURCE_BY_MODE[source.mode]}
-        </p>
+        <p className="mt-2 font-mono text-[14px] text-ink-3">{tile.aggregate} · continuous aggregate</p>
       )}
     </section>
   );

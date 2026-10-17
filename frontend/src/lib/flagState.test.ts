@@ -11,6 +11,7 @@ function caseWith(status: MatchDecision["status"], outcome: CaseData["outcome"])
     detail: { ...base, pair: { ...base.pair, decision: { ...base.pair.decision, status } } },
     outcome,
     resolved: true,
+    alertsKnown: true,
   };
 }
 
@@ -36,6 +37,11 @@ describe("flagState", () => {
 
   it("says no flag when the approval raised none", () => {
     expect(flagState(caseWith("LINKED", linkedOutcome([])))).toEqual({ kind: "none" });
+  });
+
+  it("makes no rule claim when the alerts read was unavailable", () => {
+    const data = { ...caseWith("LINKED", linkedOutcome([])), alertsKnown: false };
+    expect(flagState(data)).toEqual({ kind: "unavailable" });
   });
 
   it("never claims a result for a link whose review result this view does not hold", () => {

@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { ReviewResponse } from "@/api/types";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { useDataSource } from "@/data/DataSourceProvider";
+import { DataError } from "@/data/source";
 import { differingFields, type CardField } from "@/lib/display";
 import { flagState } from "@/lib/flagState";
 import { EventFeed } from "./EventFeed";
@@ -59,6 +60,10 @@ export function CaseScreen() {
   );
 
   if (caseQuery.isPending) return <p aria-busy="true">Loading case...</p>;
+  if (caseQuery.isError && caseQuery.error instanceof DataError && caseQuery.error.code === "NO_SESSION") {
+    // No session to bind the hero to: Reset demo (in the header) is the one action that helps.
+    return <p data-testid="reset-prompt">{caseQuery.error.message}</p>;
+  }
   if (caseQuery.isError) {
     return (
       <div className="space-y-3">
@@ -70,7 +75,8 @@ export function CaseScreen() {
   }
 
   const { sources, detail, resolved } = caseQuery.data;
-  const cards = detail ? [detail.recordA, detail.recordB] : sources;
+  // The hero's cards are the session's showcase sources, never the pair's records.
+  const cards = sources;
   const differs =
     cards.length === 2 ? differingFields(cards[0].normalized, cards[1].normalized) : new Set<CardField>();
 
