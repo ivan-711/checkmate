@@ -121,10 +121,12 @@ def _raw_scores(model: LogisticRegression, X: np.ndarray) -> np.ndarray:
     return model.decision_function(X)
 
 
-def data_digest(*paths: Path) -> str:
+def data_digest(*paths: Path, partition: str | None, c: float, folds: int) -> str:
+    """Digest of the inputs and the settings that change the fit, so runs never overwrite each other."""
     h = hashlib.sha256()
     for path in paths:
         h.update(path.read_bytes())
+    h.update(f"|partition={partition}|C={c}|folds={folds}".encode())
     return h.hexdigest()[:DIGEST_CHARS]
 
 
@@ -135,6 +137,7 @@ def fit_weights(
     version: str,
     n_folds: int = DEFAULT_FOLDS,
     c: float = DEFAULT_C,
+    provenance: Mapping[str, Any] | None = None,
 ) -> tuple[Weights, dict[str, Any], list[dict[str, Any]]]:
     """(weights, out-of-fold report, out-of-fold rows). Raises when a class or group count is too small."""
     pairs = build_labeled_pairs(records, truth)
@@ -177,7 +180,11 @@ def fit_weights(
         "oof_average_precision": float(average_precision_score(y, oof)),
         "oof_precision_at_raw_0": tp / max(int(predicted_positive.sum()), 1),
         "oof_recall_at_raw_0": tp / max(int(y.sum()), 1),
-        "note": "development, out-of-fold, descriptive; thresholds and Platt are chosen elsewhere on these raw scores",
+        "note": (
+            "development, out-of-fold, descriptive; thresholds and Platt are chosen elsewhere on these raw scores. "
+            "A cross-component negative pair is grouped under the smaller component id, so the other component's "
+            "records can appear on both sides of a fold through it; the harness resamples by component to tighten this."
+        ),
     }
     oof_rows = [
         {
@@ -213,8 +220,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     records = load_records_csv(args.records)
     truth = load_truth_csv(args.truth, partition=args.partition)
-    version = args.version or f"{VERSION_PREFIX}-{data_digest(args.records, args.truth)}"
-    weights, report, oof_rows = fit_weights(records, truth, version=version, n_folds=args.folds, c=args.c)
+    digest = data_digest(args.records, args.truth, partition=args.partition, c=args.c, folds=args.folds)
+    version = args.version or f"{VERSION_PREFIX}-{digest}"
+    provenance = {
+        "data_digest": digest,
+        "partition": args.partition,
+        "records": args.records.name,
+        "truth": args.truth.name,
+    }
+    weights, report, oof_rows = fit_weights(
+        records, truth, version=version, n_folds=args.folds, c=args.c, provenance=provenance
+    )
     args.out_dir.mkdir(parents=True, exist_ok=True)
     out = args.out_dir / f"{version}.json"
     save_weights(weights, out)

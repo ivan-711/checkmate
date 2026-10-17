@@ -71,10 +71,10 @@ def save_weights(weights: Weights, path: Path) -> None:
 
 
 def load_weights(path_or_version: str | Path) -> Weights:
-    """A path, or a version name resolved to ``backend/core/weights/<version>.json``."""
-    path = Path(path_or_version)
-    if not path.exists():
-        path = WEIGHTS_DIR / f"{path_or_version}.json"
+    """A path to a weights JSON, or a bare version name resolved under ``backend/core/weights``."""
+    text = str(path_or_version)
+    is_bare_version = isinstance(path_or_version, str) and "/" not in text and not text.endswith(".json")
+    path = WEIGHTS_DIR / f"{text}.json" if is_bare_version else Path(path_or_version)
     return Weights.from_json_dict(json.loads(path.read_text()))
 
 
@@ -123,11 +123,12 @@ def score_pair(fv: FeatureVector, weights: Weights) -> ScoreResult:
 
 
 # Hand-set weights for the 15:30 checkpoint. Logit units, chosen so an identical full record
-# scores about +6 and two different people with the same surname score below 0; the trained
-# scorer replaces them and they are never called calibrated.
+# scores +5.5, a day/month swap or one-digit DOB edit stays above the demo c_high of 4.0, and
+# two siblings with the same surname score below 0; the trained scorer replaces them and they
+# are never called calibrated. backend/core/weights/handset-0.json is this object on disk.
 HANDSET_WEIGHTS = Weights(
     scorer_version=HANDSET_SCORER_VERSION,
-    intercept=-12.0,
+    intercept=-11.0,
     weights={
         # The folded forms carry more weight than the accented ones so an accent or hyphen
         # variant loses little; the nickname table is the only way "Paco" reaches "Francisco".

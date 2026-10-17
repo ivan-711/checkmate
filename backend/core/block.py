@@ -16,13 +16,7 @@ from dataclasses import dataclass, field
 from itertools import combinations
 
 from backend.core.normalize import Normalized
-from backend.core.phonetics import double_metaphone
-from backend.core.placeholders import (
-    is_placeholder_dob,
-    is_placeholder_name,
-    is_placeholder_phone,
-    is_placeholder_zip,
-)
+from backend.core.placeholders import is_placeholder_dob, is_placeholder_phone, is_placeholder_zip
 from contracts.version import BLOCK_MAX_RECORDS
 
 KEY_DMETA_FAMILY_YEAR = "DMETA_FAMILY_BIRTH_YEAR"
@@ -94,17 +88,19 @@ def _dob_keys(n: Normalized) -> list[BlockKey]:
 
 
 def block_keys(n: Normalized) -> list[BlockKey]:
-    """Every block key one record contributes; placeholders contribute nothing."""
+    """Every block key one record contributes; placeholders contribute nothing.
+
+    One surname key per Double Metaphone code of every family token, so a dropped maternal
+    surname (S3) or a swapped surname order (S4) still shares a block with the full name.
+    """
     keys: list[BlockKey] = []
-    name_is_placeholder = is_placeholder_name(n.given_name_folded, n.family_name_folded)
-    if n.family_name_folded and n.birth_year is not None and not name_is_placeholder:
-        primary, _ = double_metaphone(n.family_tokens[-1] if n.family_tokens else n.family_name_folded)
-        if primary and not is_placeholder_dob(n.birth_year, n.birth_month, n.birth_day):
-            keys.append(BlockKey(KEY_DMETA_FAMILY_YEAR, f"{primary}|{n.birth_year:04d}"))
+    dob_is_placeholder = is_placeholder_dob(n.birth_year, n.birth_month, n.birth_day)
+    if n.family_codes and n.birth_year is not None and not n.name_is_placeholder and not dob_is_placeholder:
+        keys.extend(BlockKey(KEY_DMETA_FAMILY_YEAR, f"{code}|{n.birth_year:04d}") for code in n.family_codes)
     keys.extend(_dob_keys(n))
     if n.phone_digits and not is_placeholder_phone(n.phone_digits):
         keys.append(BlockKey(KEY_PHONE_LAST7, n.phone_digits[-PHONE_LAST_DIGITS:]))
-    if not is_placeholder_zip(n.zip5) and n.given_name_folded and not name_is_placeholder:
+    if not is_placeholder_zip(n.zip5) and n.given_name_folded and not n.name_is_placeholder:
         keys.append(BlockKey(KEY_ZIP5_INITIAL, f"{n.zip5}|{n.given_name_folded[0]}"))
     return keys
 
@@ -142,7 +138,7 @@ def candidate_pairs(
     index = build_block_index(records)
     excluded = normalize_exclusions(exclusions)
     keys_by_pair: dict[PairKey, list[str]] = defaultdict(list)
-    n_excluded = 0
+    excluded_seen: set[PairKey] = set()
     skipped: list[tuple[BlockKey, list[RecordId]]] = []
     for key in sorted(index):
         members = index[key]
@@ -154,21 +150,22 @@ def candidate_pairs(
         for a, b in combinations(sorted(members, key=str), 2):
             pair = _ordered(a, b)
             if pair in excluded:
-                n_excluded += 1
+                excluded_seen.add(pair)
                 continue
             keys_by_pair[pair].append(str(key))
-    # Oversized blocks are counted after the expanded ones so "skipped" means pairs that no
-    # other key would have produced.
+    # An oversized block is never expanded, not even to count: pairs it would have produced that
+    # some expanded block also produced are found by scanning the (bounded) candidate set, so the
+    # cost is O(|B|) per hot block instead of O(n^2). A pair inside two hot blocks is counted in
+    # each, so the total is an upper bound; the per-block numbers are exact.
     oversized: list[OversizedBlock] = []
-    skipped_only: set[PairKey] = set()
+    total_skipped = 0
     for key, members in skipped:
+        member_set = {str(m) for m in members}
         in_block = len(members) * (len(members) - 1) // 2
-        only_here = 0
-        for a, b in combinations(sorted(members, key=str), 2):
-            pair = _ordered(a, b)
-            if pair not in keys_by_pair and pair not in excluded:
-                only_here += 1
-                skipped_only.add(pair)
+        produced_elsewhere = sum(1 for a, b in keys_by_pair if a in member_set and b in member_set)
+        excluded_here = sum(1 for a, b in excluded if a in member_set and b in member_set)
+        only_here = in_block - produced_elsewhere - excluded_here
+        total_skipped += only_here
         oversized.append(
             OversizedBlock(key=str(key), size=len(members), pairs_in_block=in_block, pairs_skipped=only_here)
         )
@@ -184,9 +181,9 @@ def candidate_pairs(
         n_total_pairs=n_total,
         n_candidate_pairs=len(pairs),
         reduction_ratio=(1.0 - len(pairs) / n_total) if n_total else 0.0,
-        n_excluded_not_a_match=n_excluded,
+        n_excluded_not_a_match=len(excluded_seen),
         oversized_blocks=tuple(oversized),
-        pairs_skipped_oversized=len(skipped_only),
+        pairs_skipped_oversized=total_skipped,
         block_sizes={str(k): len(v) for k, v in index.items()},
     )
 

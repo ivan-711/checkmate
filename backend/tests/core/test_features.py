@@ -108,3 +108,27 @@ def test_placeholder_name_yields_missing_name_features():
     )
     assert fv.values["given_jw"] is None and fv.values["family_jw"] is None
     assert fv.missing["given_name"] and fv.missing["family_name"]
+
+
+def test_shared_given_token_is_overlap_not_nickname():
+    fv = feats({**BASE, "given_name": "Maria Jose"}, {**BASE, "given_name": "Maria Fernanda"})
+    assert fv.values["given_nickname"] == 0.0 and fv.values["given_token_overlap"] == 0.5
+    assert feats(BASE, BASE).values["given_nickname"] == 0.0
+
+
+def test_one_digit_edit_and_one_component_off_are_exclusive():
+    fv = feats({**BASE, "dob": "1985-11-02"}, {**BASE, "dob": "1985-11-12"})
+    assert fv.values["dob_one_digit_edit"] == 1.0 and fv.values["dob_one_component_off"] == 0.0
+
+
+def test_dropped_maternal_surname_still_matches_phonetically():
+    fv = feats({**BASE, "family_name": "García López"}, {**BASE, "family_name": "García"})
+    assert fv.values["family_dmeta"] == 1.0
+    swapped = feats({**BASE, "family_name": "García López"}, {**BASE, "family_name": "López García"})
+    assert swapped.values["family_dmeta"] == 1.0 and swapped.values["family_token_overlap"] == 1.0
+
+
+def test_features_of_entry_point_matches_compute_features():
+    from backend.core.band import features_of
+
+    assert features_of(BASE, BASE).values == feats(BASE, BASE).values

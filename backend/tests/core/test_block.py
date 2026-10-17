@@ -91,3 +91,39 @@ def test_gate_lookup_is_never_capped():
     assert len(found) == n
     assert all(p.record_a_id < p.record_b_id for p in found)
     assert len(candidates_for_record("intake", probe, index, exclusions=[("r000", "intake")])) == n - 1
+
+
+def test_dropped_maternal_surname_shares_the_surname_block():
+    full = block_keys(rec(given_name="Maria", family_name="García López", dob="1990-03-07"))
+    short = block_keys(rec(given_name="Maria", family_name="García", dob="1990-03-07"))
+    full_dm = {k for k in full if k.key_type == KEY_DMETA_FAMILY_YEAR}
+    short_dm = {k for k in short if k.key_type == KEY_DMETA_FAMILY_YEAR}
+    assert short_dm and short_dm <= full_dm
+
+
+def test_excluded_pairs_are_counted_once_not_per_shared_key():
+    records = {"a": rec(**FULL), "b": rec(**FULL)}
+    assert candidate_pairs(records, exclusions=[("a", "b")]).n_excluded_not_a_match == 1
+
+
+def test_oversized_block_counting_subtracts_pairs_found_elsewhere_and_exclusions():
+    n = BLOCK_MAX_RECORDS + 1
+    records = {f"r{i:03d}": rec(given_name="g", dob="1990-03-25") for i in range(n)}
+    # Two members also share a phone, so that pair is produced by the small phone block.
+    records["r000"] = rec(given_name="g", dob="1990-03-25", phone="617-555-2368")
+    records["r001"] = rec(given_name="g", dob="1990-03-25", phone="617-555-2368")
+    result = candidate_pairs(records, exclusions=[("r002", "r003")])
+    assert result.n_candidate_pairs == 1
+    block = result.oversized_blocks[0]
+    assert block.pairs_skipped == block.pairs_in_block - 1 - 1 == result.pairs_skipped_oversized
+
+
+def test_large_hot_block_is_cheap_to_report():
+    import time
+
+    n = 3000
+    records = {f"r{i:05d}": rec(given_name="g", dob="1990-03-25") for i in range(n)}
+    start = time.perf_counter()
+    result = candidate_pairs(records)
+    assert time.perf_counter() - start < 2.0
+    assert result.oversized_blocks[0].pairs_skipped == n * (n - 1) // 2

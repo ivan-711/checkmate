@@ -43,7 +43,6 @@ PLACEHOLDER_NAME_TOKENS: frozenset[str] = frozenset(
         "none",
         "null",
         "na",
-        "n/a",
         "nil",
         "anonymous",
         "anon",

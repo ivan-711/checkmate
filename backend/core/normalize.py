@@ -7,6 +7,9 @@ combining marks dropped, punctuation turned into spaces). Features compare both,
 accent or hyphen variant stays close to the unchanged name without pretending the
 accented spelling carries no information.
 
+Per-record facts the pair stages need many times (placeholder status, phonetic codes) are
+computed once here so blocking, features and the negative rules cannot drift apart.
+
 W1 (ingest) should import ``normalize_record`` / ``fold_text`` from here rather than keep a
 second copy of the rules; a drift between the two would silently change every score.
 """
@@ -16,12 +19,16 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from backend.core.phonetics import double_metaphone
+from backend.core.placeholders import is_placeholder_name
+
 # Generation suffixes carried as a separate field so "Jr" vs "Sr" can fire a negative rule
-# and a dropped suffix (taxonomy T5) does not disturb the surname comparison.
+# and a dropped suffix (taxonomy T5) does not disturb the surname comparison. Only the last
+# token of the family name (or an explicit suffix field) counts: a middle initial "V" is not one.
 GENERATION_SUFFIXES: dict[str, str] = {
     "jr": "JR",
     "jnr": "JR",
@@ -37,7 +44,13 @@ GENERATION_SUFFIXES: dict[str, str] = {
     "3rd": "III",
     "4th": "IV",
 }
-_TITLES: frozenset[str] = frozenset({"mr", "mrs", "ms", "miss", "dr", "sra", "sr.", "srta", "don", "dona"})
+# Titles are dropped from both name forms. "sr" here is the Spanish "Señor" when it is not
+# the last family token; as the last token it is the generation suffix.
+_TITLES: frozenset[str] = frozenset({"mr", "mrs", "ms", "miss", "dr", "sr", "sra", "srta", "don", "dona"})
+# Surname particles never stand for the family on their own ("de la Cruz" is Cruz).
+_PARTICLES: frozenset[str] = frozenset(
+    {"de", "del", "la", "las", "los", "da", "di", "du", "van", "von", "der", "den", "le", "st", "san", "y", "e"}
+)
 
 # Street-type abbreviations expanded so "Main St" and "Main Street" share tokens (taxonomy L2).
 _ADDRESS_ABBREVIATIONS: dict[str, str] = {
@@ -68,19 +81,22 @@ _ADDRESS_ABBREVIATIONS: dict[str, str] = {
     "sw": "southwest",
     "fl": "floor",
     "bldg": "building",
-    "po": "po",
-    "box": "box",
 }
+
+# Years outside this window are not birth dates the corpus can contain; they are dropped.
+MIN_BIRTH_YEAR = 1800
+MAX_BIRTH_YEAR = 2100
 
 _WHITESPACE = re.compile(r"\s+")
 _PUNCTUATION_TO_SPACE = re.compile(r"[\-‐-―'`’.,/_]+")
 _NON_WORD = re.compile(r"[^\w\s]+")
 _DIGITS = re.compile(r"\d")
-_ISO_DATE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})")
+_ISO_DATE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?$")
 _US_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 _COMPACT_DATE = re.compile(r"^(\d{4})(\d{2})(\d{2})$")
 _YEAR_ONLY = re.compile(r"^(\d{4})$")
 _ZIP = re.compile(r"^\s*(\d{5})(?:-\d{4})?\s*$")
+_PHONE_EXTENSION = re.compile(r"(?i)\s*(?:x|ext\.?|extension)\s*\d+\s*$")
 
 
 @dataclass(frozen=True)
@@ -88,13 +104,16 @@ class Normalized:
     """One record after S2. Every field is ``None`` when the source had nothing usable."""
 
     record_id: str | None = None
-    given_name: str | None = None  # case-folded, accents kept
+    given_name: str | None = None  # case-folded, accents kept, titles and suffix removed
     family_name: str | None = None
     given_name_folded: str | None = None  # accents stripped, punctuation to spaces
     family_name_folded: str | None = None
     given_tokens: tuple[str, ...] = ()
     family_tokens: tuple[str, ...] = ()
+    family_primary: str | None = None  # the paternal / first non-particle surname token
+    family_codes: tuple[str, ...] = ()  # Double Metaphone codes of every family token
     suffix: str | None = None  # JR, SR, II, III, IV, V
+    name_is_placeholder: bool = False
     birth_year: int | None = None
     birth_month: int | None = None
     birth_day: int | None = None
@@ -104,7 +123,6 @@ class Normalized:
     address_line: str | None = None
     address_tokens: tuple[str, ...] = ()
     zip5: str | None = None
-    extra: Mapping[str, Any] = field(default_factory=dict, compare=False)
 
     @property
     def birth_date(self) -> date | None:
@@ -117,7 +135,11 @@ class Normalized:
         return self.birth_date is not None
 
     def to_contract_dict(self) -> dict[str, Any]:
-        """The ``normalized_record`` row / contract ``NormalizedRecord`` fields."""
+        """Exactly the contract ``NormalizedRecord`` fields (``extra="forbid"`` there).
+
+        The contract has no year/month/day parts, so a year-only DOB does not survive this
+        shape; store and pass ``to_row_dict()`` (the ``normalized_record`` row) when it must.
+        """
         return {
             "record_id": self.record_id,
             "given_name": self.given_name,
@@ -125,13 +147,19 @@ class Normalized:
             "given_name_folded": self.given_name_folded,
             "family_name_folded": self.family_name_folded,
             "birth_date": self.birth_date,
-            "birth_year": self.birth_year,
-            "birth_month": self.birth_month,
-            "birth_day": self.birth_day,
             "sex": self.sex,
             "phone_e164": self.phone_e164,
             "address_line": self.address_line,
             "zip5": self.zip5,
+        }
+
+    def to_row_dict(self) -> dict[str, Any]:
+        """The ``normalized_record`` table row: the contract fields plus the DOB parts."""
+        return {
+            **self.to_contract_dict(),
+            "birth_year": self.birth_year,
+            "birth_month": self.birth_month,
+            "birth_day": self.birth_day,
         }
 
 
@@ -165,17 +193,38 @@ def strip_synthea_digits(text: str | None) -> str | None:
     return _DIGITS.sub("", str(text)) or None
 
 
-def _split_suffix(tokens: list[str]) -> tuple[list[str], str | None]:
+def _remove_tokens_from_accented(accented: str | None, removed: list[str]) -> str | None:
+    """Drop the title/suffix tokens from the accented form too, so both forms agree."""
+    if not accented:
+        return accented
+    for tok in removed:
+        accented = re.sub(rf"(?<!\w){re.escape(tok)}\.?(?!\w)", " ", accented)
+    out = _WHITESPACE.sub(" ", accented).strip(" ,")
+    return out or None
+
+
+def _split_name_tokens(tokens: list[str], suffix_allowed: bool) -> tuple[list[str], str | None, list[str]]:
+    """(kept tokens, suffix, removed tokens). A suffix is only the last family token."""
+    removed: list[str] = []
     suffix = None
-    kept: list[str] = []
+    if suffix_allowed and len(tokens) > 1 and tokens[-1] in GENERATION_SUFFIXES:
+        suffix = GENERATION_SUFFIXES[tokens[-1]]
+        removed.append(tokens[-1])
+        tokens = tokens[:-1]
+    kept = []
     for tok in tokens:
-        if tok in GENERATION_SUFFIXES and len(tokens) > 1:
-            suffix = GENERATION_SUFFIXES[tok]
-        elif tok in _TITLES and len(tokens) > 1:
-            continue
+        if tok in _TITLES and len(tokens) > 1:
+            removed.append(tok)
         else:
             kept.append(tok)
-    return kept, suffix
+    return kept, suffix, removed
+
+
+def primary_surname(tokens: tuple[str, ...]) -> str | None:
+    for tok in tokens:
+        if tok not in _PARTICLES:
+            return tok
+    return tokens[0] if tokens else None
 
 
 # --- field parsers ----------------------------------------------------------------------
@@ -184,9 +233,9 @@ def _split_suffix(tokens: list[str]) -> tuple[list[str], str | None]:
 def parse_dob_parts(value: Any) -> tuple[int | None, int | None, int | None]:
     """Year, month, day with ``None`` for any part the source lacks or that is impossible.
 
-    Accepts ``date``/``datetime``, ISO ``YYYY-MM-DD``, US ``MM/DD/YYYY``, ``YYYYMMDD`` and a
-    bare ``YYYY`` (taxonomy D4, year only). Impossible days become ``None`` rather than raising,
-    because one bad field must not drop the record.
+    Accepts ``date``/``datetime``, ISO ``YYYY-MM-DD`` (a time suffix is ignored), US
+    ``MM/DD/YYYY``, ``YYYYMMDD`` and a bare ``YYYY`` (taxonomy D4, year only). Impossible
+    parts become ``None`` rather than raising, because one bad field must not drop the record.
     """
     if value is None:
         return None, None, None
@@ -206,6 +255,8 @@ def parse_dob_parts(value: Any) -> tuple[int | None, int | None, int | None]:
         year = int(m.group(1))
     else:
         return None, None, None
+    if year is not None and not MIN_BIRTH_YEAR <= year <= MAX_BIRTH_YEAR:
+        year = None
     if month is not None and not 1 <= month <= 12:
         month = None
     if day is not None and not 1 <= day <= 31:
@@ -216,6 +267,15 @@ def parse_dob_parts(value: Any) -> tuple[int | None, int | None, int | None]:
         except ValueError:
             day = None
     return year, month, day
+
+
+def _int_or_none(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def normalize_sex(value: Any) -> str | None:
@@ -233,11 +293,13 @@ def normalize_phone(value: Any) -> tuple[str | None, str | None]:
     """(E.164, national digits) for a US number; anything else is treated as missing.
 
     The synthetic corpus is US-only, so a 10-digit number or an 11-digit number starting with
-    the country code are the only shapes we trust. Extensions and letters are dropped.
+    the country code are the only shapes we trust. A trailing extension (``x123``, ``ext 4``)
+    is removed first; letters are dropped.
     """
     if value is None:
         return None, None
-    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    text = _PHONE_EXTENSION.sub("", str(value))
+    digits = "".join(ch for ch in text if ch.isdigit())
     if len(digits) == 11 and digits.startswith("1"):
         digits = digits[1:]
     if len(digits) != 10:
@@ -265,14 +327,17 @@ def normalize_address(value: Any) -> tuple[str | None, tuple[str, ...]]:
     return " ".join(tokens), tokens
 
 
-def normalize_name_part(value: Any) -> tuple[str | None, str | None, tuple[str, ...], str | None]:
-    """(accented, folded, tokens, suffix) for one name field."""
+def normalize_name_part(
+    value: Any, *, suffix_allowed: bool
+) -> tuple[str | None, str | None, tuple[str, ...], str | None]:
+    """(accented, folded, tokens, suffix) for one name field, titles and suffix removed from both forms."""
     text = strip_synthea_digits(None if value is None else str(value))
     accented = casefold_text(text)
     folded = fold_text(text)
     if not folded:
         return accented, None, (), None
-    tokens, suffix = _split_suffix(folded.split())
+    tokens, suffix, removed = _split_name_tokens(folded.split(), suffix_allowed)
+    accented = _remove_tokens_from_accented(accented, removed)
     folded_clean = " ".join(tokens) or None
     return accented, folded_clean, tuple(tokens), suffix
 
@@ -285,6 +350,9 @@ _ALIASES: dict[str, tuple[str, ...]] = {
     "family_name": ("family_name", "family", "last_name", "last", "surname"),
     "suffix": ("suffix", "name_suffix"),
     "birth_date": ("birth_date", "birthdate", "dob", "date_of_birth"),
+    "birth_year": ("birth_year",),
+    "birth_month": ("birth_month",),
+    "birth_day": ("birth_day",),
     "sex": ("sex", "gender"),
     "phone": ("phone", "phone_e164", "telephone", "phone_number"),
     "address_line": ("address_line", "address", "street", "address1"),
@@ -300,15 +368,28 @@ def _get(raw: Mapping[str, Any], key: str) -> Any:
 
 
 def normalize_record(raw: Mapping[str, Any]) -> Normalized:
-    """Fielded source values (any of the aliases above) to one ``Normalized`` record."""
-    given, given_folded, given_tokens, given_suffix = normalize_name_part(_get(raw, "given_name"))
-    family, family_folded, family_tokens, family_suffix = normalize_name_part(_get(raw, "family_name"))
+    """Fielded source values (any of the aliases above) to one ``Normalized`` record.
+
+    Explicit ``birth_year`` / ``birth_month`` / ``birth_day`` parts (the table row) are used
+    when ``birth_date`` is absent, so a year-only DOB survives a trip through the database.
+    """
+    given, given_folded, given_tokens, _ = normalize_name_part(_get(raw, "given_name"), suffix_allowed=False)
+    family, family_folded, family_tokens, family_suffix = normalize_name_part(
+        _get(raw, "family_name"), suffix_allowed=True
+    )
     explicit_suffix = fold_text(_get(raw, "suffix"))
-    suffix = GENERATION_SUFFIXES.get(explicit_suffix or "", None) or family_suffix or given_suffix
+    suffix = GENERATION_SUFFIXES.get(explicit_suffix or "", None) or family_suffix
     year, month, day = parse_dob_parts(_get(raw, "birth_date"))
+    if year is None and month is None and day is None:
+        year, month, day = parse_dob_parts_from_components(
+            _int_or_none(_get(raw, "birth_year")),
+            _int_or_none(_get(raw, "birth_month")),
+            _int_or_none(_get(raw, "birth_day")),
+        )
     phone_e164, phone_digits = normalize_phone(_get(raw, "phone"))
     address_line, address_tokens = normalize_address(_get(raw, "address_line"))
     record_id = _get(raw, "record_id")
+    family_codes = tuple(sorted({code for tok in family_tokens for code in double_metaphone(tok) if code}))
     return Normalized(
         record_id=None if record_id is None else str(record_id),
         given_name=given,
@@ -317,7 +398,10 @@ def normalize_record(raw: Mapping[str, Any]) -> Normalized:
         family_name_folded=family_folded,
         given_tokens=given_tokens,
         family_tokens=family_tokens,
+        family_primary=primary_surname(family_tokens),
+        family_codes=family_codes,
         suffix=suffix,
+        name_is_placeholder=is_placeholder_name(given_folded, family_folded),
         birth_year=year,
         birth_month=month,
         birth_day=day,
@@ -330,11 +414,29 @@ def normalize_record(raw: Mapping[str, Any]) -> Normalized:
     )
 
 
-def coerce_normalized(value: Any) -> Normalized:
-    """Accept a ``Normalized``, a contract ``NormalizedRecord`` or a plain mapping.
+def parse_dob_parts_from_components(
+    year: int | None, month: int | None, day: int | None
+) -> tuple[int | None, int | None, int | None]:
+    """Validate already-split parts with the same bounds as ``parse_dob_parts``."""
+    if year is not None and not MIN_BIRTH_YEAR <= year <= MAX_BIRTH_YEAR:
+        year = None
+    if month is not None and not 1 <= month <= 12:
+        month = None
+    if day is not None and not 1 <= day <= 31:
+        day = None
+    if year is not None and month is not None and day is not None:
+        try:
+            date(year, month, day)
+        except ValueError:
+            day = None
+    return year, month, day
 
-    The API stores the contract shape; re-normalizing it is idempotent because every field
-    is already in its canonical form, so one entry point serves the gate and the executors.
+
+def coerce_normalized(value: Any) -> Normalized:
+    """Accept a ``Normalized``, a contract ``NormalizedRecord``, a table row or a plain mapping.
+
+    Re-normalizing canonical values is idempotent, so one entry point serves the gate and the
+    executors. Prefer the row shape (with DOB parts) over the contract shape for year-only DOBs.
     """
     if isinstance(value, Normalized):
         return value

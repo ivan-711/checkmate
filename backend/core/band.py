@@ -13,7 +13,7 @@ from typing import Any
 
 from backend.core.features import FeatureVector, compute_features
 from backend.core.normalize import Normalized, coerce_normalized
-from backend.core.placeholders import is_placeholder_dob, is_placeholder_name
+from backend.core.placeholders import is_placeholder_dob
 from backend.core.score import Weights, display_probability, score_pair
 from contracts.models.common import Band, Contribution, NegativeRule
 from contracts.models.pairs import EvidenceSnapshot
@@ -74,9 +74,7 @@ def negative_rules_for(a: Normalized, b: Normalized, fv: FeatureVector) -> list[
         fired.append(NegativeRule.PARENT_CHILD)
     if a.suffix and b.suffix and a.suffix != b.suffix:
         fired.append(NegativeRule.GENERATION_SUFFIX_MISMATCH)
-    if is_placeholder_name(a.given_name_folded, a.family_name_folded) or is_placeholder_name(
-        b.given_name_folded, b.family_name_folded
-    ):
+    if a.name_is_placeholder or b.name_is_placeholder:
         fired.append(NegativeRule.PLACEHOLDER_NAME)
     if is_placeholder_dob(a.birth_year, a.birth_month, a.birth_day) or is_placeholder_dob(
         b.birth_year, b.birth_month, b.birth_day

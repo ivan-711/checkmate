@@ -16,12 +16,7 @@ import jellyfish
 from backend.core.nicknames import same_nickname_family
 from backend.core.normalize import Normalized
 from backend.core.phonetics import phonetic_codes_match
-from backend.core.placeholders import (
-    is_placeholder_dob,
-    is_placeholder_name,
-    is_placeholder_phone,
-    is_placeholder_zip,
-)
+from backend.core.placeholders import is_placeholder_dob, is_placeholder_phone, is_placeholder_zip
 
 FEATURE_NAMES: Final[tuple[str, ...]] = (
     "given_jw",
@@ -105,7 +100,6 @@ def _name_features(
         f"{prefix}_jw": jaro_winkler(accented_a, accented_b),
         f"{prefix}_jw_folded": jaro_winkler(folded_a, folded_b),
         f"{prefix}_dl": damerau_similarity(folded_a, folded_b),
-        f"{prefix}_dmeta": 1.0 if phonetic_codes_match(tokens_a[-1], tokens_b[-1]) else 0.0,
         f"{prefix}_token_overlap": token_overlap(tokens_a, tokens_b),
     }
 
@@ -136,8 +130,9 @@ def dob_signals(a: Normalized, b: Normalized) -> dict[str, float | None]:
             "dob_exact": 1.0 if exact else 0.0,
             "dob_day_month_swap": 1.0 if swap else 0.0,
             "dob_one_digit_edit": 1.0 if hamming == 1 else 0.0,
-            # A swap is its own signal; it must not also read as a transposed pair of components.
-            "dob_one_component_off": 1.0 if (components_off == 1 and not swap) else 0.0,
+            # Each named signal is exclusive: a swap is not a component change and a one-digit edit is
+            # not also "one component off", so the scorer never earns the credit twice.
+            "dob_one_component_off": 1.0 if (components_off == 1 and not swap and hamming != 1) else 0.0,
         }
     )
     return out
@@ -160,9 +155,7 @@ def compute_features(a: Normalized, b: Normalized) -> FeatureVector:
     values: dict[str, float | None] = dict.fromkeys(FEATURE_NAMES, None)
     missing: dict[str, bool] = dict.fromkeys(MISSING_GROUPS, True)
 
-    placeholder_a = is_placeholder_name(a.given_name_folded, a.family_name_folded)
-    placeholder_b = is_placeholder_name(b.given_name_folded, b.family_name_folded)
-    names_usable = not (placeholder_a or placeholder_b)
+    names_usable = not (a.name_is_placeholder or b.name_is_placeholder)
 
     if names_usable and a.given_name and b.given_name and a.given_tokens and b.given_tokens:
         missing["given_name"] = False
@@ -178,8 +171,9 @@ def compute_features(a: Normalized, b: Normalized) -> FeatureVector:
             )
         )
         values["given_dmeta"] = 1.0 if phonetic_codes_match(a.given_tokens[0], b.given_tokens[0]) else 0.0
+        # Only a genuinely different token counts as a nickname; a shared token is token overlap.
         values["given_nickname"] = (
-            1.0 if any(same_nickname_family(x, y) for x in a.given_tokens for y in b.given_tokens) else 0.0
+            1.0 if any(x != y and same_nickname_family(x, y) for x in a.given_tokens for y in b.given_tokens) else 0.0
         )
         values["given_initial"] = 1.0 if a.given_tokens[0][0] == b.given_tokens[0][0] else 0.0
 
@@ -196,6 +190,8 @@ def compute_features(a: Normalized, b: Normalized) -> FeatureVector:
                 b.family_tokens,
             )
         )
+        # Any shared code across all surname tokens, so a dropped or reordered surname still matches.
+        values["family_dmeta"] = 1.0 if set(a.family_codes) & set(b.family_codes) else 0.0
 
     dob_usable = not (
         is_placeholder_dob(a.birth_year, a.birth_month, a.birth_day)

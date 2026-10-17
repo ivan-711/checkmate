@@ -108,3 +108,26 @@ def test_weights_json_round_trip(tmp_path):
     loaded = load_weights(path)
     assert loaded == HANDSET_WEIGHTS
     assert json.loads(path.read_text())["scorer_version"] == "handset-0"
+
+
+def test_handset_json_on_disk_equals_the_in_code_weights():
+    assert load_weights("handset-0") == HANDSET_WEIGHTS
+
+
+def test_load_weights_distinguishes_paths_from_version_names(tmp_path):
+    with pytest.raises(FileNotFoundError) as info:
+        load_weights(tmp_path / "missing.json")
+    assert str(tmp_path / "missing.json") in str(info.value)
+    with pytest.raises(FileNotFoundError) as info:
+        load_weights("no-such-version")
+    assert "no-such-version.json" in str(info.value)
+
+
+def test_platt_parameters_round_trip_through_json(tmp_path):
+    platt = Weights(
+        scorer_version="platt-test", intercept=-11.0, weights=HANDSET_WEIGHTS.weights, platt_a=-0.7, platt_b=0.3
+    )
+    path = tmp_path / "platt.json"
+    save_weights(platt, path)
+    loaded = Weights.from_json_dict(json.loads(path.read_text()))
+    assert loaded == platt and loaded.platt_a == -0.7
