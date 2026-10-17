@@ -4,6 +4,7 @@ only (ADR-004). Every other resource type in the bundle is dropped unread.
 Field paths were checked against the Nov 2021 sample on 2026-10-17 (transaction bundles,
 ``fullUrl = urn:uuid:<id>``, phone ``555-NNN-NNNN``, language under ``communication[0]``).
 """
+
 from __future__ import annotations
 
 import json

@@ -5,6 +5,7 @@ runs the corruption generator, writes every generated record through the store a
 counts the build brief asks for. The blocking reduction ratio is W2's; until W2 merges the line
 reads "reduction: pending W2".
 """
+
 from __future__ import annotations
 
 import argparse
@@ -69,7 +70,9 @@ def foreign_records(conn: psycopg.Connection, corpus) -> int:
 def stale_key_rows(conn: psycopg.Connection) -> int:
     """block_key rows outside backend.core's vocabulary: a database loaded before issue #10. A reload
     skips records whose payload is already stored, so those rows would stay; refuse instead."""
-    return conn.execute("SELECT count(*) FROM block_key WHERE NOT (key_type = ANY(%s))", (list(KEY_TYPES),)).fetchone()[0]
+    return conn.execute("SELECT count(*) FROM block_key WHERE NOT (key_type = ANY(%s))", (list(KEY_TYPES),)).fetchone()[
+        0
+    ]
 
 
 def match_run_blocking(conn: psycopg.Connection, corpus: CorpusOutput) -> BlockingResult:
@@ -95,10 +98,14 @@ def cmd_load(args: argparse.Namespace) -> int:
     with psycopg.connect(args.database_url) as conn:
         stale = stale_key_rows(conn)
         if stale:
-            raise SystemExit(f"database holds {stale} block key row(s) from before issue #10; reload into a fresh database")
+            raise SystemExit(
+                f"database holds {stale} block key row(s) from before issue #10; reload into a fresh database"
+            )
         foreign = foreign_records(conn, corpus)
         if foreign:
-            raise SystemExit(f"database already holds {foreign} record(s) from another corpus or seed; use a fresh database")
+            raise SystemExit(
+                f"database already holds {foreign} record(s) from another corpus or seed; use a fresh database"
+            )
         write_outputs(corpus, args.out / f"corruptor-{args.seed}")
         result = ingest(conn, (rec.draft for rec in corpus.records))
         counts = pair_candidates_by_key_type(conn)
@@ -106,12 +113,18 @@ def cmd_load(args: argparse.Namespace) -> int:
         total_records = conn.execute("SELECT count(*) FROM source_record").fetchone()[0]
     print(f"bundles skipped as malformed: {len(skipped)}" + (f" ({', '.join(skipped)})" if skipped else ""))
     print(f"entities: {corpus.run['entities']}")
-    print(f"records: generated={corpus.run['records']} inserted={result.records_inserted} skipped={result.records_skipped} in_db={total_records}")
-    print(f"pairs: same={corpus.run['pairs_same']} not_same={corpus.run['pairs_not_same']} grafts={corpus.run['grafts']}")
+    print(
+        f"records: generated={corpus.run['records']} inserted={result.records_inserted} skipped={result.records_skipped} in_db={total_records}"
+    )
+    print(
+        f"pairs: same={corpus.run['pairs_same']} not_same={corpus.run['pairs_not_same']} grafts={corpus.run['grafts']}"
+    )
     for key_type in KEY_TYPES:
         print(f"pair candidates [{key_type}]: {counts.get(key_type, 0)}")
-    print(f"candidate pairs: {blocking.n_candidate_pairs} of {blocking.n_total_pairs}  reduction: {blocking.reduction_ratio:.4f}"
-          f"  oversized blocks: {len(blocking.oversized_blocks)} (pairs skipped: {blocking.pairs_skipped_oversized})")
+    print(
+        f"candidate pairs: {blocking.n_candidate_pairs} of {blocking.n_total_pairs}  reduction: {blocking.reduction_ratio:.4f}"
+        f"  oversized blocks: {len(blocking.oversized_blocks)} (pairs skipped: {blocking.pairs_skipped_oversized})"
+    )
     same_hit, same_n = truth_pairs_blocked(blocking, corpus, LABEL_SAME)
     not_hit, not_n = truth_pairs_blocked(blocking, corpus, LABEL_NOT_SAME)
     print(f"blocking recall: SAME {same_hit}/{same_n}  NOT_SAME (hard negatives reaching the scorer) {not_hit}/{not_n}")
