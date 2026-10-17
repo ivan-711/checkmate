@@ -108,9 +108,13 @@ def _w1_overlay_drafts(overlay_dir: Path) -> list:
 
 
 def _w1_normalize(identity):
-    from backend.ingest.normalize import normalize_identity
+    """W1's ``normalized_record`` row for one identity, the same row ``cli load`` stores (issue #10),
+    with attribute access so ``_card_from_draft`` reads it like any normalized record."""
+    from types import SimpleNamespace
 
-    return normalize_identity(identity)
+    from backend.ingest.normalize import normalized_row
+
+    return SimpleNamespace(**normalized_row(identity))
 
 
 # --- drafts to contract cards -----------------------------------------------------------------
