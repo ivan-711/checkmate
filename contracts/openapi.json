@@ -3012,6 +3012,16 @@
           "required": true
         },
         "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewResponse"
+                }
+              }
+            },
+            "description": "Same-state request: the current decision, no new version"
+          },
           "201": {
             "content": {
               "application/json": {
