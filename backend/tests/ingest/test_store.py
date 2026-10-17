@@ -89,3 +89,19 @@ def test_cli_refuses_a_database_with_pre_issue_10_key_rows(db, bundles, csv_pati
     record_id = db.execute("SELECT id FROM source_record LIMIT 1").fetchone()[0]
     db.execute("INSERT INTO block_key (key_type, key_value, record_id) VALUES ('dob_exact', '1990-03-07', %s)", (record_id,))
     assert stale_key_rows(db) == 1
+
+
+def test_db_fixture_clears_rows_that_reference_source_records(db, bundles, csv_patients):
+    """A shared test database can hold another lane's committed candidate_pair rows; the fixture's
+    clear must delete dependents first instead of failing on the foreign key."""
+    from backend.tests.ingest.conftest import clear_test_state
+
+    ingest(db, drafts_for(bundles, csv_patients))
+    a, b = sorted(str(r[0]) for r in db.execute("SELECT id FROM source_record LIMIT 2").fetchall())
+    db.execute(
+        "INSERT INTO candidate_pair (id, record_a_id, record_b_id, origin) VALUES (gen_random_uuid(), %s, %s, 'MATCH_RUN')",
+        (a, b),
+    )
+    clear_test_state(db)
+    assert db.execute("SELECT count(*) FROM source_record").fetchone()[0] == 0
+    assert db.execute("SELECT count(*) FROM candidate_pair").fetchone()[0] == 0
