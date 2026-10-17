@@ -1,0 +1,16 @@
+{
+  "name": "checkmate-acceptance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "G16 acceptance script for CheckMate (lane W5). Runs against a running UI on 127.0.0.1:3000 and API on 8000.",
+  "scripts": {
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "install-browsers": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.5",
+    "typescript": "5.9.3"
+  }
+}
