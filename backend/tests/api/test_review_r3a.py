@@ -16,7 +16,7 @@ from sqlalchemy import text
 
 from backend.events.writer import PayloadNotStructured, write_event
 from backend.tests.api.conftest import API, approve_body, count_events, engine, new_key, reject_body, review
-from contracts.models.common import ActorType, EventType
+from contracts.models.common import ActorType, EventType, NegativeRule
 
 NOTE_MARKER = "R3A-NOTE-MARKER-must-never-be-logged"
 
@@ -147,6 +147,10 @@ def test_event_log_carries_no_note_text_no_record_fields_and_no_long_strings(cli
     for row in rows:
         blob = f"{row.payload}{row.versions}{row.outcome}"
         assert NOTE_MARKER not in blob, row.event_type
+        # Negative-rule names (BIRTH_YEAR_GAP_GT_2, ...) are enum values a PAIR_SCORED payload lists by
+        # design, not record fields; remove them before scanning for field words (W3a, with the real core).
+        for rule in NegativeRule:
+            blob = blob.replace(rule.value, "")
         for forbidden in ("given", "family", "birth", "phone", "address", "zip", "raw_payload", "api_key", "token"):
             assert forbidden not in blob.lower(), (row.event_type, forbidden)
 
