@@ -20,8 +20,8 @@ function announcement(response: ReviewResponse): string {
   if (response.decision.status === "REJECTED")
     return "Link rejected. Records kept separate. No safety check ran.";
   return response.alerts?.length
-    ? "Records linked into one golden record. Flagged for clinician review."
-    : "Records linked into one golden record.";
+    ? "Link approved. Records linked into one golden record with a crosswalk on every value. Flagged for clinician review: a rule found a documented allergy beside an active order."
+    : "Link approved. Records linked into one golden record with a crosswalk on every value. The rule did not flag this record.";
 }
 
 export function CaseScreen() {

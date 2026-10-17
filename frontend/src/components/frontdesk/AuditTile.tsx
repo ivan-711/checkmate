@@ -44,7 +44,7 @@ export function AuditTile() {
       </h3>
       {tiles.isPending && <p aria-busy="true">-</p>}
       {tiles.isError && <p className="text-error-ink">Audit tile unavailable: {tiles.error.message}</p>}
-      {tiles.isSuccess && !tile && <p className="text-ink-3">The AGENT_GATE tile is not in this response.</p>}
+      {tiles.isSuccess && !tile && <p className="text-ink-3">No agent-gate tile in this response.</p>}
       {tile && tile.total === 0 && (
         <>
           <p className="text-[24px] font-semibold">No agent actions yet.</p>
