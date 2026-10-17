@@ -250,3 +250,33 @@ def test_a_hero_export_rewritten_in_place_is_used_by_the_next_reset(client, hero
     cards = _reset(client)["sources"]
     assert [c["record"]["id"] for c in cards] == [hero_corpus.er_id, hero_corpus.clinic_id]
     assert not any(c["record"]["isConstructed"] for c in cards), "the overlay removed in place is no longer applied"
+
+
+BREAKAGE_PROBLEMS = {
+    "bundle entry not an object": "not an object",
+    "constructed Patient without id": "no id",
+    "allergies.csv not UTF-8": "UTF-8",
+    "hero.json is a directory": "cannot be read",
+}
+
+
+@pytest.mark.parametrize("case", sorted(BREAKAGE_PROBLEMS))
+def test_r3a_breakages_log_one_line_naming_the_directory_and_problem(client, hero_corpus, db_conn, caplog, case):
+    from backend.tests.api.test_hero_guard_r3a import BREAKAGES
+
+    _reset(client)
+    BREAKAGES[case](hero_corpus.hero_dir)
+    _refused_without_state_change(client, db_conn, caplog, hero_corpus.hero_dir, BREAKAGE_PROBLEMS[case])
+
+
+def test_the_corpus_cache_holds_one_corpus(client, hero_corpus):
+    """A new hero export replaces the cached corpus; it never keeps a second full corpus in memory."""
+    from backend.scenarios import loader
+
+    _reset(client)
+    allergies = hero_corpus.hero_dir / "csv" / "allergies.csv"
+    allergies.write_text(allergies.read_text() + "\n")  # a file the loader reads: a new key
+    _reset(client)
+    info = loader._corpus_cards.cache_info()
+    assert info.maxsize == 1
+    assert info.currsize == 1
