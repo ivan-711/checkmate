@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 3000;
+// CHECKMATE_UI_PORT lets a reviewer run the suite against a build on another port.
+const PORT = Number(process.env.CHECKMATE_UI_PORT ?? 3000);
 
 export default defineConfig({
   testDir: "e2e",
@@ -17,7 +18,7 @@ export default defineConfig({
   ],
   // Reuses a running server (the shared dev server rule); otherwise serves the production build.
   webServer: {
-    command: "npm run start",
+    command: `npm run start -- -p ${PORT}`,
     url: `http://127.0.0.1:${PORT}/`,
     reuseExistingServer: true,
     timeout: 60_000,

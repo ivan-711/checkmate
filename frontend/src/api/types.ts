@@ -23,3 +23,5 @@ export type Tile = Schemas["Tile"];
 export type TilesResponse = Schemas["TilesResponse"];
 export type TimelineEvent = Schemas["TimelineEvent"];
 export type ErrorEnvelope = Schemas["ErrorEnvelope"];
+export type EventLogRow = Schemas["EventLogRow"];
+export type EventType = Schemas["EventType"];

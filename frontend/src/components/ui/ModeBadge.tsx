@@ -18,6 +18,7 @@ export function ModeBadge({ mode }: { mode: Mode }) {
   const { Icon, border, title } = BADGES[mode];
   return (
     <span
+      data-testid="app-mode-badge"
       title={title}
       className={`inline-flex h-9 items-center gap-2 rounded border-2 ${border} border-ink-1 px-3 text-[14px] font-semibold tracking-wide`}
     >

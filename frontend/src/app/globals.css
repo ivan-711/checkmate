@@ -61,7 +61,7 @@
     --error-ink: #f2a07a;
     --error-bg: #341a10;
     --evidence-for: #3987e5;
-    --evidence-against: #d95926;
+    --evidence-against: #c47a2a;
     --band-auto: #4fc1b3;
     --on-band-auto: #0b1413;
   }
@@ -88,7 +88,7 @@
   --error-ink: #f2a07a;
   --error-bg: #341a10;
   --evidence-for: #3987e5;
-  --evidence-against: #d95926;
+  --evidence-against: #c47a2a;
   --band-auto: #4fc1b3;
   --on-band-auto: #0b1413;
 }

@@ -20,6 +20,7 @@ interface Props {
 export function Timeline({ events, cards }: Props) {
   return (
     <section
+      data-testid="timeline"
       aria-labelledby="timeline-heading"
       className="enter enter-late rounded-lg border border-border-subtle bg-surface p-4"
     >
@@ -45,6 +46,8 @@ export function Timeline({ events, cards }: Props) {
                     {lane.map((e) => (
                       <li
                         key={`${e.resourceId}-${e.occurredAt}`}
+                        data-testid="timeline-event"
+                        data-source-system={e.sourceSystem}
                         className="flex flex-wrap items-center gap-2"
                       >
                         <Marker type={e.type} />

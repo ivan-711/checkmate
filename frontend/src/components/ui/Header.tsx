@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { ModeBadge } from "./ModeBadge";
+import { ProvisionalBadge } from "./ProvisionalBadge";
 import { ResetButton } from "./ResetButton";
 
 const TABS = [
@@ -38,6 +39,7 @@ export function Header() {
         </ul>
       </nav>
       <div className="ml-auto flex items-center gap-3">
+        <ProvisionalBadge />
         <ModeBadge mode={mode} />
         <ResetButton />
       </div>

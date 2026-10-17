@@ -14,7 +14,7 @@ export function EvidenceRail({ detail }: { detail: CandidatePairDetail }) {
   const scale = Math.max(...ranked.map((c) => Math.abs(c.logit)), Number.EPSILON);
 
   return (
-    <section aria-labelledby="evidence-heading" className="space-y-4">
+    <section data-testid="evidence-rail" aria-labelledby="evidence-heading" className="space-y-4">
       <h2 id="evidence-heading" className="text-[18px] font-semibold uppercase tracking-wider">
         Evidence{" "}
         <span className="font-normal normal-case tracking-normal text-ink-2">
@@ -24,7 +24,9 @@ export function EvidenceRail({ detail }: { detail: CandidatePairDetail }) {
       <div>
         <div className="flex items-center gap-3">
           <span className="text-[56px] font-bold leading-[60px] tabular-nums">{decision.p.toFixed(2)}</span>
-          <BandChip band={decision.band} />
+          <span data-testid="pair-band" className="contents">
+            <BandChip band={decision.band} />
+          </span>
         </div>
         <p className="text-[16px] text-ink-2">
           Probability estimate fitted on our synthetic development distribution
@@ -34,7 +36,11 @@ export function EvidenceRail({ detail }: { detail: CandidatePairDetail }) {
         <p className="mb-2 text-[16px] text-ink-3">Evidence weight (log-odds): against ← 0 → for</p>
         <ul aria-label="Top evidence" className="space-y-1">
           {ranked.map((c) => (
-            <li key={c.feature} className="grid grid-cols-[10rem_1fr_4rem] items-center gap-2 text-[16px]">
+            <li
+              key={c.feature}
+              data-testid="evidence-feature-row"
+              className="grid grid-cols-[10rem_1fr_4rem] items-center gap-2 text-[16px]"
+            >
               <span>{c.label}</span>
               {c.missing ? (
                 <span className="col-span-2 text-ink-3">no evidence</span>

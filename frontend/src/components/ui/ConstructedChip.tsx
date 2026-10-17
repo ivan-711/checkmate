@@ -8,6 +8,7 @@ export function ConstructedChip() {
   const tipId = useId();
   return (
     <span
+      data-testid="constructed-scenario-chip"
       tabIndex={0}
       aria-describedby={tipId}
       className="group relative inline-flex items-center rounded border border-ink-2 px-2 text-[14px] font-medium text-ink-2"
