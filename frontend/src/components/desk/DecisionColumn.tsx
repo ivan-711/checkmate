@@ -57,7 +57,9 @@ function ResolveButton({
 function AttachCheckIn({ c, registrar }: { c: DeskCase; registrar: string }) {
   const source = useDataSource();
   const queryClient = useQueryClient();
-  const pair = c.detail ? attachablePair(c.handoffs, c.detail.pair.id) : null;
+  // Once any hand-off pair is linked the check-in is attached; a weaker pair left proposed is not offered.
+  const attached = c.handoffs.some((d) => d.pair.decision.status === "LINKED");
+  const pair = c.detail && !attached ? attachablePair(c.handoffs, c.detail.pair.id) : null;
   // One Idempotency-Key per intent, kept until a response, so a retry resends it.
   const key = useRef<string | null>(null);
   const attach = useMutation({
