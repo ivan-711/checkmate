@@ -3,6 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { CandidatePairDetail } from "@/api/types";
+import { DeskProvider } from "@/components/desk/DeskContext";
 import { DataSourceProvider } from "@/data/DataSourceProvider";
 import { scenario } from "@/data/scenario";
 import type { Sheet } from "@/lib/desk";
@@ -33,14 +34,18 @@ function render(sheet: Sheet, handoffPairs: CandidatePairDetail[] = []): string 
       createElement(
         DataSourceProvider,
         null,
-        createElement(ReviewPanel, {
-          detail: hero,
-          handoffPairs,
-          sheet,
-          onSheetChange: () => {},
-          onConfirmed: () => {},
-          onDecided: () => {},
-        }),
+        createElement(
+          DeskProvider,
+          null,
+          createElement(ReviewPanel, {
+            detail: hero,
+            handoffPairs,
+            sheet,
+            onSheetChange: () => {},
+            onConfirmed: () => {},
+            onDecided: () => {},
+          }),
+        ),
       ),
     ),
   );
@@ -58,7 +63,8 @@ describe("ReviewPanel", () => {
   it("the approve sheet asks the question, takes the registrar and a note, and confirms the link", () => {
     const html = render("approve");
     expect(html).toContain("Link these two records?");
-    for (const name of scenario.registrarLabels) expect(html).toContain(`<option>${name}</option>`);
+    for (const name of scenario.registrarLabels)
+      expect(html).toMatch(new RegExp(`<option[^>]*>${name}</option>`));
     expect(html).toContain('data-testid="review-note-input"');
     expect(html).toMatch(/data-testid="review-submit-button"[^>]*>Confirm link/);
     expect(html).not.toContain('data-testid="review-reason-select"');
@@ -86,7 +92,10 @@ describe("ReviewPanel", () => {
   it("offers no attach row when no check-in is held, or when the held pair is the one under review", () => {
     expect(render("approve", [])).not.toContain("Also attach the kiosk check-in");
     expect(render("approve", [hero])).not.toContain("Also attach the kiosk check-in");
-    const linked = { ...handoff("h", 0.98), pair: { ...handoff("h", 0.98).pair, decision: { ...hero.pair.decision, status: "LINKED" as const } } };
+    const linked = {
+      ...handoff("h", 0.98),
+      pair: { ...handoff("h", 0.98).pair, decision: { ...hero.pair.decision, status: "LINKED" as const } },
+    };
     expect(render("approve", [linked])).not.toContain("Also attach the kiosk check-in");
   });
 

@@ -2,14 +2,23 @@
 
 import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import type { ReviewResponse } from "@/api/types";
+import type { CandidatePairDetail, IntakeSession, ReviewResponse } from "@/api/types";
+import { attachablePair, type ReviewRun } from "@/components/case/reviewPlan";
+import { INTAKE_KEY, handoffPairKey, useHandoffPairs } from "@/components/frontdesk/intake";
 import { useAnnounce } from "@/components/ui/LiveRegion";
-import { LATEST_MATCH_RUN_KEY, RESOLVE_KEY, SESSION_CHANGE_KEY, WORK_QUEUE_KEY } from "@/components/ui/ResetButton";
+import {
+  LATEST_MATCH_RUN_KEY,
+  RESOLVE_KEY,
+  SESSION_CHANGE_KEY,
+  WORK_QUEUE_KEY,
+} from "@/components/ui/ResetButton";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { DataError } from "@/data/source";
 import { actorName } from "@/lib/display";
 import { flagState } from "@/lib/flagState";
 import { useDesk } from "./DeskContext";
+
+export const CASE_KEY = ["case", undefined] as const;
 
 function announcement(response: ReviewResponse): string {
   if (response.decision.status === "REJECTED")
@@ -31,7 +40,7 @@ export function useDeskCase() {
   // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
   const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
   const caseQuery = useQuery({
-    queryKey: ["case", undefined],
+    queryKey: CASE_KEY,
     queryFn: () => source.getCase(),
     // Paused while Reset or Undo runs: reads against the half-reset session only race the reset.
     enabled: !sessionChanging,
@@ -46,10 +55,20 @@ export function useDeskCase() {
   const flagRaised = flag.kind === "raised";
   const cards = data?.sources ?? [];
   const name = cards.map((c) => c.normalized.givenName).find((n) => n) ?? null;
+  // Before Resolve the pair has not been compared: the stage stays idle or held, never "review".
+  const compared = (data?.resolved ?? false) || linked;
+  const handoffs = useHandoffPairs()
+    .map((q) => q.data)
+    .filter((d): d is CandidatePairDetail => d !== undefined);
+  const thresholds = useQuery({
+    queryKey: ["thresholds"],
+    queryFn: () => source.getThresholds(),
+    staleTime: Infinity,
+  });
 
   useEffect(() => {
     setFacts({
-      decision: decision?.status ?? null,
+      decision: compared ? (decision?.status ?? null) : null,
       linked,
       flagRaised,
       name,
@@ -57,7 +76,7 @@ export function useDeskCase() {
       reason: decision?.reasonCode ?? null,
       linkedAt: decision?.status === "LINKED" ? decision.decidedAt : null,
     });
-  }, [setFacts, decision, linked, flagRaised, name]);
+  }, [setFacts, decision, compared, linked, flagRaised, name]);
 
   // A decision closes any sheet; a reset drops the facts with the query.
   useEffect(() => {
@@ -93,8 +112,38 @@ export function useDeskCase() {
     setJustApproved(false);
   }, [justApproved, linked, flagRaised]);
 
+  /** The server's responses, written into the queries the Desk draws from in the same frame the
+   * sheet closes (motion-polish finding 2): the record forms at once, the refetch fills in the rest. */
+  function onConfirmed(run: ReviewRun) {
+    const attached = data?.detail ? attachablePair(handoffs, data.detail.pair.id) : null;
+    const { primary } = run;
+    queryClient.setQueryData<typeof data>(CASE_KEY, (d) =>
+      d?.detail
+        ? {
+            ...d,
+            resolved: true,
+            detail: { ...d.detail, pair: { ...d.detail.pair, decision: primary.decision } },
+            outcome: primary.decision.status === "LINKED" ? primary : d.outcome,
+          }
+        : d,
+    );
+    if (primary.decision.status === "LINKED") setJustApproved(true);
+    if (run.attach && attached) writeAttach(attached.pair.id, run.attach);
+  }
+
+  /** A hand-off pair's approval: its decision, and the kiosk's check-in, which the server derives
+   * as LINKED once any of its pairs is (backend/frontdesk/registration.py). */
+  function writeAttach(pairId: string, response: ReviewResponse) {
+    queryClient.setQueryData<CandidatePairDetail>(handoffPairKey(pairId), (d) =>
+      d ? { ...d, pair: { ...d.pair, decision: response.decision } } : d,
+    );
+    if (response.decision.status !== "LINKED") return;
+    queryClient.setQueryData<IntakeSession>(INTAKE_KEY, (s) =>
+      s ? { ...s, registration: { ...s.registration, state: "LINKED" } } : s,
+    );
+  }
+
   function onDecided(response: ReviewResponse) {
-    setJustApproved(response.decision.status === "LINKED");
     announce(announcement(response));
   }
 
@@ -104,6 +153,11 @@ export function useDeskCase() {
     cards,
     detail: data?.detail ?? null,
     resolved: data?.resolved ?? false,
+    compared,
+    handoffs,
+    thresholds: thresholds.data,
+    onConfirmed,
+    writeAttach,
     entity,
     linked,
     flag,

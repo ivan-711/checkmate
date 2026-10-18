@@ -6,7 +6,11 @@ import { attachablePair, planReviews, runReviews } from "./reviewPlan";
 const hero = scenario.pair;
 const kiosk = "kiosk-record";
 
-function handoff(id: string, p: number, status: "PROPOSED" | "LINKED" | "REJECTED" = "PROPOSED"): CandidatePairDetail {
+function handoff(
+  id: string,
+  p: number,
+  status: "PROPOSED" | "LINKED" | "REJECTED" = "PROPOSED",
+): CandidatePairDetail {
   return {
     ...hero,
     pair: {
@@ -28,7 +32,12 @@ describe("attachablePair", () => {
 
   it("is nothing when no hand-off pair is waiting, or when the only one is the pair under review", () => {
     expect(attachablePair([handoff("done", 0.98, "LINKED")], hero.pair.id)).toBeNull();
-    expect(attachablePair([{ ...handoff("same", 0.98), pair: { ...handoff("same", 0.98).pair, id: hero.pair.id } }], hero.pair.id)).toBeNull();
+    expect(
+      attachablePair(
+        [{ ...handoff("same", 0.98), pair: { ...handoff("same", 0.98).pair, id: hero.pair.id } }],
+        hero.pair.id,
+      ),
+    ).toBeNull();
     expect(attachablePair([], hero.pair.id)).toBeNull();
   });
 });
@@ -52,15 +61,35 @@ describe("planReviews", () => {
   });
 
   it("a reject never touches the check-in, and an approve with the row off posts one review", () => {
-    const reject: ReviewRequest = { action: "REJECT", actor, reasonCode: "INSUFFICIENT_EVIDENCE", note: null };
+    const reject: ReviewRequest = {
+      action: "REJECT",
+      actor,
+      reasonCode: "INSUFFICIENT_EVIDENCE",
+      note: null,
+    };
     expect(
-      planReviews({ pairId: hero.pair.id, body: reject, attach: { pairId: "handoff-1", on: true }, keys: { primary: "k", attach: "k2" } }),
+      planReviews({
+        pairId: hero.pair.id,
+        body: reject,
+        attach: { pairId: "handoff-1", on: true },
+        keys: { primary: "k", attach: "k2" },
+      }),
     ).toHaveLength(1);
     expect(
-      planReviews({ pairId: hero.pair.id, body: { action: "APPROVE", actor, note: null }, attach: { pairId: "handoff-1", on: false }, keys: { primary: "k", attach: "k2" } }),
+      planReviews({
+        pairId: hero.pair.id,
+        body: { action: "APPROVE", actor, note: null },
+        attach: { pairId: "handoff-1", on: false },
+        keys: { primary: "k", attach: "k2" },
+      }),
     ).toHaveLength(1);
     expect(
-      planReviews({ pairId: hero.pair.id, body: { action: "APPROVE", actor, note: null }, attach: null, keys: { primary: "k", attach: "k2" } }),
+      planReviews({
+        pairId: hero.pair.id,
+        body: { action: "APPROVE", actor, note: null },
+        attach: null,
+        keys: { primary: "k", attach: "k2" },
+      }),
     ).toHaveLength(1);
   });
 });

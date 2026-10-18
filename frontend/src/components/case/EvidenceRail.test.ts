@@ -41,7 +41,9 @@ describe("EvidenceRail", () => {
     const html = render();
     const first = rows(html)[0];
     expect(first.slice(0, 400)).toContain('tabindex="0"');
-    expect(first).toMatch(/aria-label="Given name, same letters, weight \+0\.90\. ER FHIR PLACEHOLDER-GIVEN\. Clinic CSV PLACEHOLDER-GIVEN\."/);
+    expect(first).toMatch(
+      /aria-label="Given name, same letters, weight \+0\.90\. ER FHIR PLACEHOLDER-GIVEN\. Clinic CSV PLACEHOLDER-GIVEN\."/,
+    );
   });
 
   it("says auto-link is off and that the weights are hand-set, from the threshold set", () => {

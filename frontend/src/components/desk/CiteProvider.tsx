@@ -8,11 +8,20 @@ const NONE: CiteContext = { cite: null, setCite: () => {} };
 const Cite = createContext<CiteContext>(NONE);
 
 /** Hover-to-cite (CONCEPT.md §5, touch 6). The evidence rail writes the cited field; the Organism's
- * records read it and wash that field in both. `initial` is for server renders and tests. */
-export function CiteProvider({ initial = null, children }: { initial?: CiteField | null; children: ReactNode }) {
+ * records read it and wash that field in both. On the Desk, `value` is DeskContext's cite, so the
+ * header and Organism share it; `initial` is for server renders and tests. */
+export function CiteProvider({
+  initial = null,
+  value,
+  children,
+}: {
+  initial?: CiteField | null;
+  value?: CiteContext;
+  children: ReactNode;
+}) {
   const [cite, setCite] = useState<CiteField | null>(initial);
-  const value = useMemo<CiteContext>(() => ({ cite, setCite }), [cite]);
-  return <Cite.Provider value={value}>{children}</Cite.Provider>;
+  const own = useMemo<CiteContext>(() => ({ cite, setCite }), [cite]);
+  return <Cite.Provider value={value ?? own}>{children}</Cite.Provider>;
 }
 
 export function useCite(): CiteContext {

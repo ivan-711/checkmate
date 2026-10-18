@@ -6,19 +6,36 @@ import { scenario } from "@/data/scenario";
 import { HISTORY_ROWS, Timeline, historyRows } from "./Timeline";
 
 const cards = scenario.session.sources;
-const decision = { ...scenario.pair.pair.decision, status: "LINKED" as const, actor: "registrar:Registrar B" };
+const decision = {
+  ...scenario.pair.pair.decision,
+  status: "LINKED" as const,
+  actor: "registrar:Registrar B",
+};
 const events = scenario.timelineIfApproved;
 
-function event(year: number, system: "ER_FHIR" | "CLINIC_CSV", display: string, extra: Partial<TimelineEvent> = {}): TimelineEvent {
-  return { ...events[0], occurredAt: `${year}-06-01T00:00:00Z`, sourceSystem: system, display, isConstructed: false, resourceId: `${year}-${system}`, ...extra };
+function event(
+  year: number,
+  system: "ER_FHIR" | "CLINIC_CSV",
+  display: string,
+  extra: Partial<TimelineEvent> = {},
+): TimelineEvent {
+  return {
+    ...events[0],
+    occurredAt: `${year}-06-01T00:00:00Z`,
+    sourceSystem: system,
+    display,
+    isConstructed: false,
+    resourceId: `${year}-${system}`,
+    ...extra,
+  };
 }
 
-const render = (list: TimelineEvent[] | null | undefined = events) =>
+const render = (list: TimelineEvent[] | null | undefined) =>
   renderToStaticMarkup(createElement(Timeline, { events: list, cards, decision }));
 
 describe("Timeline (History)", () => {
   it("is the History pane: both sources, who linked them, one row per event with its source", () => {
-    const html = render();
+    const html = render(events);
     expect(html).toContain('data-testid="timeline"');
     expect(html).toContain("History");
     expect(html).toContain("both sources");

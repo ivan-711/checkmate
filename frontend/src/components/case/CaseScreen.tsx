@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/ResetButton";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { DataError } from "@/data/source";
-import { differingFields, type CardField } from "@/lib/display";
+import type { Sheet } from "@/lib/desk";
+import { actorName, differingFields, formatCt, type CardField } from "@/lib/display";
 import { flagState } from "@/lib/flagState";
 import { EventFeed } from "./EventFeed";
 import { EvidenceRail } from "./EvidenceRail";
@@ -36,6 +37,8 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
   const announce = useAnnounce();
   const queryClient = useQueryClient();
   const [justApproved, setJustApproved] = useState(false);
+  // The confirm sheet for this pair; this page has no kiosk, so nothing is attached.
+  const [sheet, setSheet] = useState<Sheet>(null);
   const flagRef = useRef<HTMLDivElement>(null);
   // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
   const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
@@ -170,8 +173,21 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
               aria-busy={resolve.isPending || sessionChanging}
               className="space-y-3 rounded-lg border border-border-subtle bg-surface p-3"
             >
-              <EvidenceRail detail={detail} />
-              <ReviewPanel detail={detail} onDecided={onDecided} />
+              <EvidenceRail detail={detail} thresholds={undefined} />
+              {detail.pair.decision.status !== "PROPOSED" && (
+                <p data-testid="decision-line">
+                  {detail.pair.decision.status === "LINKED" ? "Approved" : "Rejected"} by{" "}
+                  {actorName(detail.pair.decision.actor)} at {formatCt(detail.pair.decision.decidedAt)}.
+                </p>
+              )}
+              <ReviewPanel
+                detail={detail}
+                handoffPairs={[]}
+                sheet={sheet}
+                onSheetChange={setSheet}
+                onConfirmed={() => {}}
+                onDecided={onDecided}
+              />
             </div>
           ) : (
             <div className="rounded-lg border border-border-subtle bg-surface p-4 text-ink-2">
