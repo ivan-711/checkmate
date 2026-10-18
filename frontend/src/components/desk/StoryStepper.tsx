@@ -1,6 +1,7 @@
 "use client";
 
-import { STORY_STEPS, currentStep, stepStatus } from "@/lib/desk";
+import { useIntakeSession } from "@/components/frontdesk/intake";
+import { STORY_STEPS, currentStep, newChartStepStatus, stepStatus } from "@/lib/desk";
 import { useDesk } from "./DeskContext";
 
 const STATUS_RING = {
@@ -20,6 +21,9 @@ const STATUS_LABEL = {
 export function StoryStepper() {
   const { desk, kiosk, facts } = useDesk();
   const current = currentStep(desk, kiosk, facts.flagRaised);
+  // A new chart opened at the kiosk: the story ends at the gate, nothing is current on the Desk.
+  const intake = useIntakeSession();
+  const newChart = desk === "idle" && intake?.registration.state === "NEW_CHART";
   return (
     <ol
       data-testid="story-stepper"
@@ -27,7 +31,7 @@ export function StoryStepper() {
       className="stepper flex items-center gap-1 whitespace-nowrap text-[14px]"
     >
       {STORY_STEPS.map((step, i) => {
-        const status = stepStatus(step.id, current);
+        const status = newChart ? newChartStepStatus(step.id) : stepStatus(step.id, current);
         return (
           <li
             key={step.id}

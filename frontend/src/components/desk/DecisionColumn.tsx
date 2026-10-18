@@ -6,9 +6,10 @@ import { EvidenceRail } from "@/components/case/EvidenceRail";
 import { ReviewPanel } from "@/components/case/ReviewPanel";
 import { Timeline } from "@/components/case/Timeline";
 import { attachablePair } from "@/components/case/reviewPlan";
-import { HANDOFF_KEY } from "@/components/frontdesk/intake";
+import { HANDOFF_KEY, useIntakeSession } from "@/components/frontdesk/intake";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { actorName } from "@/lib/display";
+import { newChartFacts, type NewChartFacts } from "@/lib/kioskNewChart";
 import { useDesk } from "./DeskContext";
 import type { useDeskCase } from "./useDeskCase";
 
@@ -118,10 +119,40 @@ function RejectedLine({ c, name }: { c: DeskCase; name: string }) {
   );
 }
 
+/** The kiosk's check-in opened a new chart: who, as the patient typed it, and why nothing waits here. */
+function NewChartCard({ facts }: { facts: NewChartFacts }) {
+  return (
+    <div data-pane="new-chart" data-testid="new-chart-card">
+      <p className={EYEBROW}>From the kiosk</p>
+      <h2 className={TITLE}>New chart opened</h2>
+      <p className="text-[20px] font-semibold leading-tight text-ink">{facts.name}</p>
+      <dl className="mt-2 mb-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[16px]">
+        {facts.birthDate && (
+          <>
+            <dt className="text-ink-2">Born</dt>
+            <dd className="text-ink">{facts.birthDate}</dd>
+          </>
+        )}
+        {facts.phone && (
+          <>
+            <dt className="text-ink-2">Phone</dt>
+            <dd className="text-ink">{facts.phone}</dd>
+          </>
+        )}
+      </dl>
+      <p className={LEAD}>
+        No existing chart scored close enough, so the gate allowed a new one. Nothing to resolve; a registrar
+        finishes the registration in person.
+      </p>
+    </div>
+  );
+}
+
 /** The registrar's column (CONCEPT.md §8, L4): one pane per Desk state, so exactly one of Resolve,
  * the evidence and Approve, the confirm sheet, History, or "Kept apart" is on screen. */
 export function DecisionColumn({ c, onResolve }: { c: DeskCase; onResolve: () => void }) {
   const { desk, sheet, setSheet } = useDesk();
+  const newChart = newChartFacts(useIntakeSession());
   const noSession = c.caseQuery.isError && !c.detail;
   if (c.caseQuery.isPending || noSession) return null;
   const detail = c.detail;
@@ -176,6 +207,9 @@ export function DecisionColumn({ c, onResolve }: { c: DeskCase; onResolve: () =>
       </div>
     );
   }
+
+  // The gate let the kiosk open a new chart: say so, instead of offering a comparison nobody asked for.
+  if (desk === "idle" && newChart) return <NewChartCard facts={newChart} />;
 
   const held = desk === "held";
   return (

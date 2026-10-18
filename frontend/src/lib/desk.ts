@@ -74,6 +74,13 @@ export function stepStatus(step: StoryStep, current: StoryStep): StepStatus {
   return diff < 0 ? "done" : diff === 0 ? "current" : "upcoming";
 }
 
+/** A check-in the gate let open a new chart: check-in and the gate are done, nothing follows on
+ * the Desk, so no step is current. */
+export function newChartStepStatus(step: StoryStep): StepStatus {
+  const order = STORY_STEPS.map((s) => s.id);
+  return order.indexOf(step) <= order.indexOf("gate") ? "done" : "upcoming";
+}
+
 export interface StageHead {
   eyebrow: string;
   title: string;
