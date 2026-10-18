@@ -94,6 +94,19 @@ describe("KioskPane states", () => {
     }
   });
 
+  it("tells the two Use this buttons apart by the label of their own box", () => {
+    vi.stubEnv("NEXT_PUBLIC_CHECKMATE_SOURCE", "api");
+    try {
+      const html = renderKiosk(fresh);
+      const buttons = [...html.matchAll(/<button[^>]*aria-describedby="([^"]+)"[^>]*>Use this<\/button>/g)];
+      expect(buttons).toHaveLength(2);
+      const described = buttons.map(([, id]) => html.match(new RegExp(`id="${id}"[^>]*>([^<]*)<`))?.[1]);
+      expect(described).toEqual([COPY.en.demoLabel, COPY.en.newPatientLabel]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("offers only the one line the fixture can replay", () => {
     const html = renderKiosk(fresh);
     expect(visibleText(html)).not.toContain(COPY.en.newPatientLabel);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { IntakeSession, IntakeTurn } from "@/api/types";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { RESOLVE_KEY, SESSION_CHANGE_KEY, useDemoReset } from "@/components/ui/demoReset";
@@ -186,13 +186,23 @@ function DemoLine({
   disabled: boolean;
   onUse: (line: string) => void;
 }) {
+  // Both buttons read "Use this"; the box's label tells a screen reader which line each one uses.
+  const labelId = useId();
   return (
     <div className={alt ? "k-demo k-demo-alt" : "k-demo"}>
-      <p className="k-demo-lbl">{label}</p>
+      <p id={labelId} className="k-demo-lbl">
+        {label}
+      </p>
       <q lang={language} className="k-demo-q">
         {line}
       </q>
-      <button type="button" disabled={disabled} onClick={() => onUse(line)} className="k-use">
+      <button
+        type="button"
+        aria-describedby={labelId}
+        disabled={disabled}
+        onClick={() => onUse(line)}
+        className="k-use"
+      >
         {use}
       </button>
     </div>
