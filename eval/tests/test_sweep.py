@@ -31,7 +31,15 @@ from eval.sweep.executors import (
     select_executor,
 )
 from eval.sweep.manifest import TIER_FIXTURE, TIER_SYNTHEA, ManifestEntry, SweepManifest, build_manifest, split_id
-from eval.sweep.results import NOT_REPORTED, aggregate, interval_95, render_table, t_critical_95
+from eval.sweep.results import (
+    NOT_REPORTED,
+    aggregate,
+    interval_95,
+    is_below_floor,
+    render_table,
+    t_critical_95,
+    withhold_below_floor,
+)
 
 TWO_SEEDS = (20261017, 99)
 NO_TOKEN = (False, "no Modal token: run `uvx modal token new`")
@@ -381,12 +389,30 @@ def test_rate_intervals_are_clipped_to_the_unit_range_and_other_numbers_are_not(
     assert "clipped to [0, 1]" in table["note"] and "clipped to [0, 1]" in render_table(table)
 
 
-def test_the_caption_states_the_floor_the_harness_uses():
+def test_the_caption_states_the_floor_the_harness_uses_and_that_counts_fall_under_it():
     from eval.harness.metrics import DO_NOT_READ_COMPONENTS, DO_NOT_READ_PAIRS
 
     text = render_table(aggregate([fake_result(1, {"band.review.precision": rate_cell(0.9)})]))
     assert f"{DO_NOT_READ_COMPONENTS} components" in text and f"{DO_NOT_READ_PAIRS} pairs" in text
-    assert "not reported" in text
+    assert "not reported" in text and "counts included" in text
+
+
+def test_withhold_below_floor_nulls_value_and_interval_and_keeps_everything_else():
+    numbers = {
+        "false_merge_rate": rate_cell(0.0, n_pairs=57, n_components=44, do_not_read=True),
+        "band.auto_link.count": {"value": 57, "n_pairs": 57, "n_entities": 44, "n_components": 44},
+        "band.review.precision": rate_cell(0.9),
+        "thresholds.c_high": {"value": 4.0, "thresholds_id": "provisional-1"},  # no support: no floor
+        "thresholds.operating_point": {"value": "provisional-1"},
+    }
+    before = json.loads(json.dumps(numbers))
+    out = withhold_below_floor(numbers)
+    assert numbers == before  # a copy; the caller's cells are not changed
+    assert out["false_merge_rate"] == {**before["false_merge_rate"], "value": None, "ci95": None}
+    assert out["band.auto_link.count"] == {**before["band.auto_link.count"], "value": None, "ci95": None}
+    for key in ("band.review.precision", "thresholds.c_high", "thresholds.operating_point"):
+        assert out[key] == before[key], key
+    assert is_below_floor(before["false_merge_rate"]) and not is_below_floor(before["thresholds.c_high"])
 
 
 # --- Modal executor fallback (no cloud) --------------------------------------------------------------
@@ -485,6 +511,10 @@ def test_cli_local_two_seed_sweep_writes_the_sweep_file_and_the_table(
     assert doc["sweepSha256"] == doc["manifest"]["sweepSha256"] and doc["executor"] == EXECUTOR_LOCAL
     assert len(doc["entries"]) == 2 and doc["table"]["cells"][0]["seeds"] == [99, 20261017]
     assert doc["elapsedSeconds"] > 0
+    below = [cell for entry in doc["entries"] for cell in entry["numbers"].values() if is_below_floor(cell)]
+    assert below, "the fixture run has cells under the floor; the check below must not be vacuous"
+    assert all(cell["value"] is None and cell["ci95"] is None for cell in below)
+    assert all("n_pairs" in cell and "n_components" in cell for cell in below)
 
 
 def test_cli_modal_without_a_token_exits_with_a_clear_message(capsys: pytest.CaptureFixture[str]):
@@ -576,7 +606,7 @@ def test_cli_records_the_executor_that_ran_when_every_seed_fell_back(
     assert "ran on: local (fallback from modal)" in out
 
 
-def test_cli_never_prints_or_tabulates_a_flagged_metric_but_keeps_the_per_seed_entries(
+def test_cli_never_prints_tabulates_or_stores_a_value_under_the_floor(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ):
     flagged = 0.987654
@@ -585,6 +615,7 @@ def test_cli_never_prints_or_tabulates_a_flagged_metric_but_keeps_the_per_seed_e
             seed,
             {
                 "band.auto_link.precision": rate_cell(flagged, n_pairs=45, n_components=40, do_not_read=True),
+                "band.auto_link.count": {"value": 45, "n_pairs": 45, "n_entities": 40, "n_components": 40},
                 "band.review.precision": rate_cell(0.7),
             },
         )
@@ -598,7 +629,18 @@ def test_cli_never_prints_or_tabulates_a_flagged_metric_but_keeps_the_per_seed_e
     assert code == 0
     out = capsys.readouterr().out
     assert f"| AUTO_LINK precision | {NOT_REPORTED} | n/a | n/a |" in out and "0.988" not in out
-    doc = json.loads(next((tmp_path / "sweeps").glob("*/sweep.json")).read_text())
-    assert "0.987654" not in json.dumps(doc["table"])
-    stored = [e["numbers"]["band.auto_link.precision"] for e in doc["entries"]]  # as the harness itself stores them
-    assert [c["value"] for c in stored] == [flagged, flagged] and all(c["do_not_read"] for c in stored)
+    written = next((tmp_path / "sweeps").glob("*/sweep.json")).read_text()
+    assert "0.987654" not in written
+    doc = json.loads(written)
+    for entry in doc["entries"]:
+        precision = entry["numbers"]["band.auto_link.precision"]
+        assert precision["value"] is None and precision["ci95"] is None
+        assert precision["do_not_read"] is True and (precision["n_pairs"], precision["n_components"]) == (45, 40)
+        count = entry["numbers"]["band.auto_link.count"]  # under the floor without a flag: withheld the same way
+        assert count["value"] is None and count["n_pairs"] == 45
+        assert (
+            entry["numbers"]["band.review.precision"]["value"] == 0.7
+        )  # above the floor: kept as the harness wrote it
+        assert entry["numbers"]["band.review.precision"]["ci95"] == [0.69, 0.71]
+    assert "harness floor" in doc["entriesNote"]
+    assert results[0]["numbers"]["band.auto_link.precision"]["value"] == flagged  # the executor's results untouched

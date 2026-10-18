@@ -32,7 +32,7 @@ from eval.sweep.executors import (
     select_executor,
 )
 from eval.sweep.manifest import CONFIG_FAST, CONFIGS, TIER_SYNTHEA, TIERS, build_manifest
-from eval.sweep.results import aggregate, render_table
+from eval.sweep.results import ENTRIES_NOTE, aggregate, render_table, withhold_below_floor
 
 EXIT_OK = 0
 EXIT_TOKEN_MISSING = 3
@@ -116,7 +116,8 @@ def main(argv: Sequence[str] | None = None, *, token_present: TokenCheck = modal
         "startedAt": started_at.isoformat(),
         "finishedAt": datetime.now(UTC).isoformat(),
         "elapsedSeconds": elapsed,
-        "entries": results,
+        "entriesNote": ENTRIES_NOTE,
+        "entries": [{**r, "numbers": withhold_below_floor(r["numbers"])} for r in results],
         "table": table,
     }
     sweep_dir = args.out / SWEEPS_SUBDIR / f"{started_at:%Y%m%dT%H%M%SZ}-{manifest.sha256[:SWEEP_SHA_DIGITS]}"

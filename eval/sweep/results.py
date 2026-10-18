@@ -4,16 +4,17 @@
 The interval is a two-sided Student t interval on the per-seed values (n seeds is small, so the t critical
 value, not 1.96). A rate's interval is clipped to [0, 1], because a proportion cannot leave it. A metric the
 harness marks ``do_not_read`` on any seed, or whose support is under the harness's own floor, is withheld:
-no mean, no interval, no per-seed values in this table. Each entry keeps the harness's cells as the harness
-stores them; this table is the across-seed view. Latency never enters the table (ADR-012 excludes it from any
-cross-executor comparison).
+no mean, no interval, no per-seed values in this table. The per-seed entries written beside the table go
+through ``withhold_below_floor`` too, so no file the sweep writes carries a number the harness says not to
+read; each harness run directory still holds its raw cells. Latency never enters the table (ADR-012 excludes
+it from any cross-executor comparison).
 """
 
 from __future__ import annotations
 
 import math
 import statistics
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from scipy.stats import t as student_t
 
@@ -24,11 +25,17 @@ from eval.sweep.evaluate import LATENCY_PREFIX
 CONFIDENCE_QUANTILE = 0.975  # two-sided 95%
 INTERVAL_METHOD = "Student t, two-sided 95%, across seeds"
 INTERVAL_NOTE = (
-    "rate intervals are clipped to [0, 1]; a metric the harness marks do-not-read on any seed "
-    f"(under {DO_NOT_READ_COMPONENTS} components or {DO_NOT_READ_PAIRS} pairs) is not reported; "
-    "with few seeds (df = n - 1) the interval is wide, so read the per-seed values too"
+    "rate intervals are clipped to [0, 1]; a metric the harness marks do-not-read on any seed, or any cell "
+    f"under {DO_NOT_READ_COMPONENTS} components or {DO_NOT_READ_PAIRS} pairs on any seed (counts included), "
+    "is not reported; with few seeds (df = n - 1) the interval is wide, so read the per-seed values too"
 )
 NOT_REPORTED = "not reported (below the harness floor)"
+WITHHELD_FIELDS = ("value", "ci95")
+ENTRIES_NOTE = (
+    f"cells under the harness floor (do_not_read, or under {DO_NOT_READ_COMPONENTS} components or "
+    f"{DO_NOT_READ_PAIRS} pairs) have value and ci95 set to null; support counts and flags are kept; each "
+    "harness run directory holds the raw cells"
+)
 UNIT_RATIO_KEYS = frozenset({"blocking.reduction_ratio"})
 """Proportions the harness publishes without its own ``ci95`` cell field."""
 DECIMALS = 3
@@ -63,7 +70,7 @@ def _cell(result: dict, key: str) -> dict:
     return cell if isinstance(cell, dict) else {}
 
 
-def _below_floor(cell: dict) -> bool:
+def is_below_floor(cell: dict) -> bool:
     """The harness's own rule (``metrics.rate``): flagged, or under the component or pair floor. A cell that
     carries no support counts (a config value such as a cutoff) has no floor to fall under."""
     return (
@@ -71,6 +78,16 @@ def _below_floor(cell: dict) -> bool:
         or cell.get("n_components", DO_NOT_READ_COMPONENTS) < DO_NOT_READ_COMPONENTS
         or cell.get("n_pairs", DO_NOT_READ_PAIRS) < DO_NOT_READ_PAIRS
     )
+
+
+def withhold_below_floor(numbers: Mapping[str, dict]) -> dict[str, dict]:
+    """A copy of one run's cells for a file the sweep writes: a cell under the floor keeps its support counts
+    and flags, and its value and interval become null. Cells above the floor, and cells with no support counts
+    (a cutoff, an id), are copied unchanged. The caller's cells are never modified."""
+    return {
+        key: {**cell, **dict.fromkeys(WITHHELD_FIELDS)} if isinstance(cell, dict) and is_below_floor(cell) else cell
+        for key, cell in numbers.items()
+    }
 
 
 def _is_rate(key: str, cells: Sequence[dict]) -> bool:
@@ -84,7 +101,7 @@ def _clip_to_unit(interval: list[float]) -> list[float]:
 def _metric(key: str, seeds: Sequence[int], cells: Sequence[dict]) -> dict:
     """One metric across seeds: withheld if any seed is below the floor or has no value (an empty denominator
     is flagged by the harness anyway), else its mean and interval, clipped to [0, 1] for a rate."""
-    withheld = [s for s, c in zip(seeds, cells) if _below_floor(c) or not _numeric(c.get("value"))]
+    withheld = [s for s, c in zip(seeds, cells) if is_below_floor(c) or not _numeric(c.get("value"))]
     if withheld:
         return {"reported": False, "reason": NOT_REPORTED, "seedsBelowFloor": withheld}
     stats = interval_95([c["value"] for c in cells])
