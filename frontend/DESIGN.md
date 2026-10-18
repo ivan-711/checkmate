@@ -59,15 +59,15 @@ Hit targets ≥ 44 px (`h-11`). Approve and Reject are 48 px (`h-12`) today, bel
 ## Band chips (`components/ui/BandChip.tsx`; reuse it, never restyle)
 
 `inline-flex items-center gap-1 rounded px-2 py-0.5 text-[14px] font-semibold` with a 16 px icon.
-AUTO-LINK `bg-band-auto text-on-band-auto` + Check · REVIEW `bg-band-review text-on-band-review` + Eye · KEEP SEPARATE `bg-band-keep text-on-band-keep` + Split. Label text is always shown. In a queue row the chip sits right of the score.
+AUTO-LINK `bg-band-auto text-on-band-auto` + Check · REVIEW `bg-band-review text-on-band-review` + Eye · KEEP SEPARATE `bg-band-keep text-on-band-keep` + Split. Label text is always shown. In a queue row the chip comes first, before the score.
 
 ## Gate card ("Blocked by identity gate") — amber, firm, calm
 
-`rounded-lg border border-denied-border border-l-[6px] border-l-gate-bar bg-gate-bg px-5 py-4` . Heading 24/32 600 `text-ink-1` with a ShieldAlert icon in `text-denied-ink`. Reason sentence in body. Inner masked-candidate card `rounded-md border border-border-subtle bg-surface`. No red, no shake, no glow. Amber says "REVIEW caused this".
+Target (Q1.3, not built yet): `rounded-lg border border-denied-border border-l-[6px] border-l-gate-bar bg-gate-bg px-5 py-4` . Heading 24/32 600 `text-ink-1` with a ShieldAlert icon in `text-denied-ink`. Reason sentence in body. Inner masked-candidate card `rounded-md border border-border-subtle bg-surface`. No red, no shake, no glow. Amber says "REVIEW caused this".
 
 ## Flag card ("Flagged for clinician review") — neutral
 
-`rounded-lg border-2 border-ink-1 border-l-[6px] border-l-band-keep bg-surface p-4`, Flag icon, heading as section label. Constructed-scenario chip in the header when the API says so. No `role="alert"`; announce through the polite live region. Quiet states (no flag yet, no link, not available, rule silent) are an outlined neutral card in `FlagCard.tsx`. Target for the polish pass (audit #3, in review): body `max-w-[68ch]`, the rule id once in the header, quiet states `border-border-subtle bg-sunken text-[16px]` with a 16 px Flag icon. Allergy cards have no special colour: diamond marker, 4 px `ink-1` left bar, provenance chip.
+`rounded-lg border-2 border-ink-1 border-l-[6px] border-l-band-keep bg-surface p-4`, Flag icon, heading as section label. Constructed-scenario chip in the header when the API says so. No `role="alert"`; announce through the polite live region. Quiet states (no flag yet, no link, not available, rule silent) are an outlined neutral card in `FlagCard.tsx`. Target for the polish pass (audit #3, in review): body `max-w-[68ch]`, the rule id once in the header, quiet states `border-border-subtle bg-sunken text-[16px]` with a 16 px Flag icon. Allergy cards have no special colour: today the timeline gives them a diamond marker (`Timeline.tsx`); the 4 px `ink-1` left bar and the provenance chip are a target, not built yet.
 
 ## Buttons
 
@@ -77,7 +77,7 @@ Ghost/link `font-semibold text-accent underline underline-offset-2`. Busy label 
 
 ## Focus
 
-Global `:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px }`. Never `outline-none` without a visible replacement. After Approve, focus moves to the new record's heading (`tabIndex={-1}`).
+Global `:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px }`. Never `outline-none` without a visible replacement, except on a programmatic focus target (`tabIndex={-1}` heading or main), which is never reached by Tab. After Approve, focus moves to the new record's heading (`tabIndex={-1}`).
 
 ## Motion (tokens in globals.css)
 
@@ -111,12 +111,12 @@ Placement decided by the UX lead (Christian Flores, design squad, UX lead). The 
 1. Route `/queue`, new file `app/queue/page.tsx`. Add `{ href: "/queue", label: "Work queue" }` to `TABS` in `components/ui/Header.tsx` after Case. Final order: FrontDesk, Case, Work queue. Do not touch `/` or `/frontdesk`. The third tab widens a header that does not wrap yet (audit #11); keep the label "Work queue" and check 1366 px still fits on one row.
 2. Data path. Add two reads to `DataSource` (`src/data/source.ts`) and implement both in each adapter:
    - `getReviewQueue(cursor?: string): Promise<{ items: CandidatePair[]; nextCursor: string | null }>`. `ApiSource`: `GET /api/v1/candidate-pairs?band=REVIEW&status=PROPOSED&limit=50&cursor=…` through the generated client; send `band` and `status` again with every cursor, because the cursor does not carry them. `FixtureSource`: one item, the fixture pair, once Resolve has run and while its decision is `PROPOSED`; none before Resolve or after a decision, matching Case. Add `export type CandidatePair = Schemas["CandidatePair"]` to `src/api/types.ts` (an alias of the generated type, never hand-written).
-   - `getCandidatePair(id: string): Promise<CandidatePairDetail>`. `ApiSource`: `GET /api/v1/candidate-pairs/{pair_id}`. `FixtureSource`: the fixture's pair detail for its pair id, `DataError("NOT_FOUND")` otherwise.
+   - `getCandidatePair(id: string): Promise<CandidatePairDetail>`. `ApiSource`: `GET /api/v1/candidate-pairs/{pair_id}`. `FixtureSource`: the fixture's pair detail for its pair id with the session's current decision and history, built the same way as `getCase`; `DataError("NOT_FOUND")` otherwise.
    - Both endpoints are in the frozen contract, so no contract change. Existing methods, their calls and the Case screen's reads stay exactly as they are.
 3. Order: keep the server's order ("most uncertain first", `|p − 0.5|`) and say so in the header line. Don't re-sort on the client: "Load more" appends the next page: use `useInfiniteQuery` with `nextCursor` as the page param.
 4. Collapsed row, 56 px minimum, built only from the list item:
    - the band chip (`BandChip`, text and icon);
-   - `p` as a two-decimal number (tabular), labelled "Probability estimate" with the Case caption "fitted on our synthetic development distribution" (never a bare "Probability"), display only;
+   - `p` as a two-decimal number (tabular), display only. The label "Probability estimate" and the Case caption "fitted on our synthetic development distribution" appear once in the list header, never a bare "Probability";
    - the origin as "Match run" or "FrontDesk hand-off";
    - the age from `decision.decidedAt` ("waiting 3 m"); in REPLAY the fixture time is fixed, so show the CT time ("scored 13:00 CT") instead of an age;
    - a short pair id (mono, first 8 characters).
@@ -130,4 +130,4 @@ Placement decided by the UX lead (Christian Flores, design squad, UX lead). The 
    No red, no `role="alert"`. Testids are new only, prefixed `work-queue-`.
 
 8. Refresh: TanStack Query refetches on mount and on window focus; there's no `refetchInterval`. Reset demo needs no special handling.
-9. Done when: the build is green, the G16 acceptance script passes unchanged, and a Playwright check shows the tab, at least one REVIEW row after Resolve, and **Open in Case** landing on `/` with `resolve-button` visible.
+9. Done when: the build is green, the G16 acceptance script passes unchanged, and a Playwright check in REPLAY (the LOCAL corpus can push the Case pair past the first page) shows the tab, at least one REVIEW row after Resolve, and **Open in Case** landing on `/` with `resolve-button` visible.
