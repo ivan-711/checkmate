@@ -86,16 +86,32 @@ export function GoldenRecord({ entity, cards, focusOnMount, onFocused }: Props) 
                   recordId={g.crosswalk.sourceRecordId}
                   cards={cards}
                 />
-                {g.alternates?.map((alt) => (
-                  <span key={alt.crosswalk.sourceRecordId} className="text-[16px] text-ink-3">
-                    also {goldenValueText(alt.value) ?? "not given"}{" "}
+                {g.alternates?.map((alt) => {
+                  const altValue = goldenValueText(alt.value);
+                  const chip = (
                     <CrosswalkChip
                       system={alt.crosswalk.sourceSystem}
                       recordId={alt.crosswalk.sourceRecordId}
                       cards={cards}
                     />
-                  </span>
-                ))}
+                  );
+                  // A source that agrees adds only its chip; "also" is kept for a value that differs,
+                  // so the one real difference stands out after the collapse.
+                  return altValue === value ? (
+                    <span key={alt.crosswalk.sourceRecordId} className="inline-flex items-center">
+                      <span className="sr-only">also in </span>
+                      {chip}
+                    </span>
+                  ) : (
+                    <span key={alt.crosswalk.sourceRecordId} className="text-[16px] text-ink-3">
+                      also{" "}
+                      <span className="text-ink-1 underline decoration-2 underline-offset-4">
+                        {altValue ?? "not given"}
+                      </span>{" "}
+                      {chip}
+                    </span>
+                  );
+                })}
               </dd>
             </div>
           );
