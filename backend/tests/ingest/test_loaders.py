@@ -29,7 +29,12 @@ def test_fhir_identity_strips_digits_first_and_reads_the_documented_paths(bundle
     assert ident.prefix == "Mr." and ident.suffix is None
     assert ident.birth_date == "1990-03-07" and ident.sex == "male"
     assert ident.phone == "555-123-4567"
-    assert (ident.address_line, ident.city, ident.state, ident.postal_code) == ("857 Kling Arcade", "Worcester", "MA", "01604")
+    assert (ident.address_line, ident.city, ident.state, ident.postal_code) == (
+        "857 Kling Arcade",
+        "Worcester",
+        "MA",
+        "01604",
+    )
     assert ident.language == "es"
     assert ident.mother_maiden == "Isabela de Anda"
     b = bundles[PATIENT_B].identity
@@ -56,14 +61,27 @@ def test_csv_reader_restricts_to_cohort_and_groups_clinical_rows(csv_patients):
     a = csv_patients[PATIENT_A]
     assert (len(a.allergies), len(a.medications), len(a.encounters)) == (1, 1, 1)
     assert a.allergies[0]["CODE"] == "7984"
-    assert (a.identity.given, a.identity.family, a.identity.sex, a.identity.postal_code) == ("José", "Núñez-García", "M", "01604")
+    assert (a.identity.given, a.identity.family, a.identity.sex, a.identity.postal_code) == (
+        "José",
+        "Núñez-García",
+        "M",
+        "01604",
+    )
     assert csv_patients[PATIENT_B].identity.postal_code is None
-    assert read_csv_dir(FIXTURES / "csv")[ "cccccccc-0000-4000-8000-000000000001"].identity.given == "Dora"
+    assert read_csv_dir(FIXTURES / "csv")["cccccccc-0000-4000-8000-000000000001"].identity.given == "Dora"
 
 
 def test_csv_identity_accepts_clinic_rows_with_phone_and_us_dates():
-    ident = identity_from_row({"FIRST": "Ana1", "LAST": "Ruiz2", "BIRTHDATE": "07/03/1985", "GENDER": "F", "PHONE": "555-000-1111", "ZIP": ""})
-    assert (ident.given, ident.family, ident.birth_date, ident.phone, ident.postal_code) == ("Ana", "Ruiz", "07/03/1985", "555-000-1111", None)
+    ident = identity_from_row(
+        {"FIRST": "Ana1", "LAST": "Ruiz2", "BIRTHDATE": "07/03/1985", "GENDER": "F", "PHONE": "555-000-1111", "ZIP": ""}
+    )
+    assert (ident.given, ident.family, ident.birth_date, ident.phone, ident.postal_code) == (
+        "Ana",
+        "Ruiz",
+        "07/03/1985",
+        "555-000-1111",
+        None,
+    )
 
 
 def test_drafts_carry_the_right_kind_and_hide_the_synthea_id(bundles, csv_patients):
@@ -100,7 +118,11 @@ def test_rendered_fhir_never_echoes_the_original_name_or_shares_clinical_ids(bun
         assert original not in text, original
     assert one.raw_payload["encounters"][0]["subject"]["display"] == "Pepe Nunes"
     assert one.raw_payload["encounters"][0]["subject"]["reference"] == f"urn:uuid:{one.id}"
-    ids = lambda d: {r["id"] for k in ("allergyIntolerances", "medicationRequests", "encounters", "medications") for r in d.raw_payload[k]}
+    ids = lambda d: {
+        r["id"]
+        for k in ("allergyIntolerances", "medicationRequests", "encounters", "medications")
+        for r in d.raw_payload[k]
+    }
     assert ids(one) and not ids(one) & ids(two)  # re-minted per record
     original_ids = {r["id"] for r in a.allergies + a.medication_requests + a.encounters + a.medications}
     assert not ids(one) & original_ids
@@ -130,7 +152,11 @@ def test_csv_variants_share_no_encounter_id_and_mixed_case_headers_cannot_leak(b
     assert "aaaaaaaa-0000-4000-8000-000000000002" not in json.dumps(one.raw_payload)
     from backend.ingest.csvio import CsvPatient
 
-    mixed = CsvPatient(PATIENT_A, base.identity, {"Id": PATIENT_A, "Last": "Núñez-García", "Phone": "555-123-4567", "BIRTHDATE": "1990-03-07"})
+    mixed = CsvPatient(
+        PATIENT_A,
+        base.identity,
+        {"Id": PATIENT_A, "Last": "Núñez-García", "Phone": "555-123-4567", "BIRTHDATE": "1990-03-07"},
+    )
     draft = csv_draft(replace(a.identity, family="Nunes"), mixed, "CL-MIXED", include_phone=False)
     row = draft.raw_payload["patient"]
     assert row["LAST"] == "Nunes" and "Last" not in row and "Phone" not in row and "PHONE" not in row

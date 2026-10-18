@@ -5,6 +5,7 @@ The builder's fixture bundles have no ``Encounter.subject.display``; the Nov 202
 every Encounter ("Mr. Abdul218 Harris789", the original name with Synthea's per-person digits), so
 these tests add it to the fixture before drafting, the way the real sample arrives.
 """
+
 from __future__ import annotations
 
 import json
@@ -44,10 +45,17 @@ def _clone_cohort(bundles, csv_patients, n: int):
         src = sources[i % len(sources)]
         new_id = f"{i:08x}-0000-4000-8000-00000000c10e"
         resources = [src.patient, *src.encounters, *src.allergies, *src.medication_requests, *src.medications]
-        entries = json.loads(json.dumps([{"fullUrl": f"urn:uuid:{r['id']}", "resource": r} for r in resources]).replace(src.patient_id, new_id))
+        entries = json.loads(
+            json.dumps([{"fullUrl": f"urn:uuid:{r['id']}", "resource": r} for r in resources]).replace(
+                src.patient_id, new_id
+            )
+        )
         cloned_bundles[new_id] = parse_bundle({"entry": entries})
         base_csv = csv_patients[src.patient_id]
-        rows = {k: json.loads(json.dumps(getattr(base_csv, k)).replace(src.patient_id, new_id)) for k in ("allergies", "medications", "encounters")}
+        rows = {
+            k: json.loads(json.dumps(getattr(base_csv, k)).replace(src.patient_id, new_id))
+            for k in ("allergies", "medications", "encounters")
+        }
         cloned_csv[new_id] = CsvPatient(new_id, base_csv.identity, {**base_csv.row, "Id": new_id}, **rows)
     return cloned_bundles, cloned_csv
 
@@ -90,13 +98,21 @@ def test_within_system_duplicates_do_not_share_clinical_resource_ids(bundles, cs
 
     def resource_ids(draft) -> set[str]:
         if draft.source_system == SOURCE_ER_FHIR:
-            return {r["id"] for key in ("encounters", "medicationRequests", "allergyIntolerances", "medications")
-                    for r in draft.raw_payload[key] if r.get("id")}
+            return {
+                r["id"]
+                for key in ("encounters", "medicationRequests", "allergyIntolerances", "medications")
+                for r in draft.raw_payload[key]
+                if r.get("id")
+            }
         return {r["Id"] for r in draft.raw_payload["encounters"] if r.get("Id")}
 
-    same_system_pairs = [p for p in corpus.pairs if by_id[p["record_a_id"]].source_system == by_id[p["record_b_id"]].source_system]
+    same_system_pairs = [
+        p for p in corpus.pairs if by_id[p["record_a_id"]].source_system == by_id[p["record_b_id"]].source_system
+    ]
     assert same_system_pairs, "the cohort must produce within-system duplicates"
-    shared = [p for p in same_system_pairs if resource_ids(by_id[p["record_a_id"]]) & resource_ids(by_id[p["record_b_id"]])]
+    shared = [
+        p for p in same_system_pairs if resource_ids(by_id[p["record_a_id"]]) & resource_ids(by_id[p["record_b_id"]])
+    ]
     assert not shared, f"{len(shared)} of {len(same_system_pairs)} same-system pairs share a clinical resource id"
 
 
@@ -120,7 +136,10 @@ def _write_raw_dir(tmp_path, extra: dict[str, str]):
     [
         ("no_patient.json", json.dumps({"resourceType": "Bundle", "entry": []})),
         ("truncated.json", '{"resourceType":"Bundle","entry":['),
-        ("patient_without_id.json", json.dumps({"entry": [{"resource": {"resourceType": "Patient", "name": [{"family": "X1"}]}}]})),
+        (
+            "patient_without_id.json",
+            json.dumps({"entry": [{"resource": {"resourceType": "Patient", "name": [{"family": "X1"}]}}]}),
+        ),
     ],
 )
 def test_one_malformed_bundle_does_not_abort_the_load(tmp_path, name, text):
@@ -155,20 +174,47 @@ def test_bundles_without_birthdate_or_name_still_load(tmp_path):
 @pytest.mark.parametrize(
     ("identity", "forbidden_key_types"),
     [
-        (Identity(given="Ana", family="Garcia", birth_date="1900-01-01", phone="555-123-4567", postal_code="01604"),
-         {"DOB_EXACT", "DOB_DAY_MONTH_SWAP", "DMETA_FAMILY_BIRTH_YEAR"}),
-        (Identity(given="Unknown", family="Unknown", birth_date="1990-03-07", phone="555-123-4567", postal_code="01604"),
-         {"DMETA_FAMILY_BIRTH_YEAR", "ZIP5_FIRST_INITIAL"}),
-        (Identity(given="Baby Boy", family="Doe", birth_date="1990-03-07", phone="555-123-4567", postal_code="01604"),
-         {"DMETA_FAMILY_BIRTH_YEAR", "ZIP5_FIRST_INITIAL"}),
-        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-555-5555", postal_code="01604"), {"PHONE_LAST7"}),
-        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="617-555-0123", postal_code="01604"), {"PHONE_LAST7"}),
-        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="000-000-0000", postal_code="01604"), {"PHONE_LAST7"}),
-        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-123-4567", postal_code=""), {"ZIP5_FIRST_INITIAL"}),
-        (Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-123-4567", postal_code="016"), {"ZIP5_FIRST_INITIAL"}),
+        (
+            Identity(given="Ana", family="Garcia", birth_date="1900-01-01", phone="555-123-4567", postal_code="01604"),
+            {"DOB_EXACT", "DOB_DAY_MONTH_SWAP", "DMETA_FAMILY_BIRTH_YEAR"},
+        ),
+        (
+            Identity(
+                given="Unknown", family="Unknown", birth_date="1990-03-07", phone="555-123-4567", postal_code="01604"
+            ),
+            {"DMETA_FAMILY_BIRTH_YEAR", "ZIP5_FIRST_INITIAL"},
+        ),
+        (
+            Identity(
+                given="Baby Boy", family="Doe", birth_date="1990-03-07", phone="555-123-4567", postal_code="01604"
+            ),
+            {"DMETA_FAMILY_BIRTH_YEAR", "ZIP5_FIRST_INITIAL"},
+        ),
+        (
+            Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-555-5555", postal_code="01604"),
+            {"PHONE_LAST7"},
+        ),
+        (
+            Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="617-555-0123", postal_code="01604"),
+            {"PHONE_LAST7"},
+        ),
+        (
+            Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="000-000-0000", postal_code="01604"),
+            {"PHONE_LAST7"},
+        ),
+        (
+            Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-123-4567", postal_code=""),
+            {"ZIP5_FIRST_INITIAL"},
+        ),
+        (
+            Identity(given="Ana", family="Garcia", birth_date="1990-03-07", phone="555-123-4567", postal_code="016"),
+            {"ZIP5_FIRST_INITIAL"},
+        ),
     ],
 )
-def test_placeholder_values_never_form_a_block_key_in_the_database(db, bundles, csv_patients, identity, forbidden_key_types):
+def test_placeholder_values_never_form_a_block_key_in_the_database(
+    db, bundles, csv_patients, identity, forbidden_key_types
+):
     """Gap coverage: the builder tests block_keys() in memory; this checks what lands in block_key through
     both renderers (the ER Patient and the clinic row) for each placeholder family of the hot-block rule.
     Key types are backend.core's (issue #10); the guard keeps a renamed type from passing vacuously."""
