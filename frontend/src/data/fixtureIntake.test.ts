@@ -40,6 +40,9 @@ describe("FixtureSource FrontDesk intake", () => {
       preferredLanguage: "ES",
       evidence: { birthDate: "3 de julio de 1985" },
     });
+    expect(propose.args).toHaveProperty("givenName");
+    expect(propose.args).toHaveProperty("familyName");
+    expect(search.candidates![0].pairId).toBeNull();
     // Every quoted value is exactly what the patient typed.
     for (const quote of Object.values((propose.args as { evidence: Record<string, string> }).evidence)) {
       expect(utteranceEs).toContain(quote);
@@ -111,5 +114,14 @@ describe("FixtureSource FrontDesk intake", () => {
     expect(events).toEqual(
       expect.arrayContaining(["INTAKE_STARTED", "AGENT_TOOL_CALLED", "INTAKE_HANDOFF_CREATED"]),
     );
+  });
+  it("quotes names verbatim even when the patient typed extra spaces", async () => {
+    const s = new FixtureSource(scenario, () => NOW);
+    const { id } = await s.startIntake("ES");
+    const spaced = utteranceEs.replace(" ", "   ");
+    const turn = await s.sendTurn(id, spaced, "k1");
+    const args = turn.toolCalls![1].args as Record<string, unknown> & { evidence: Record<string, string> };
+    expect(args.givenName).toBe(scenario.pair.recordA.normalized.givenName);
+    for (const quote of Object.values(args.evidence)) expect(spaced).toContain(quote);
   });
 });
