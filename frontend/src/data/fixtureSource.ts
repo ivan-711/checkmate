@@ -27,6 +27,8 @@ interface SessionState {
   /** Append-only, oldest first: what the API's event_log would hold for this session. */
   events: EventLogRow[];
   resolved: boolean;
+  /** A FrontDesk check-in handed the fixture pair to a registrar; the API stores that pair. */
+  handedOff: boolean;
 }
 
 interface KeyedReview {
@@ -75,10 +77,10 @@ export class FixtureSource implements DataSource {
     return null;
   }
 
-  /** The fixture's one pair, with this session's decision, once Resolve has queued it (as Case
-   * shows it); filtered the way the API filters, on one page. */
+  /** The fixture's one pair, with this session's decision, once Resolve or a FrontDesk hand-off
+   * has stored it (as the API would); filtered the way the API filters, on one page. */
   async getCandidatePairs(query: CandidatePairQuery): Promise<CandidatePairPage> {
-    if (!this.current.resolved) return { items: [], nextCursor: null };
+    if (!this.current.resolved && !this.current.handedOff) return { items: [], nextCursor: null };
     const { pair } = this.currentDetail();
     const matches =
       (!query.band || pair.decision.band === query.band) &&
@@ -164,6 +166,7 @@ export class FixtureSource implements DataSource {
       for (const pairId of turn.registration.handoffPairIds ?? []) {
         this.log("INTAKE_HANDOFF_CREATED", { intakeSessionId: sessionId, pairId });
       }
+      this.current = { ...this.current, handedOff: true };
     }
     if (turn.degraded)
       this.log("AGENT_TURN_DEGRADED", { intakeSessionId: sessionId, degraded: turn.degraded });
@@ -268,6 +271,7 @@ export class FixtureSource implements DataSource {
       outcome: null,
       events: [],
       resolved: false,
+      handedOff: false,
     };
   }
 }

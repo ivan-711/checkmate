@@ -166,6 +166,18 @@ describe("FixtureSource work queue", () => {
     expect(page.nextCursor).toBeNull();
   });
 
+  it("lists the pair a FrontDesk check-in handed off, before any Resolve, with its decision", async () => {
+    const s = source();
+    const { id } = await s.startIntake("EN");
+    await s.sendTurn(id, scenario.frontdeskIntake.utteranceEn, "k1");
+    expect((await s.getCandidatePairs({})).items.map((p) => p.id)).toEqual([pairId]);
+    await s.review(pairId, approve, "key-queue-3");
+    const page = await s.getCandidatePairs({});
+    expect(page.items.map((p) => p.decision.status)).toEqual(["LINKED"]);
+    await s.reset();
+    expect((await s.getCandidatePairs({})).items).toEqual([]);
+  });
+
   it("filters by band and status the way the API does", async () => {
     const s = source();
     await s.resolve();
