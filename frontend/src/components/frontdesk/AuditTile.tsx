@@ -39,9 +39,9 @@ export function AuditTile() {
       aria-labelledby="audit-heading"
       className="rounded-lg border border-border-subtle bg-surface p-4"
     >
-      <h3 id="audit-heading" className="text-[16px] font-semibold uppercase tracking-wider">
+      <h2 id="audit-heading" className="text-[16px] font-semibold uppercase tracking-wider">
         Agent actions per 5 minutes
-      </h3>
+      </h2>
       {tiles.isPending && <p aria-busy="true">-</p>}
       {tiles.isError && <p className="text-error-ink">Audit tile unavailable: {tiles.error.message}</p>}
       {tiles.isSuccess && !tile && <p className="text-ink-3">No agent-gate tile in this response.</p>}

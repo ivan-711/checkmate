@@ -16,6 +16,7 @@ const COPY = {
     ],
     fact: "held",
     title: "A chart may already be yours",
+    ruleResult: "Rule result",
   },
   es: {
     toggle: "Español",
@@ -30,6 +31,7 @@ const COPY = {
     ],
     fact: "en espera",
     title: "Puede que ya tenga un expediente",
+    ruleResult: "Resultado de regla",
   },
 } as const;
 
@@ -71,7 +73,7 @@ for (const viewport of [
       await expect(steps.locator("li").last()).toHaveAttribute("data-testid", "gate-fact");
       // The checklist is one voice, ink-2 like the prototype's steps; the gate card carries the weight.
       await expect(fact).toHaveCSS("color", INK_2);
-      await expect(page.getByTestId("rule-result-tag")).toHaveCount(0);
+      await expect(page.getByTestId("rule-result-tag")).toHaveText(c.ruleResult);
       await expect(page.getByTestId("tool-call-chip")).toHaveCount(2);
 
       const card = page.getByTestId("gate-card");

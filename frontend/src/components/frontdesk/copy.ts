@@ -1,6 +1,6 @@
 // The FrontDesk copy deck (UX spec 10.9, redesigned with critiques/copy.md). Strings with
 // parameters are functions filled from the API. Nothing here names a tool, a policy id, a source
-// system code or an agent mode: the patient reads plain words, and the ids stay in data attributes.
+// system code. The patient reads plain words; the kiosk's explicit agent mode remains visible.
 import type { Band, PolicyReason } from "@/api/types";
 import { FAMILY_FEATURES, FEATURE_LABELS, GIVEN_FEATURES, type NameFeature } from "@/lib/display";
 
@@ -120,6 +120,7 @@ export const COPY = {
     detailLatency: "Latency",
     details: "Details",
     gateLabel: "Identity gate · denied",
+    ruleResult: "Rule result",
     gateTitle: "A chart may already be yours",
     gateBody: (score: string) => [
       "FrontDesk asked to open a new chart. The gate denied it because an existing chart matches ",
@@ -215,6 +216,7 @@ export const COPY = {
     detailLatency: "Latencia",
     details: "Detalles",
     gateLabel: "Control de identidad · denegado",
+    ruleResult: "Resultado de regla",
     gateTitle: "Puede que ya tenga un expediente",
     gateBody: (score: string) => [
       "FrontDesk pidió abrir un expediente nuevo. El control lo denegó porque un expediente existente coincide en ",

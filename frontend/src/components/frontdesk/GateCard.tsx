@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react";
 import type { ToolCallCandidate, ToolCallRecord } from "@/api/types";
+import { RuleResultTag } from "@/components/ui/RuleResultTag";
 import { rankContributions } from "@/lib/display";
 import { kioskSourceLabel, type KioskCopy } from "./copy";
 
@@ -50,15 +51,22 @@ export const GateCard = forwardRef<
         <GateMark />
         {t.gateLabel}
       </p>
-      <h3 className="k-gate-title">{t.gateTitle}</h3>
+      <h2 className="k-gate-title">{t.gateTitle}</h2>
       <p className="k-gate-body">
         {before}
         <b className="num">{score}</b>
         {after}
       </p>
-      <p className="k-gate-held">{reviewing ? t.gateReview : t.gateHeld}</p>
+      <p data-testid={reviewing ? undefined : "kiosk-finish-held"} className="k-gate-held">
+        {reviewing ? t.gateReview : t.gateHeld}
+      </p>
       <details className="k-gate-details">
-        <summary>{t.details}</summary>
+        <summary>
+          {t.details}
+          <span className="k-rule-tag">
+            <RuleResultTag label={t.ruleResult} />
+          </span>
+        </summary>
         <div className="k-gate-candidate">
           <p className="k-gate-row">
             <span className="k-gate-lbl">{t.gateCandidate}</span>

@@ -60,6 +60,28 @@ const HERO_PAIR: Contribution[] = [
 const HERO_GATE = [...HERO_PAIR].sort((a, b) => Math.abs(b.logit) - Math.abs(a.logit)).slice(0, 10);
 
 describe("GateCard evidence rows", () => {
+  it("uses an h2 on both the held and registrar-review stages", async () => {
+    const { call, candidate } = await heldCall();
+    for (const reviewing of [false, true]) {
+      const html = renderToStaticMarkup(createElement(GateCard, { call, candidate, t: COPY.en, reviewing }));
+      expect(html).toMatch(/<h2 class="k-gate-title">/);
+      expect(html).not.toMatch(/<h3 class="k-gate-title">/);
+    }
+  });
+
+  it("restores the one-line rule result tag in English and Spanish", async () => {
+    const { call, candidate } = await heldCall();
+    for (const [language, label] of [
+      ["en", "Rule result"],
+      ["es", "Resultado de regla"],
+    ] as const) {
+      const html = renderToStaticMarkup(createElement(GateCard, { call, candidate, t: COPY[language] }));
+      expect(html).toMatch(
+        new RegExp(`data-testid="rule-result-tag"[^>]*whitespace-nowrap[^>]*>.*${label}</span>`),
+      );
+    }
+  });
+
   it("reads the same rows, weights and order as the registrar's rail for the fixture pair", async () => {
     const { call, candidate } = await heldCall();
     const gate = gateRows(call, candidate);

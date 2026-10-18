@@ -7,12 +7,12 @@ import { useAnnounce } from "@/components/ui/LiveRegion";
 import { SESSION_CHANGE_KEY, useDemoReset } from "@/components/ui/demoReset";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { scenario } from "@/data/scenario";
-import { DataError } from "@/data/source";
+import { DataError, type Mode } from "@/data/source";
 import type { KioskState as DeskKioskState } from "@/lib/desk";
 import { COPY, type KioskCopy, type KioskLanguage } from "./copy";
 import { needsNewCheckIn } from "./checkIn";
 import { GateCard } from "./GateCard";
-import { HANDOFF_KEY, INTAKE_KEY, refreshHandoffOnMutation, useHandoffPairs } from "./intake";
+import { HANDOFF_KEY, INTAKE_KEY, refreshHandoffOnMutation, SEND_TURN_KEY, useHandoffPairs } from "./intake";
 import { KioskMark, Tick } from "./KioskMark";
 import { gateDenial, kioskState, patientGivenName, type KioskState } from "./kioskState";
 import { turnSteps } from "./turnSteps";
@@ -32,6 +32,12 @@ const LANGUAGES: { value: KioskLanguage; label: string }[] = [
 ];
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** Start over is a demo-wide reset in API and fixture modes. Fixture state includes the Desk's
+ * decision, so clearing only the intake cache can leave the next check-in past the gate. */
+export function runStartOver(_mode: Mode, resetDemo: () => void): void {
+  resetDemo();
+}
 
 /** Scrolls the kiosk's own scroll area so `el` is fully in view: the whole element when it fits,
  * its top otherwise. Only the kiosk region moves, never the window (BUILD-SPEC decision 6). */
@@ -178,6 +184,7 @@ export function KioskPane({
   // A reset on the corpus takes seconds and wipes every check-in when it lands: nothing is sent
   // meanwhile, and the shared reset starts the new check-in once it has finished.
   const resetting = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
+  const sending = useIsMutating({ mutationKey: SEND_TURN_KEY }) > 0;
   const demoReset = useDemoReset();
   const session = useQuery({
     queryKey: INTAKE_KEY,
@@ -198,6 +205,7 @@ export function KioskPane({
       : null;
 
   const send = useMutation({
+    mutationKey: SEND_TURN_KEY,
     mutationFn: async (message: { text: string; key: string }) => {
       try {
         return await source.sendTurn(session.data!.id, message.text, message.key);
@@ -236,7 +244,7 @@ export function KioskPane({
 
   // The toggle changed before the first turn: start over in the new language, so the demo
   // script line goes into a check-in in its own language.
-  const restart = !resetting && !send.isPending && needsNewCheckIn(session.data, checkInLanguage);
+  const restart = !resetting && !sending && needsNewCheckIn(session.data, checkInLanguage);
   useEffect(() => {
     if (restart) void queryClient.resetQueries({ queryKey: INTAKE_KEY });
   }, [restart, queryClient]);
@@ -302,7 +310,7 @@ export function KioskPane({
 
   function submit() {
     const message = text.trim();
-    if (!message || send.isPending || resetting || !session.data) return;
+    if (!message || sending || resetting || !session.data) return;
     // One key per typed message, reused when the same message is retried.
     if (key.current?.text !== message) key.current = { text: message, key: crypto.randomUUID() };
     setText("");
@@ -315,28 +323,27 @@ export function KioskPane({
     setText("");
     key.current = null;
     send.reset();
-    // BUILD-SPEC decision 5: on the API, a second check-in without a reset would find the first
-    // one's own intake record, so Start over performs the same reset as the top bar's button.
-    if (source.mode === "LOCAL") {
-      demoReset.mutate();
-      return;
-    }
-    void queryClient.resetQueries({ queryKey: INTAKE_KEY });
-    void queryClient.resetQueries({ queryKey: HANDOFF_KEY });
-    composer.current?.focus();
+    runStartOver(source.mode, () =>
+      demoReset.mutate(undefined, { onSettled: () => composer.current?.focus() }),
+    );
   }
 
   const idle = state === "idle";
   const finished = state === "done" || state === "rejected";
   // The demo line sends the one recorded turn: not while a turn runs, not after the first turn.
-  const demoLineDisabled = resetting || send.isPending || turns.length > 0;
-  const sendDisabled = !text.trim() || send.isPending || resetting || !session.data;
+  const demoLineDisabled = resetting || sending || turns.length > 0;
+  const sendDisabled = !text.trim() || sending || resetting || !session.data;
 
   return (
     <div data-testid="kiosk" data-k={state} lang={language} className="kiosk">
       <div className="k-head">
         <KioskMark />
         <b>FrontDesk</b>
+        {session.data?.agentMode && (
+          <span data-testid="agent-mode-badge" className="k-mode">
+            {session.data.agentMode}
+          </span>
+        )}
         <div role="group" aria-label={t.language} className="k-lang">
           {LANGUAGES.map(({ value, label }) => (
             <button
@@ -484,7 +491,7 @@ export function KioskPane({
         {!idle && state !== "working" && (
           <button
             type="button"
-            disabled={send.isPending || resetting}
+            disabled={sending || resetting}
             onClick={startOver}
             className={finished ? "k-restart" : "k-link"}
           >
