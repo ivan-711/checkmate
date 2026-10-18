@@ -1,4 +1,5 @@
 import type {
+  CandidatePairDetail,
   EventLogRow,
   EventType,
   IntakeSession,
@@ -56,10 +57,21 @@ export class FixtureSource implements DataSource {
   }
 
   async getCase(): Promise<CaseData> {
-    const { history, outcome, resolved } = this.current;
-    const base = this.fixture.pair;
-    const detail = { ...base, pair: { ...base.pair, decision: history[history.length - 1] }, history };
+    const { outcome, resolved } = this.current;
+    const detail = this.currentDetail();
     return { sources: this.current.session.sources, detail, outcome, resolved, alertsKnown: true };
+  }
+
+  /** The fixture has one pair: it is both the Case pair and the pair FrontDesk hands off. */
+  async getCandidatePair(pairId: string): Promise<CandidatePairDetail> {
+    if (pairId !== this.fixture.pair.pair.id) throw new DataError("NOT_FOUND", "Pair not found.");
+    return this.currentDetail();
+  }
+
+  private currentDetail(): CandidatePairDetail {
+    const { history } = this.current;
+    const base = this.fixture.pair;
+    return { ...base, pair: { ...base.pair, decision: history[history.length - 1] }, history };
   }
 
   /** The fixture is already scored; Resolve only re-queues the pair and logs the run. */
