@@ -1,4 +1,5 @@
 import type { Contribution, NormalizedRecord, SourceCard } from "@/api/types";
+import type { CiteField } from "./desk";
 
 // Feature codes come from the scorer; the screen shows plain words. One closed list: the scorer's
 // ids (backend/core) plus the contract fixture's older ids. Unknown codes fall through unchanged
@@ -54,6 +55,74 @@ export const FEATURE_LABELS: Record<string, string> = {
   family_name_jw: "Family name",
   family_metaphone: "Family name sound",
 };
+
+// The record field each evidence feature cites (CONCEPT.md §5, hover-to-cite). Sex and phone
+// have no cite: the Organism draws threads for the four fields the story is about.
+const DOB_FEATURES = [
+  "dob_exact",
+  "dob_day_month_swap",
+  "dob_one_digit_edit",
+  "dob_one_component_off",
+  "dob_year_match",
+] as const;
+
+const FEATURE_FIELD: Record<string, CiteField> = {
+  ...Object.fromEntries(GIVEN_FEATURES.map((f) => [`given_${f}`, "given"])),
+  ...Object.fromEntries(FAMILY_FEATURES.map((f) => [`family_${f}`, "family"])),
+  ...Object.fromEntries(DOB_FEATURES.map((f) => [f, "dob"])),
+  address_jaccard: "addr",
+  zip_match: "addr",
+  given_name_jw: "given",
+  family_name_jw: "family",
+  family_metaphone: "family",
+};
+
+/** The field an evidence row lights up in both records; null when the feature has none. */
+export function citeFieldFor(feature: string): CiteField | null {
+  return FEATURE_FIELD[feature] ?? null;
+}
+
+/** The card fields (NormalizedRecord keys) each cite washes. */
+export const CITE_CARD_FIELDS = {
+  given: ["givenName"],
+  family: ["familyName"],
+  dob: ["birthDate"],
+  addr: ["addressLine", "zip5"],
+} as const satisfies Record<CiteField, readonly (keyof NormalizedRecord)[]>;
+
+// Display labels for the event feed (the Activity strip). The code stays in data-event-type for
+// the acceptance script; the words are what a judge reads.
+const EVENT_LABELS: Record<string, string> = {
+  RECORD_INGESTED: "Records loaded",
+  MATCH_RUN_COMPLETED: "Match run completed",
+  PAIR_SCORED: "Pairs scored",
+  LINK_APPROVED: "Link approved",
+  LINK_REJECTED: "Link rejected",
+  LINK_REVOKED: "Link revoked",
+  ENTITY_MERGED: "Records joined",
+  ENTITY_SPLIT: "Records split",
+  ALERT_RAISED: "Flag raised",
+  ALERT_RETRACTED: "Flag withdrawn",
+  WHATIF_APPLIED: "What-if applied",
+  DEMO_RESET: "Demo reset",
+  DEMO_RESTORED: "Demo restored",
+  EXPLANATION_GENERATED: "Explanation written",
+  EXTERNAL_CALL: "External call",
+  EVAL_RUN_STARTED: "Evaluation started",
+  EVAL_RUN_FINISHED: "Evaluation finished",
+  INTAKE_STARTED: "Check-in started",
+  AGENT_TOOL_CALLED: "Agent tool call",
+  INTAKE_HANDOFF_CREATED: "Held for registrar",
+  AGENT_TURN_DEGRADED: "Agent turn degraded",
+};
+
+/** "LINK_APPROVED" reads as "Link approved"; an unlisted code reads as words, never as a code. */
+export function eventLabel(eventType: string): string {
+  const known = EVENT_LABELS[eventType];
+  if (known) return known;
+  const words = eventType.toLowerCase().replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 export interface RankedContribution extends Contribution {
   label: string;

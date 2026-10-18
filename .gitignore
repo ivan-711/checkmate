@@ -48,3 +48,6 @@ playwright-report/
 # Editors
 .idea/
 .vscode/
+
+# Per-lane Next.js build folders (CHECKMATE_DIST_DIR=.next-<lane>)
+.next-*/
