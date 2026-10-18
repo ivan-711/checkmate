@@ -109,6 +109,7 @@ export class FixtureSource implements DataSource {
       if (tile.id === "HUMAN_REVIEW") return { ...tile, total: tile.total + reviews };
       if (tile.id !== "AGENT_GATE") return tile;
       const added = (series: string) => (series === "ALLOW" || series === "DENY" ? gate[series] : 0);
+      // The fixture has one bucket per series (its 18:00 snapshot); new outcomes are added there.
       const buckets = tile.buckets.map((b) => ({ ...b, count: b.count + added(b.series) }));
       return { ...tile, buckets, total: tile.total + gate.ALLOW + gate.DENY };
     });
