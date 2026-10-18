@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import socket
 import subprocess
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
@@ -126,6 +128,38 @@ def test_after_reset_the_same_scripted_checkin_sends_again():
     assert rec.sent == [MESSAGE, MESSAGE]
 
 
+def test_reset_between_the_reads_does_not_double_notify():
+    api, rec = FakeApi(), Recorder()
+    n = make_notifier(api, rec)
+    n.poll_once()
+    real_call = api.__class__.__call__
+    flipped = {"done": False}
+
+    def racing_fetch(url: str) -> object:
+        body = real_call(api, url)
+        if url.endswith(SESSION_PATH) and not flipped["done"]:
+            # Reset and a fast scripted check-in land right after the first session read.
+            flipped["done"] = True
+            api.session_id, api.items = "session-2", [handoff("pair-1", "intake-1")]
+        return body
+
+    n.fetch = racing_fetch
+    for _ in range(4):
+        n.poll_once()
+    assert rec.sent == [MESSAGE]
+
+
+def test_holds_made_while_the_api_was_down_at_start_are_announced():
+    api, rec = FakeApi(), Recorder()
+    api.down = True
+    n = make_notifier(api, rec)
+    n.poll_once()
+    api.down, api.items = False, [handoff("pair-1")]
+    assert n.poll_once() == 1
+    assert n.poll_once() == 0
+    assert not any("reset" in line for line in rec.lines)
+
+
 def test_holds_already_waiting_at_start_are_not_announced():
     api, rec = FakeApi(), Recorder()
     api.items = [handoff("pair-1")]
@@ -185,6 +219,31 @@ def test_real_http_get_against_a_closed_port_raises_api_unavailable():
         port = sock.getsockname()[1]
     with pytest.raises(ApiUnavailable):
         http_get_json(f"http://127.0.0.1:{port}{SESSION_PATH}")
+
+
+class _StatusHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(404 if self.path.endswith(SESSION_PATH) else 500)
+        self.end_headers()
+
+    def log_message(self, *args):  # keep test output quiet
+        pass
+
+
+def test_real_http_error_statuses_map_to_not_found_and_unavailable():
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _StatusHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with pytest.raises(notify.NotFound):
+            http_get_json(base + SESSION_PATH)
+        with pytest.raises(ApiUnavailable) as caught:
+            http_get_json(base + PAIRS_PATH)
+        assert not isinstance(caught.value, notify.NotFound)
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def test_dry_run_never_calls_osascript():

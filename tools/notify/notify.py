@@ -16,6 +16,7 @@ Standard library only.
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import re
@@ -111,10 +112,11 @@ def http_get_json(url: str) -> object:
         with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
+        exc.close()  # release the error response's socket; polls repeat every few seconds
         if exc.code == 404:
             raise NotFound(url) from None
         raise ApiUnavailable(f"HTTP {exc.code}") from None
-    except (urllib.error.URLError, OSError, ValueError) as exc:  # refused, timeout, bad JSON
+    except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as exc:  # refused, timeout, bad body
         raise ApiUnavailable(type(exc).__name__) from None
 
 
@@ -156,6 +158,7 @@ def _held_key(item: object) -> str | None:
     decision = item.get("decision")
     if not isinstance(decision, dict) or decision.get("status") != PENDING_STATUS:
         return None
+    # The hand-off writer always sets intakeSessionId (backend/chart_store/writes.py); the pair id is a fallback.
     key = item.get("intakeSessionId") or item.get("id")
     return str(key) if key else None
 
@@ -231,6 +234,7 @@ class Notifier:
     session_id: str | None = None
     seen: set[str] = field(default_factory=set)
     baselined: bool = False
+    session_known: bool = False
     api_down: bool = False
 
     def poll_once(self) -> int:
@@ -238,25 +242,29 @@ class Notifier:
         try:
             session_id = current_session_id(self.fetch, self.api_base)
             keys = held_checkins(self.fetch, self.api_base)
+            if current_session_id(self.fetch, self.api_base) != session_id:
+                return 0  # a Reset landed between the reads; the next poll sees one consistent session
         except ApiUnavailable:
+            if not self.baselined:
+                # Down at start: nothing is known to be waiting, so every hold seen once it answers is new.
+                self.baselined = True
             if not self.api_down:
-                self.log("API not reachable; retrying quietly every 2 s.")
+                self.log(f"API not reachable; retrying quietly every {POLL_INTERVAL_S:g} s.")
                 self.api_down = True
             return 0
         if self.api_down:
             self.log("API reachable again.")
             self.api_down = False
-        if session_id != self.session_id:
-            if self.baselined:
-                self.log("Demo reset seen; the next held check-in notifies again.")
-            self.session_id = session_id
-            self.seen = set()
         if not self.baselined:
             # Holds already waiting at start are not announced, so restarting the notifier never re-buzzes.
-            self.seen |= keys
+            self.session_id, self.session_known, self.seen = session_id, True, set(keys)
             self.baselined = True
             self.log(f"Watching for held check-ins ({len(keys)} already waiting, not announced).")
             return 0
+        if not self.session_known or session_id != self.session_id:
+            if self.session_known:
+                self.log("Demo reset seen; the next held check-in notifies again.")
+            self.session_id, self.session_known, self.seen = session_id, True, set()
         sent = 0
         for key in sorted(keys - self.seen):
             self.seen.add(key)  # one attempt per hold: a failing send never becomes a retry loop

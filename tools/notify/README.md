@@ -19,7 +19,7 @@ Every 2 s it reads two frozen `GET` endpoints on the running API, and nothing el
 - `GET /api/v1/candidate-pairs?origin=FRONTDESK_HANDOFF&status=PROPOSED`: the pairs the identity gate created when it denied a new chart and handed the patient to the registrar. One check-in can create several pairs (one per blocking candidate), so it sends one message per intake session.
 - `GET /api/v1/sessions/current`: the demo session id. A Reset creates a new one; the notifier then forgets what it sent, so the same scripted check-in after a Reset notifies again.
 
-Holds already waiting when the notifier starts are not announced, so restarting it never re-buzzes. What it has sent lives in memory only. It never writes to the API.
+Holds already waiting when it first reads the API are not announced, so restarting it never re-buzzes; if the API was down when it started, every hold it sees once the API answers is new. A Reset landing between its reads skips that poll. What it has sent lives in memory only. It never writes to the API.
 
 ## Run it
 
@@ -57,7 +57,7 @@ The first live send makes macOS ask once for Automation access: for Contacts (co
 ## Failure handling
 
 - API down or not answering: one line, then it retries quietly every 2 s.
-- `osascript` fails (Messages not signed in, Automation not allowed): one line, and it keeps running. Each hold gets one attempt, so a failing send never repeats every 2 s. A missing contact prints only `contact not found`; a card with no number prints only `no phone`. `osascript` error output is never echoed, because it can contain the number.
+- `osascript` fails (Messages not signed in, Automation not allowed): one line, and it keeps running. A send waits up to 60 s for the one-time Automation prompt; polling pauses meanwhile. Each hold gets one attempt, so a failing send never repeats every 2 s. A missing contact prints only `contact not found`; a card with no number prints only `no phone`. `osascript` error output is never echoed, because it can contain the number.
 - The recipient and the text reach `osascript` as arguments to `on run argv` (`send_handle.applescript`, `send_contact.applescript`); they are never spliced into script source.
 
 ## Tests
