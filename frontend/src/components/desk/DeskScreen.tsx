@@ -83,8 +83,7 @@ export function DeskScreen() {
     if (!c.resolve.isPending && !c.sessionChanging) c.resolve.mutate();
   };
   // Resolve is offered while the pair is not under review: before the first run and after a reject.
-  const canResolve =
-    !c.caseQuery.isPending && !c.linked && (!c.compared || c.detail?.pair.decision.status !== "PROPOSED");
+  const canResolve = !c.caseQuery.isPending && !c.linked && !c.underReview;
   useDeskAction("resolve", canResolve ? resolveNow : null);
 
   // The keyboard map (CONCEPT.md §5, touch 11): R, A, X, Enter, Escape. ⌘K and ⇧R are the

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CandidatePairDetail, ReviewRequest, ReviewResponse } from "@/api/types";
 import { scenario } from "@/data/scenario";
-import { attachablePair, planReviews, runReviews } from "./reviewPlan";
+import { attachablePair, planReviews, reviewable, runReviews } from "./reviewPlan";
 
 const hero = scenario.pair;
 const kiosk = "kiosk-record";
@@ -142,5 +142,24 @@ describe("runReviews", () => {
       ]),
     ).rejects.toThrow("down");
     expect(review).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("reviewable", () => {
+  const decision = scenario.pair.pair.decision;
+  it("a proposed pair is open for review", () => {
+    expect(reviewable({ ...decision, status: "PROPOSED" }, false)).toBe(true);
+  });
+
+  it("a rejection for not enough evidence reopens only after Resolve again", () => {
+    const rejected = { ...decision, status: "REJECTED" as const, reasonCode: "INSUFFICIENT_EVIDENCE" as const };
+    expect(reviewable(rejected, false)).toBe(false);
+    expect(reviewable(rejected, true)).toBe(true);
+  });
+
+  it("a different-person rejection or a link never reopens", () => {
+    expect(reviewable({ ...decision, status: "REJECTED", reasonCode: "DIFFERENT_PERSON" }, true)).toBe(false);
+    expect(reviewable({ ...decision, status: "LINKED" }, true)).toBe(false);
+    expect(reviewable(null, true)).toBe(false);
   });
 });

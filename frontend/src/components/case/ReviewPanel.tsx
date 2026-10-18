@@ -9,7 +9,14 @@ import { RESOLVE_KEY, SESSION_CHANGE_KEY } from "@/components/ui/ResetButton";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { scenario } from "@/data/scenario";
 import type { Sheet } from "@/lib/desk";
-import { attachablePair, planReviews, runReviews, type ReviewKeys, type ReviewRun } from "./reviewPlan";
+import {
+  attachablePair,
+  planReviews,
+  reviewable,
+  runReviews,
+  type ReviewKeys,
+  type ReviewRun,
+} from "./reviewPlan";
 
 // Fixture names, recorded as a label on the decision; not an authenticated identity.
 const REGISTRARS = scenario.registrarLabels;
@@ -61,6 +68,8 @@ interface Props {
   /** The pairs the kiosk's held check-in waits on; the strongest still proposed can be attached. */
   handoffPairs: CandidatePairDetail[];
   sheet: Sheet;
+  /** True after Resolve again on a rejection for not enough evidence (see reviewable). */
+  reopened?: boolean;
   onSheetChange: (sheet: Sheet) => void;
   /** Called first, synchronously, with the server's responses, so the caller can draw the result
    * in the same frame the sheet closes (motion-polish finding 2: no Approve flash-back). */
@@ -71,7 +80,15 @@ interface Props {
 
 /** Approve and Reject for the pair under review, and the confirm sheet that records the decision
  * (BUILD-SPEC decision 1: one Confirm may record the pair and the kiosk's check-in). */
-export function ReviewPanel({ detail, handoffPairs, sheet, onSheetChange, onConfirmed, onDecided }: Props) {
+export function ReviewPanel({
+  detail,
+  handoffPairs,
+  sheet,
+  reopened = false,
+  onSheetChange,
+  onConfirmed,
+  onDecided,
+}: Props) {
   const source = useDataSource();
   const queryClient = useQueryClient();
   const ids = useId();
@@ -111,7 +128,7 @@ export function ReviewPanel({ detail, handoffPairs, sheet, onSheetChange, onConf
     },
   });
   const blocked = decide.isPending || pairChanging;
-  const proposed = detail.pair.decision.status === "PROPOSED";
+  const proposed = reviewable(detail.pair.decision, reopened);
 
   useEffect(() => {
     if (!sheet) {

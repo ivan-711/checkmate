@@ -3,7 +3,7 @@
 import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import type { CandidatePairDetail, IntakeSession, ReviewResponse } from "@/api/types";
-import { attachablePair, type ReviewRun } from "@/components/case/reviewPlan";
+import { attachablePair, reviewable, type ReviewRun } from "@/components/case/reviewPlan";
 import { INTAKE_KEY, handoffPairKey, useHandoffPairs } from "@/components/frontdesk/intake";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import {
@@ -36,6 +36,8 @@ export function useDeskCase() {
   const queryClient = useQueryClient();
   const { setFacts, setSheet } = useDesk();
   const [justApproved, setJustApproved] = useState(false);
+  // Resolve again after a "not enough evidence" reject reopens that review (see reviewable).
+  const [reopenAsked, setReopenAsked] = useState(false);
   const flagRef = useRef<HTMLDivElement>(null);
   // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
   const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
@@ -57,6 +59,8 @@ export function useDeskCase() {
   const name = cards.map((c) => c.normalized.givenName).find((n) => n) ?? null;
   // Before Resolve the pair has not been compared: the stage stays idle or held, never "review".
   const compared = (data?.resolved ?? false) || linked;
+  const reopened = reopenAsked && decision?.status === "REJECTED";
+  const underReview = compared && reviewable(decision, reopenAsked);
   const handoffs = useHandoffPairs()
     .map((q) => q.data)
     .filter((d): d is CandidatePairDetail => d !== undefined);
@@ -68,7 +72,8 @@ export function useDeskCase() {
 
   useEffect(() => {
     setFacts({
-      decision: compared ? (decision?.status ?? null) : null,
+      // A reopened rejection is back under review, so the stage reads it as proposed.
+      decision: !compared ? null : underReview ? "PROPOSED" : (decision?.status ?? null),
       linked,
       flagRaised,
       name,
@@ -76,12 +81,12 @@ export function useDeskCase() {
       reason: decision?.reasonCode ?? null,
       linkedAt: decision?.status === "LINKED" ? decision.decidedAt : null,
     });
-  }, [setFacts, decision, compared, linked, flagRaised, name]);
+  }, [setFacts, decision, compared, underReview, linked, flagRaised, name]);
 
   // A decision closes any sheet; a reset drops the facts with the query.
   useEffect(() => {
-    if (!decision || decision.status !== "PROPOSED") setSheet(null);
-  }, [decision, setSheet]);
+    if (!underReview) setSheet(null);
+  }, [underReview, setSheet]);
 
   const timeline = useQuery({
     queryKey: ["timeline", entity?.id],
@@ -95,6 +100,7 @@ export function useDeskCase() {
     onSuccess: async (run) => {
       // Kept for the work queue's funnel, so the queue never has to start a run of its own.
       if (run) queryClient.setQueryData(LATEST_MATCH_RUN_KEY, run);
+      setReopenAsked(true);
       await queryClient.invalidateQueries({ queryKey: WORK_QUEUE_KEY });
       await queryClient.invalidateQueries({ queryKey: ["case"] });
       await queryClient.invalidateQueries({ queryKey: ["events"] });
@@ -117,6 +123,7 @@ export function useDeskCase() {
   function onConfirmed(run: ReviewRun) {
     const attached = data?.detail ? attachablePair(handoffs, data.detail.pair.id) : null;
     const { primary } = run;
+    setReopenAsked(false);
     queryClient.setQueryData<typeof data>(CASE_KEY, (d) =>
       d?.detail
         ? {
@@ -154,6 +161,8 @@ export function useDeskCase() {
     detail: data?.detail ?? null,
     resolved: data?.resolved ?? false,
     compared,
+    reopened,
+    underReview,
     handoffs,
     thresholds: thresholds.data,
     onConfirmed,

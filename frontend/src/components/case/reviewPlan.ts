@@ -1,4 +1,4 @@
-import type { CandidatePairDetail, ReviewRequest, ReviewResponse } from "@/api/types";
+import type { CandidatePairDetail, MatchDecision, ReviewRequest, ReviewResponse } from "@/api/types";
 
 /** Decision 1 (BUILD-SPEC): one Confirm may record two approvals. The pair under review goes
  * first; then, when the kiosk's check-in is held by a hand-off pair and the "Also attach" row is
@@ -18,6 +18,16 @@ export interface ReviewKeys {
 export interface AttachChoice {
   pairId: string;
   on: boolean;
+}
+
+/** Whether Approve and Reject are offered for this decision. A proposed pair always; a rejection
+ * for not enough evidence once the registrar presses Resolve again: a match run keeps that
+ * rejection when the evidence is unchanged (backend/api/match_runs.py needs_new_version), and the
+ * review endpoint lets a later approve supersede it (backend/api/reviews.py). */
+export function reviewable(decision: MatchDecision | null, reopened: boolean): boolean {
+  if (!decision) return false;
+  if (decision.status === "PROPOSED") return true;
+  return reopened && decision.status === "REJECTED" && decision.reasonCode === "INSUFFICIENT_EVIDENCE";
 }
 
 /** The hand-off pair the attach row offers: the strongest one still waiting on a person, and
@@ -47,7 +57,11 @@ export function planReviews({
   const steps: ReviewStep[] = [{ pairId, body, key: keys.primary }];
   if (body.action === "APPROVE" && attach?.on) {
     // The registrar's label carries over; the note belongs to the first decision only.
-    steps.push({ pairId: attach.pairId, body: { action: "APPROVE", actor: body.actor, note: null }, key: keys.attach });
+    steps.push({
+      pairId: attach.pairId,
+      body: { action: "APPROVE", actor: body.actor, note: null },
+      key: keys.attach,
+    });
   }
   return steps;
 }

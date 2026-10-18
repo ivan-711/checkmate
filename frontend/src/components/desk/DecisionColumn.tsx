@@ -125,6 +125,7 @@ export function DecisionColumn({ c, onResolve }: { c: DeskCase; onResolve: () =>
             detail={detail}
             handoffPairs={c.handoffs}
             sheet={sheet}
+            reopened={c.reopened}
             onSheetChange={setSheet}
             onConfirmed={c.onConfirmed}
             onDecided={c.onDecided}
