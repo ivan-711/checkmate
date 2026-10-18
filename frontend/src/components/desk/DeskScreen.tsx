@@ -6,7 +6,16 @@ import { citedFields } from "@/components/record/cite";
 import { Organism } from "@/components/record/Organism";
 import { typingInField } from "@/components/ui/Header";
 import { DataError } from "@/data/source";
-import { agoText, formatHeld, stageHead, type CiteContext, type DeskState } from "@/lib/desk";
+import { useIntakeSession } from "@/components/frontdesk/intake";
+import {
+  agoText,
+  formatHeld,
+  newChartStageHead,
+  stageHead,
+  type CiteContext,
+  type DeskState,
+} from "@/lib/desk";
+import { newChartFacts } from "@/lib/kioskNewChart";
 import { ActivityStrip } from "./ActivityStrip";
 import { CiteProvider } from "./CiteProvider";
 import { DecisionColumn } from "./DecisionColumn";
@@ -31,7 +40,8 @@ function useNow(active: boolean): number {
 /** Row 1 of the stage: an eyebrow with the live wait, a plain-language title, one gray line. */
 function StageHead() {
   const { desk, kiosk, facts } = useDesk();
-  const head = stageHead(desk, facts);
+  const newChart = newChartFacts(useIntakeSession());
+  const head = desk === "idle" && newChart ? newChartStageHead(newChart.name) : stageHead(desk, facts);
   const waiting = WAITING_STATES.includes(desk) && kiosk === "held";
   const now = useNow(waiting || desk === "linked");
   const [heldSince, setHeldSince] = useState<number | null>(null);
@@ -120,6 +130,9 @@ export function DeskScreen() {
   }, [actions, desk, commandsOpen]);
 
   const cards = c.cards;
+  // A check-in that opened a new chart matched none of the records on file: show only the new patient.
+  const intake = useIntakeSession();
+  const newChart = desk === "idle" && newChartFacts(intake) !== null;
   // One thread per field the shown evidence cites, once Resolve has scored the pair.
   const threads = c.detail && (c.resolved || c.linked) ? citedFields(c.detail.contributions) : [];
   const noSession =
@@ -152,7 +165,7 @@ export function DeskScreen() {
                 {c.caseQuery.isError && !noSession && (
                   <p className="text-ink-2">Records unavailable: {c.caseQuery.error.message}</p>
                 )}
-                {cards.length > 0 && (
+                {cards.length > 0 && !newChart && (
                   <div className="organism-scale">
                     <Organism
                       cards={cards}

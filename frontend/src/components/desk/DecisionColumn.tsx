@@ -141,8 +141,8 @@ function NewChartCard({ facts }: { facts: NewChartFacts }) {
         )}
       </dl>
       <p className={LEAD}>
-        No existing chart scored close enough, so the gate allowed a new one. Nothing to resolve; a registrar
-        finishes the registration in person.
+        The identity gate allowed a new chart. Nothing to resolve; a registrar finishes the registration in
+        person.
       </p>
     </div>
   );
