@@ -1,7 +1,7 @@
 "use client";
 
 import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReviewResponse } from "@/api/types";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { LATEST_MATCH_RUN_KEY, RESOLVE_KEY, SESSION_CHANGE_KEY, WORK_QUEUE_KEY } from "@/components/ui/ResetButton";
@@ -26,8 +26,8 @@ export function useDeskCase() {
   const announce = useAnnounce();
   const queryClient = useQueryClient();
   const { setFacts, setSheet } = useDesk();
+  // Set by an Approve made here; the Organism moves focus after the morph, then clears it.
   const [justApproved, setJustApproved] = useState(false);
-  const flagRef = useRef<HTMLDivElement>(null);
   // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
   const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
   const caseQuery = useQuery({
@@ -83,16 +83,6 @@ export function useDeskCase() {
     },
   });
 
-  // After an approve, focus goes where the eye should: to the flag's heading when the rule
-  // flagged the linked record, with the notice scrolled into view; otherwise the record keeps it.
-  useEffect(() => {
-    if (!justApproved || !linked || !flagRaised) return;
-    flagRef.current?.querySelector<HTMLElement>("#flag-heading")?.focus({ preventScroll: true });
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    flagRef.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
-    setJustApproved(false);
-  }, [justApproved, linked, flagRaised]);
-
   function onDecided(response: ReviewResponse) {
     setJustApproved(response.decision.status === "LINKED");
     announce(announcement(response));
@@ -113,6 +103,5 @@ export function useDeskCase() {
     onDecided,
     justApproved,
     setJustApproved,
-    flagRef,
   };
 }

@@ -1,11 +1,13 @@
 "use client";
 
 import { motion } from "motion/react";
-import type { EntityMember, SourceCard } from "@/api/types";
+import type { Entity, SourceCard } from "@/api/types";
 import { TABS } from "./geometry";
 import { SourceGlyph } from "./Glyph";
 import { sourceNameFrom } from "./labels";
 import { CROSSFADE_S, EASE_OUT, TABS_IN, type MorphMode } from "./motion";
+
+type EntityMember = Entity["members"][number];
 
 export interface TabsProps {
   members: EntityMember[];

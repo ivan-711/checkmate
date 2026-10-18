@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { EvidenceRail } from "@/components/case/EvidenceRail";
-import { FlagCard } from "@/components/case/FlagCard";
-import { GoldenRecord } from "@/components/case/GoldenRecord";
 import { ReviewPanel } from "@/components/case/ReviewPanel";
-import { SourceCardView } from "@/components/case/SourceCardView";
 import { Timeline } from "@/components/case/Timeline";
 import { KioskPane } from "@/components/frontdesk/KioskPane";
+import { citedFields } from "@/components/record/cite";
+import { CiteContextProvider } from "@/components/record/CiteContext";
+import { Organism } from "@/components/record/Organism";
 import { typingInField } from "@/components/ui/Header";
 import { DataError } from "@/data/source";
-import { agoText, formatHeld, stageHead, type DeskState } from "@/lib/desk";
-import { differingFields, type CardField } from "@/lib/display";
+import { agoText, formatHeld, stageHead, type CiteContext, type DeskState } from "@/lib/desk";
 import { ActivityStrip } from "./ActivityStrip";
 import { useDesk, useDeskAction } from "./DeskContext";
 import { useDeskCase } from "./useDeskCase";
@@ -74,12 +73,17 @@ function StageHead() {
 }
 
 /** The Desk (CONCEPT.md §3): the kiosk device on the left, the registrar's stage on the right,
- * three fixed rows so nothing jumps between states. Until the Organism (L3) and the decision
- * column (L4) land, the body slots compose the current case components so every G16 hook stays
- * live; the kiosk slot holds the current KioskPane until L2's. */
+ * three fixed rows so nothing jumps between states. The body holds the Organism (L3) beside the
+ * decision column; until L4's column lands, that column composes the current case components so
+ * every G16 hook stays live; the kiosk slot holds the current KioskPane until L2's. */
 export function DeskScreen() {
-  const { desk, kiosk, actions, commandsOpen } = useDesk();
+  const { desk, kiosk, sheet, cite, setCite, actions, commandsOpen } = useDesk();
   const c = useDeskCase();
+  const { setJustApproved } = c;
+  // The Organism reads the cite the evidence rail writes; DeskContext owns it, so both meet there.
+  const citeValue = useMemo<CiteContext>(() => ({ cite, setCite }), [cite, setCite]);
+  // Stable, so the Organism's focus timer is not restarted by unrelated re-renders.
+  const onFocused = useCallback(() => setJustApproved(false), [setJustApproved]);
   const resolveNow = () => {
     if (!c.resolve.isPending && !c.sessionChanging) c.resolve.mutate();
   };
@@ -115,8 +119,8 @@ export function DeskScreen() {
   }, [actions, desk, commandsOpen]);
 
   const cards = c.cards;
-  const differs =
-    cards.length === 2 ? differingFields(cards[0].normalized, cards[1].normalized) : new Set<CardField>();
+  // One thread per field the shown evidence cites, once Resolve has scored the pair.
+  const threads = c.detail && (c.resolved || c.linked) ? citedFields(c.detail.contributions) : [];
   const noSession =
     c.caseQuery.isError && c.caseQuery.error instanceof DataError && c.caseQuery.error.code === "NO_SESSION";
 
@@ -134,37 +138,36 @@ export function DeskScreen() {
         <StageHead />
 
         <div className="stage-body">
-          {/* The Organism slot (L3). Interim: the two source cards, then the record, notice and history. */}
-          <div className="organism-slot overflow-auto" data-testid="organism-slot">
-            {c.caseQuery.isPending && <p aria-busy="true">Loading records…</p>}
-            {noSession && <p data-testid="reset-prompt">{c.caseQuery.error?.message}</p>}
-            {c.caseQuery.isError && !noSession && (
-              <p className="text-ink-2">Records unavailable: {c.caseQuery.error.message}</p>
-            )}
-            {c.linked && c.entity ? (
-              <div className="space-y-4">
-                <GoldenRecord
-                  entity={c.entity}
-                  cards={cards}
-                  focusOnMount={c.justApproved && !c.flagRaised}
-                  onFocused={() => c.setJustApproved(false)}
-                />
-                <div ref={c.flagRef}>
-                  <FlagCard state={c.flag} />
+          {/* The Organism (L3): the fragments, their threads, and after Approve the one record with
+              the notice risen from the join. History sits under it until L4 places it. */}
+          <div className="min-w-0">
+            <div className="organism-slot" data-testid="organism-slot">
+              {c.caseQuery.isPending && <p aria-busy="true">Loading records…</p>}
+              {noSession && <p data-testid="reset-prompt">{c.caseQuery.error?.message}</p>}
+              {c.caseQuery.isError && !noSession && (
+                <p className="text-ink-2">Records unavailable: {c.caseQuery.error.message}</p>
+              )}
+              {cards.length > 0 && (
+                <div className="organism-scale">
+                  <CiteContextProvider value={citeValue}>
+                    <Organism
+                      cards={cards}
+                      stage={desk}
+                      sheet={sheet}
+                      entity={c.entity}
+                      flag={c.flag}
+                      threads={threads}
+                      focusAfterLink={c.justApproved}
+                      onFocused={onFocused}
+                    />
+                  </CiteContextProvider>
                 </div>
+              )}
+            </div>
+            {c.linked && c.entity && (
+              <div className="mt-4">
                 <Timeline events={c.timeline.data} cards={cards} />
               </div>
-            ) : (
-              cards.length > 0 && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    {cards.map((card) => (
-                      <SourceCardView key={card.record.id} card={card} differs={differs} />
-                    ))}
-                  </div>
-                  <FlagCard state={c.flag} />
-                </div>
-              )
             )}
           </div>
 

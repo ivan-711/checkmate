@@ -59,7 +59,7 @@ describe("Fragment", () => {
     const kiosk: SourceCard = {
       ...er,
       displayLabel: "Kiosk check-in",
-      record: { ...er.record, sourceSystem: "KIOSK", kind: "INTAKE_UTTERANCE" },
+      record: { ...er.record, sourceSystem: "KIOSK", kind: "FRONTDESK_INTAKE" },
     };
     const html = render({ card: kiosk, side: "er" });
     expect(html).toContain('aria-label="Kiosk check-in record"');
