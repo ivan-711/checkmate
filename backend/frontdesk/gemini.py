@@ -29,8 +29,9 @@ FUNCTION_RESPONSE_ROLE = "user"
 _RETRYABLE_HTTP_MIN = 500
 _RATE_LIMITED = 429
 QUOTA_STATUS = "RESOURCE_EXHAUSTED"
-PROBE_TEXT = "ok"
-PROBE_MAX_OUTPUT_TOKENS = 1
+SERVER_TIMEOUT_HEADER = "X-Server-Timeout"
+# The API rejects a server deadline under 10 s; the per-call model timeout is that floor (contracts).
+PROBE_SERVER_DEADLINE_S = MODEL_TIMEOUT_MS // 1000
 _BLOCKED_FINISH = {types.FinishReason.SAFETY: "SAFETY_BLOCKED", types.FinishReason.MALFORMED_FUNCTION_CALL: "MALFORMED"}
 
 
@@ -46,7 +47,11 @@ class GeminiAgentModel:
         self._http_options = types.HttpOptions(
             timeout=MODEL_TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=SDK_ATTEMPTS)
         )
-        self._client = Client(api_key=api_key, http_options=self._http_options)
+        try:
+            self._client = Client(api_key=api_key, http_options=self._http_options)
+        except Exception as exc:  # noqa: BLE001 — a client that cannot be built degrades each step, never a 500
+            log.warning("gemini client unavailable exception_class=%s", type(exc).__name__)
+            self._client = None
 
     def _config(self, req: ModelRequest) -> types.GenerateContentConfig:
         declarations = [
@@ -64,11 +69,14 @@ class GeminiAgentModel:
         )
 
     def next_step(self, req: ModelRequest) -> ModelStep:
+        if self._client is None:
+            return ErrorStep(kind="UNAVAILABLE", retryable=False, mode=self.mode)
         started = time.perf_counter()
         try:
             response = self._client.models.generate_content(
                 model=self._model_id, contents=contents_from_messages(req.messages), config=self._config(req)
             )
+            return step_from_response(response, _elapsed_ms(started), self.mode)
         except httpx.TimeoutException as exc:
             log.warning("gemini timeout exception_class=%s", type(exc).__name__)
             return ErrorStep(kind="TIMEOUT", retryable=True, mode=self.mode)
@@ -82,7 +90,10 @@ class GeminiAgentModel:
             # failure (connection refused, DNS) is none of those.
             log.warning("gemini transport error exception_class=%s", type(exc).__name__)
             return ErrorStep(kind="UNAVAILABLE", retryable=False, mode=self.mode)
-        return step_from_response(response, _elapsed_ms(started), self.mode)
+        except Exception as exc:  # noqa: BLE001 — a parse or auth error from the library degrades the turn
+            # Not retried: an unknown failure is not one of ADR-016 §8's retryable cases.
+            log.warning("gemini unexpected error exception_class=%s", type(exc).__name__)
+            return ErrorStep(kind="UNAVAILABLE", retryable=False, mode=self.mode)
 
 
 def retry_after_seconds(exc: errors.APIError) -> float | None:
@@ -124,30 +135,33 @@ def api_error_retryable(exc: errors.APIError) -> bool:
     return False
 
 
+def probe_http_options() -> types.HttpOptions:
+    """The probe's own options: a short client-side wait (AUTO_MODE_PROBE_S) so session start never
+    stalls, and an explicit server deadline. Without the header the SDK derives X-Server-Timeout from
+    the client timeout (1.5 s → "2"), and the API rejects any deadline under 10 s, so every probe
+    would fail and AUTO could never pin LIVE."""
+    return types.HttpOptions(
+        timeout=int(AUTO_MODE_PROBE_S * 1000),
+        headers={SERVER_TIMEOUT_HEADER: str(PROBE_SERVER_DEADLINE_S)},
+        retry_options=types.HttpRetryOptions(attempts=SDK_ATTEMPTS),
+    )
+
+
 def probe_live(*, api_key: str, model_id: str) -> bool:
-    """AUTO mode's session-start probe: one minimal real generate call inside AUTO_MODE_PROBE_S, so a
-    model whose daily quota is gone cannot pass (a metadata read would). It spends one request of the
-    free tier's daily quota. Any 429, any other API error, a timeout or a transport failure pins the
-    session to REPLAY (fail closed)."""
+    """AUTO mode's session-start probe: one cheap metadata read (``models.get`` on the configured
+    model id), no generate call, so it spends no generation quota (billing is linked since 19:41).
+    Any 429, 403, 404, 5xx, timeout, transport failure or other library error pins the session to
+    REPLAY (fail closed)."""
     try:
-        client = Client(
-            api_key=api_key,
-            http_options=types.HttpOptions(
-                timeout=int(AUTO_MODE_PROBE_S * 1000), retry_options=types.HttpRetryOptions(attempts=SDK_ATTEMPTS)
-            ),
-        )
-        client.models.generate_content(
-            model=model_id,
-            contents=PROBE_TEXT,
-            config=types.GenerateContentConfig(temperature=0, max_output_tokens=PROBE_MAX_OUTPUT_TOKENS),
-        )
+        client = Client(api_key=api_key, http_options=probe_http_options())
+        client.models.get(model=model_id)
         return True
     except errors.APIError as exc:
         log.warning(
             "gemini probe failed exception_class=%s code=%s status=%s", type(exc).__name__, exc.code, _status(exc)
         )
         return False
-    except httpx.HTTPError as exc:
+    except Exception as exc:  # noqa: BLE001 — fail closed: anything else from the library also pins REPLAY
         log.warning("gemini probe failed exception_class=%s", type(exc).__name__)
         return False
 

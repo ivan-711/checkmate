@@ -477,19 +477,11 @@ def test_unknown_tool_extra_property_bad_postal_are_audited_denies_not_500(api, 
 
 
 def test_seven_tool_calls_trip_the_loop_guard_and_the_template(api, engine, seeded):
+    # Eight distinct calls (no two identical, so only the per-turn limit applies): the 7th is denied
+    # LOOP_GUARD and the turn ends. Identical calls end earlier, at the 4th (ADR-016 §8; next test).
     _client, use, start, turn, _ = api
     model = ScriptedModel(
-        [
-            call(
-                "search_patients",
-                {
-                    "givenName": "Priscilla",
-                    "familyName": "Oyelaran-Whitcombe",
-                    "evidence": {"givenName": "Priscilla", "familyName": "Oyelaran-Whitcombe"},
-                },
-            )
-        ]
-        * 8,
+        [call("search_patients", {"givenName": f"Name{i}", "evidence": {"givenName": f"Name{i}"}}) for i in range(8)],
         engine,
     )
     use(model)
@@ -499,6 +491,24 @@ def test_seven_tool_calls_trip_the_loop_guard_and_the_template(api, engine, seed
     assert len(body["toolCalls"]) == 7 and body["toolCalls"][-1]["gate"]["reasonCode"] == "LOOP_GUARD"
     assert len(events(engine, sid, "AGENT_TURN_DEGRADED")) == 1
     assert model.calls == 7
+
+
+def test_fourth_identical_call_trips_the_loop_guard_and_the_template(api, engine, seeded):
+    _client, use, start, turn, _ = api
+    search = {
+        "givenName": "Priscilla",
+        "familyName": "Oyelaran-Whitcombe",
+        "evidence": {"givenName": "Priscilla", "familyName": "Oyelaran-Whitcombe"},
+    }
+    model = ScriptedModel([call("search_patients", search)] * 8, engine)
+    use(model)
+    sid = start("EN")["id"]
+    body = turn(sid, NEW_TEXT).json()
+    assert body["degraded"] == "LOOP_GUARD" and body["assistantTextSource"] == "TEMPLATE"
+    assert len(body["toolCalls"]) == 4 and body["toolCalls"][-1]["gate"]["reasonCode"] == "LOOP_GUARD"
+    assert body["toolCalls"][-1]["gate"]["handoffRequired"] is True
+    assert len(events(engine, sid, "AGENT_TURN_DEGRADED")) == 1
+    assert model.calls == 4
 
 
 def test_timeout_retries_once_then_degrades_and_two_degraded_turns_stop_calling_the_model(api, engine, seeded):

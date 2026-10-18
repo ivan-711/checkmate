@@ -7,12 +7,14 @@ import uuid
 import jsonschema
 from sqlalchemy import text
 
+from backend.frontdesk import gemini
 from backend.frontdesk.tools import tool_result_schema
-from backend.tests.frontdesk.conftest import API, create_session, error, new_key, tool_call, turn
+from backend.tests.frontdesk.conftest import API, HOLDER, create_session, error, new_key, tool_call, turn
 from backend.tests.policy.seed import CLINIC_DEMOGRAPHICS, ER_DEMOGRAPHICS, insert_record
 from backend.tests.policy.test_gate_db import PROPOSE_ARGS, UNRELATED_ARGS, UNRELATED_TEXT, USER_TEXT
 from contracts.models.common import SourceKind
 from contracts.models.intake import IntakeTurn
+from contracts.version import MAX_IDENTICAL_CALLS_PER_SESSION
 
 ATTACH_ARGS = {"items": [{"kind": "ALLERGY", "text": "penicillin", "evidenceQuote": "alérgica a la penicilina"}]}
 ATTACH_TEXT = USER_TEXT + ". Soy alérgica a la penicilina."
@@ -331,18 +333,67 @@ def test_banned_phrase_is_swapped_for_the_template(client, fake, cleanup):
     assert body["degraded"] is None
 
 
-def test_loop_guard_denies_the_seventh_call_and_ends_with_the_template(client, fake, cleanup):
-    session = create_session(client)
-    cleanup[0].append(session["id"])
-    search = {"givenName": "Maria Jose", "familyName": "Gonzalez Rivera", "evidence": PROPOSE_ARGS["evidence"]}
-    fake.steps = [tool_call("search_patients", search) for _ in range(8)]
-    body = turn(client, session["id"], USER_TEXT).json()
-    assert body["degraded"] == "LOOP_GUARD" and body["assistantTextSource"] == "TEMPLATE"
+LOOP_SEARCH = {"givenName": "Maria Jose", "familyName": "Gonzalez Rivera", "evidence": PROPOSE_ARGS["evidence"]}
+
+
+def _assert_identical_call_guard_ended_the_turn(body: dict, fake, db_conn, session_id: str) -> None:
+    """ADR-016 §8: the 4th identical call is denied LOOP_GUARD with handoffRequired, and the turn ends
+    there with the template; the model is not asked again and its own text never reaches the patient."""
     reasons = [c["gate"]["reasonCode"] for c in body["toolCalls"]]
-    assert reasons[-1] == "LOOP_GUARD" and len(body["toolCalls"]) <= 7
-    assert "LOOP_GUARD" in reasons
+    assert len(body["toolCalls"]) == MAX_IDENTICAL_CALLS_PER_SESSION + 1
+    assert "LOOP_GUARD" not in reasons[:-1] and reasons[-1] == "LOOP_GUARD"
+    last_gate = body["toolCalls"][-1]["gate"]
+    assert last_gate["outcome"] == "DENY" and last_gate["handoffRequired"] is True
+    assert body["degraded"] == "LOOP_GUARD" and body["assistantTextSource"] == "TEMPLATE"
+    assert body["assistantText"] == "One moment, a registrar will help you."
+    assert len(fake.requests) == MAX_IDENTICAL_CALLS_PER_SESSION + 1
+    degraded = events(db_conn, session_id, "AGENT_TURN_DEGRADED")
+    assert len(degraded) == 1 and degraded[0]._mapping["outcome"] == "LOOP_GUARD"
+
+
+def test_loop_guard_on_identical_calls_ends_the_turn_with_the_template(client, fake, db_conn, cleanup):
+    session = create_session(client, "EN")
+    cleanup[0].append(session["id"])
+    fake.steps = [tool_call("search_patients", LOOP_SEARCH) for _ in range(8)]
+    body = turn(client, session["id"], USER_TEXT).json()
+    _assert_identical_call_guard_ended_the_turn(body, fake, db_conn, session["id"])
+
+
+def test_four_identical_searches_then_text_never_let_the_model_text_through(client, fake, db_conn, cleanup):
+    """The second-layer reproduction: four identical searches, then the model's own text."""
+    session = create_session(client, "EN")
+    cleanup[0].append(session["id"])
+    fake.steps = [tool_call("search_patients", LOOP_SEARCH) for _ in range(4)]
+    fake.final_text = "All set, you can sit down now."
+    body = turn(client, session["id"], USER_TEXT).json()
+    _assert_identical_call_guard_ended_the_turn(body, fake, db_conn, session["id"])
+    assert "sit down" not in body["assistantText"]
 
 
 def test_get_unknown_session_is_404(client):
     r = client.get(f"{API}/intake-sessions/{uuid.uuid4()}")
     assert r.status_code == 404 and r.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_unexpected_library_exception_degrades_the_turn_not_a_500(client, fake, db_conn, cleanup, monkeypatch):
+    """The real LIVE adapter over a client whose call raises something that is neither an API error
+    nor an httpx error: the turn degrades to the template with an AGENT_TURN_DEGRADED row."""
+
+    class _Models:
+        def generate_content(self, **kwargs):
+            raise RuntimeError("response parse failed")
+
+    class _Client:
+        models = _Models()
+
+    monkeypatch.setattr(gemini, "Client", lambda **kwargs: _Client())
+    HOLDER.model = gemini.GeminiAgentModel(api_key="not-a-real-key", model_id="fixture-model")
+    session = create_session(client, "EN")
+    cleanup[0].append(session["id"])
+    r = turn(client, session["id"], "Hello")
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["degraded"] == "UNAVAILABLE" and body["assistantTextSource"] == "TEMPLATE"
+    assert body["assistantText"] == "One moment, a registrar will help you."
+    degraded = events(db_conn, session["id"], "AGENT_TURN_DEGRADED")
+    assert len(degraded) == 1 and degraded[0]._mapping["outcome"] == "UNAVAILABLE"

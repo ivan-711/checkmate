@@ -39,6 +39,7 @@ from contracts.models.intake import (
     TurnRequest,
     TurnStatus,
 )
+from contracts.models.policy import PolicyReason
 from contracts.version import (
     MAX_DEGRADED_TURNS_BEFORE_TEMPLATE,
     MAX_TOOL_CALLS_PER_TURN,
@@ -263,7 +264,10 @@ def _run_claimed(
             tool_calls.append(outcome.record)
             new_chart_created = new_chart_created or outcome.notice == Notice.NEW_CHART_CREATED
             last_sha = outcome.tool_result_sha256
-            if calls_this_turn > MAX_TOOL_CALLS_PER_TURN:
+            if outcome.record.gate.reason_code == PolicyReason.LOOP_GUARD or calls_this_turn > MAX_TOOL_CALLS_PER_TURN:
+                # ADR-016 §8: either loop limit (6 calls per turn, 3 identical calls per session) ends
+                # the turn with the template and the gate's handoff; the model is not asked again, so
+                # its own text after a denied loop never reaches the patient.
                 degraded = DegradedKind.LOOP_GUARD
                 break
             messages.append(Message(role="model", tool_call=step))

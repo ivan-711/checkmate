@@ -10,6 +10,7 @@ import uuid
 import httpx
 import pytest
 from google.genai import errors, types
+from google.genai._api_client import get_timeout_in_seconds, populate_server_timeout_header
 
 from backend.frontdesk import gemini
 from backend.frontdesk.model import ErrorStep, Message, ModelRequest, TextStep, ToolCallStep
@@ -17,7 +18,7 @@ from backend.frontdesk.prompts import PROMPT_VERSION, system_instruction
 from backend.frontdesk.tools import tool_declarations
 from contracts.models.intake import AgentMode
 from contracts.models.policy import Language
-from contracts.version import MODEL_TIMEOUT_MS, TOOL_SCHEMA_VERSION
+from contracts.version import AUTO_MODE_PROBE_S, MODEL_TIMEOUT_MS, TOOL_SCHEMA_VERSION
 
 
 class _Models:
@@ -181,19 +182,31 @@ class _ProbeModels:
         self.outcome = outcome
         self.calls = []
 
-    def generate_content(self, **kwargs):
+    def get(self, **kwargs):
         self.calls.append(kwargs)
         if isinstance(self.outcome, BaseException):
             raise self.outcome
         return self.outcome
 
-    def get(self, **kwargs):
-        raise AssertionError("the probe must make a real generate call, not a metadata read")
+    def generate_content(self, **kwargs):
+        raise AssertionError("the probe is a metadata read (models.get), never a generate call")
 
 
 class _ProbeClient:
     def __init__(self, outcome):
         self.models = _ProbeModels(outcome)
+        self.http_options: types.HttpOptions | None = None
+
+
+def _install_probe_client(monkeypatch, outcome) -> _ProbeClient:
+    client = _ProbeClient(outcome)
+
+    def build(**kwargs):
+        client.http_options = kwargs.get("http_options")
+        return client
+
+    monkeypatch.setattr(gemini, "Client", build)
+    return client
 
 
 def _auto_settings(key_present: bool = True, model_id: str | None = "fixture-model"):
@@ -210,42 +223,70 @@ def _auto_settings(key_present: bool = True, model_id: str | None = "fixture-mod
     )
 
 
+def test_probe_is_one_models_get_with_a_short_client_timeout_and_a_10s_server_deadline(monkeypatch):
+    """Second layer, blocking 1: a 1.5 s HttpOptions.timeout alone makes the SDK send
+    X-Server-Timeout: 2, which the API rejects (deadlines under 10 s), so AUTO could never pin LIVE.
+    The probe is a metadata read with the 1.5 s client timeout and an explicit 10 s server deadline."""
+    from backend.frontdesk import adapters
+
+    monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-key")
+    client = _install_probe_client(monkeypatch, types.Model(name="models/fixture-model"))
+    assert adapters.pin_mode(_auto_settings()) == AgentMode.LIVE
+    assert client.models.calls == [{"model": "fixture-model"}]
+    opts = client.http_options
+    assert opts.timeout == int(AUTO_MODE_PROBE_S * 1000)
+    assert opts.retry_options.attempts == 1
+    assert int(opts.headers["X-Server-Timeout"]) >= MODEL_TIMEOUT_MS // 1000 >= 10
+    # The SDK keeps a header already set and only fills it in from the client timeout when absent.
+    headers = dict(opts.headers)
+    populate_server_timeout_header(headers, get_timeout_in_seconds(opts.timeout))
+    assert int(headers["X-Server-Timeout"]) >= 10
+
+
 def test_auto_pins_replay_on_a_probe_429_resource_exhausted(monkeypatch):
     from backend.frontdesk import adapters
 
     monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-key")
-    client = _ProbeClient(errors.APIError(429, {"error": {"message": "quota", "status": "RESOURCE_EXHAUSTED"}}))
-    monkeypatch.setattr(gemini, "Client", lambda **kwargs: client)
+    client = _install_probe_client(
+        monkeypatch, errors.APIError(429, {"error": {"message": "quota", "status": "RESOURCE_EXHAUSTED"}})
+    )
     assert adapters.pin_mode(_auto_settings()) == AgentMode.REPLAY
-    assert len(client.models.calls) == 1  # one real generate call, one request of the daily quota
+    assert len(client.models.calls) == 1
 
 
 @pytest.mark.parametrize(
     "outcome",
     [
         errors.APIError(429, {"error": {"message": "per-minute"}}),
+        errors.APIError(403, {"error": {"message": "denied"}}),
+        errors.APIError(404, {"error": {"message": "no such model"}}),
+        errors.APIError(500, {"error": {"message": "internal"}}),
         errors.APIError(503, {"error": {"message": "overloaded"}}),
         errors.APIError(400, {"error": {"message": "deadline too short"}}),
         httpx.ReadTimeout("t"),
         httpx.ConnectError("down"),
+        ValueError("unparseable model metadata"),
+        RuntimeError("anything else from the library"),
     ],
 )
 def test_auto_pins_replay_on_any_probe_failure(monkeypatch, outcome):
     from backend.frontdesk import adapters
 
     monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-key")
-    monkeypatch.setattr(gemini, "Client", lambda **kwargs: _ProbeClient(outcome))
+    client = _install_probe_client(monkeypatch, outcome)
     assert adapters.pin_mode(_auto_settings()) == AgentMode.REPLAY
+    assert len(client.models.calls) == 1
 
 
-def test_auto_pins_live_only_when_the_probe_generate_call_answers(monkeypatch):
+def test_auto_pins_replay_when_the_client_cannot_be_built(monkeypatch):
     from backend.frontdesk import adapters
 
+    def broken(**kwargs):
+        raise ValueError("bad client options")
+
     monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-key")
-    client = _ProbeClient(_response([types.Part.from_text(text="ok")]))
-    monkeypatch.setattr(gemini, "Client", lambda **kwargs: client)
-    assert adapters.pin_mode(_auto_settings()) == AgentMode.LIVE
-    assert client.models.calls[0]["model"] == "fixture-model"
+    monkeypatch.setattr(gemini, "Client", broken)
+    assert adapters.pin_mode(_auto_settings()) == AgentMode.REPLAY
 
 
 def test_auto_pins_replay_without_a_key_or_model_id_and_never_probes(monkeypatch):
@@ -258,3 +299,23 @@ def test_auto_pins_replay_without_a_key_or_model_id_and_never_probes(monkeypatch
     assert adapters.pin_mode(_auto_settings(key_present=False)) == AgentMode.REPLAY
     monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-key")
     assert adapters.pin_mode(_auto_settings(model_id=None)) == AgentMode.REPLAY
+
+
+@pytest.mark.parametrize("outcome", [RuntimeError("boom SECRET-DETAILS"), ValueError("bad SECRET-DETAILS"), object()])
+def test_any_other_library_exception_degrades_instead_of_raising(monkeypatch, caplog, outcome):
+    """Second layer, item 3: a parse error, an auth error or anything else from the library (or a
+    response the mapper cannot read) is an ErrorStep, never an exception and never a 500."""
+    adapter, _ = _adapter(monkeypatch, outcome)
+    with caplog.at_level("WARNING", logger="checkmate.frontdesk.gemini"):
+        step = adapter.next_step(_request())
+    assert step == ErrorStep(kind="UNAVAILABLE", retryable=False, mode=AgentMode.LIVE)
+    assert "SECRET-DETAILS" not in caplog.text and "not-a-real-key" not in caplog.text
+
+
+def test_a_client_that_cannot_be_built_degrades_every_step(monkeypatch):
+    def broken(**kwargs):
+        raise ValueError("bad client options")
+
+    monkeypatch.setattr(gemini, "Client", broken)
+    adapter = gemini.GeminiAgentModel(api_key="not-a-real-key", model_id="fixture-model")
+    assert adapter.next_step(_request()) == ErrorStep(kind="UNAVAILABLE", retryable=False, mode=AgentMode.LIVE)
