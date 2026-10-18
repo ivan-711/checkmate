@@ -21,7 +21,9 @@ test("the app declares an icon the server serves, so the tab icon request never 
   expect(icon.headers()["content-type"]).toMatch(/^image\//);
 });
 
-test("the header carries the synthetic-data sentence and the story stepper, and no tabs", async ({ page }) => {
+test("the header carries the synthetic-data sentence and the story stepper, and no tabs", async ({
+  page,
+}) => {
   await page.goto("/frontdesk");
   await expect(page).toHaveURL(/\/$/);
   const header = page.locator("header");
@@ -37,7 +39,9 @@ for (const [width, height] of [
   [1440, 900],
   [1280, 720],
 ] as const) {
-  test(`the Desk never scrolls the window at ${width}x${height}; the header fits on one row`, async ({ page }) => {
+  test(`the Desk never scrolls the window at ${width}x${height}; the header fits on one row`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height });
     await page.goto("/");
     await expect(page.getByTestId("organism-slot")).toBeVisible();
