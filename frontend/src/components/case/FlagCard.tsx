@@ -1,8 +1,8 @@
 import { Flag } from "lucide-react";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
-import { VerifiedTag } from "@/components/ui/VerifiedTag";
 import { footerWithoutRule } from "@/lib/display";
 import type { FlagState } from "@/lib/flagState";
+import { VerifiedTag } from "@/components/ui/VerifiedTag";
 
 const QUIET_LINES = {
   idle: "No safety check yet. It runs after a link is approved.",
