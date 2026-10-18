@@ -34,32 +34,39 @@ test("case path: reject keeps the rule silent, then approve links and flags", as
   await expect(page.getByTestId("candidate-pair")).toBeVisible();
   await expect(page.getByTestId("pair-band")).toHaveText(/REVIEW/);
 
-  const er = page.getByRole("article", { name: "ER FHIR record" });
+  // The Desk names sources in plain words (record/labels.ts): "Emergency room", "Clinic".
+  const er = page.getByRole("article", { name: "Emergency room record" });
   await expect(er).toBeVisible();
   await expect(er.getByText("constructed scenario")).toBeVisible();
-  await expect(page.getByRole("article", { name: "Clinic CSV record" })).toBeVisible();
+  await expect(page.getByRole("article", { name: "Clinic record" })).toBeVisible();
   await expect(
     page.getByText("Probability estimate fitted on our synthetic development distribution"),
   ).toBeVisible();
   await expect(page.getByRole("list", { name: "Top evidence" }).getByRole("listitem")).toHaveCount(5);
-  await expect(page.getByText("No safety check yet. It runs after a link is approved.")).toBeVisible();
+  // The stage holds no notice until a link is approved (the quiet pre-link lines left with the old card).
+  await expect(page.getByTestId("flag-card")).toHaveCount(0);
 
   await reviewPanel(page).getByLabel("Registrar").selectOption("Registrar B");
   await review(page, "reject", "DIFFERENT_PERSON");
   await expect(
     page.getByText(/Rejected by Registrar B at \d\d:\d\d:\d\d CT\. Reason: Different person\./),
   ).toBeVisible();
-  await expect(page.getByText("No safety check ran: no link was approved.")).toBeVisible();
+  await expect(page.getByTestId("flag-card")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Flagged for clinician review" })).toHaveCount(0);
   await expect(page.locator('[data-testid="event-row"][data-event-type="LINK_REJECTED"]')).toHaveCount(1);
 
   await review(page, "approve", undefined, "second review approves");
   // The approval raised the flag: focus lands on the flag card's heading.
   await expect(page.getByRole("heading", { name: "Flagged for clinician review" })).toBeFocused();
-  const goldenRegion = page.getByRole("region", { name: "Golden record" });
-  await expect(goldenRegion.getByText("Clinic CSV").first()).toBeVisible();
-  await expect(goldenRegion.getByText("ER FHIR").first()).toBeVisible();
-  await expect(page.getByRole("article", { name: "ER FHIR record" })).toHaveCount(0);
+  // The joined record is headed by the patient's name; its tabs name both sources.
+  const goldenRegion = page.getByTestId("golden-record");
+  await expect(
+    goldenRegion.locator('[data-testid="crosswalk-chip"][data-source-system="CLINIC_CSV"]'),
+  ).toContainText("Clinic");
+  await expect(
+    goldenRegion.locator('[data-testid="crosswalk-chip"][data-source-system="ER_FHIR"]'),
+  ).toContainText("Emergency room");
+  await expect(page.getByRole("article", { name: "Emergency room record" })).toHaveCount(0);
 
   const timeline = page.getByRole("region", { name: "Timeline" });
   for (const event of scenario.timelineIfApproved) {
@@ -71,7 +78,7 @@ test("case path: reject keeps the rule silent, then approve links and flags", as
   await expect(flag.getByText("constructed scenario")).toBeVisible();
   // The card leads with one line; the full text and the rule's limits sit under Details.
   await expect(flag.getByTestId("flag-card-headline")).toHaveText(
-    "Penicillin V allergy (anaphylaxis) from Clinic CSV · active amoxicillin order from ER FHIR",
+    "Penicillin V allergy (anaphylaxis) on the Clinic record, and an active amoxicillin order on the Emergency room record. A clinician decides.",
   );
   const { cardFooter, ruleId, ruleVersion } = scenario.alertIfApproved;
   const footer = flag.getByText(cardFooter.replace(`Rule ${ruleId} ${ruleVersion}.`, "").trim());
@@ -168,13 +175,13 @@ test("reset returns to the separate records and Undo reset brings the link back"
   await page.goto("/");
   await page.getByTestId("resolve-button").click();
   await review(page, "approve");
-  await expect(page.getByRole("heading", { name: "Golden record" })).toBeVisible();
+  await expect(page.getByTestId("golden-record")).toBeVisible();
 
   await page.getByRole("button", { name: "Reset demo" }).click();
-  await expect(page.getByRole("article", { name: "ER FHIR record" })).toBeVisible();
+  await expect(page.getByRole("article", { name: "Emergency room record" })).toBeVisible();
   await page.getByRole("button", { name: "Undo reset" }).click();
-  const golden = page.getByRole("heading", { name: "Golden record" });
-  await expect(golden).toBeVisible();
+  await expect(page.getByTestId("golden-record")).toBeVisible();
+  const golden = page.locator("#golden-heading");
   // Focus moves to the golden record only after an approval made here, not after Undo.
   await expect(golden).not.toBeFocused();
 });

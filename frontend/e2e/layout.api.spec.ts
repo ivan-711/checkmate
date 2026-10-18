@@ -317,7 +317,7 @@ for (const size of LANDSCAPE.slice(0, 2)) {
       await page.getByTestId("review-submit-button").click();
       await expect(page.getByTestId("golden-record")).toBeVisible({ timeout: 30_000 });
       await expect(page.getByTestId("flag-quiet")).toContainText("The rule did not flag this linked record");
-      await expect(page.getByRole("heading", { name: "Golden record" })).toBeFocused();
+      await expect(page.locator("#golden-heading")).toBeFocused();
       await expect.poll(() => focusShown(page)).toBe(true);
       expect(await pageScroll(page)).toEqual({ x: 0, y: 0, scrollY: 0 });
     });
