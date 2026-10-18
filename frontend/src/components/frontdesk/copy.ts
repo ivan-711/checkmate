@@ -1,6 +1,6 @@
 // UX spec 10.9, the FrontDesk copy deck. Strings with braces are functions filled from the API.
 import type { Band } from "@/api/types";
-import { FEATURE_LABELS } from "@/lib/display";
+import { FAMILY_FEATURES, FEATURE_LABELS, GIVEN_FEATURES, type NameFeature } from "@/lib/display";
 
 export type KioskLanguage = "en" | "es";
 
@@ -11,7 +11,7 @@ const BAND_LABEL: Record<KioskLanguage, Record<Band, string>> = {
 
 // The registrar rail's evidence labels (lib/display FEATURE_LABELS), in Spanish. The gate card
 // lists the rail's rows one for one, so both panes name the same evidence the same way.
-const NAME_PART_ES = {
+const NAME_PART_ES: Record<NameFeature, string> = {
   jw: ", ortografía",
   jw_folded: ", sin contar acentos",
   dl: ", admite erratas",
@@ -19,19 +19,15 @@ const NAME_PART_ES = {
   nickname: ", diminutivo",
   initial: ", inicial",
   token_overlap: ", partes",
-} as const;
+};
 
-function nameLabelsEs(prefix: "given" | "family", name: string): Record<string, string> {
-  // Only given names have nickname and initial checks (backend/core/features.py).
-  const parts = Object.entries(NAME_PART_ES).filter(
-    ([part]) => prefix === "given" || (part !== "nickname" && part !== "initial"),
-  );
-  return Object.fromEntries(parts.map(([part, suffix]) => [`${prefix}_${part}`, `${name}${suffix}`]));
+function nameLabelsEs(prefix: "given" | "family", name: string, features: readonly NameFeature[]) {
+  return Object.fromEntries(features.map((f) => [`${prefix}_${f}`, `${name}${NAME_PART_ES[f]}`]));
 }
 
 const FEATURE_LABELS_ES: Record<string, string> = {
-  ...nameLabelsEs("given", "Nombre"),
-  ...nameLabelsEs("family", "Apellido"),
+  ...nameLabelsEs("given", "Nombre", GIVEN_FEATURES),
+  ...nameLabelsEs("family", "Apellido", FAMILY_FEATURES),
   dob_exact: "Fecha de nacimiento",
   dob_day_month_swap: "Día y mes invertidos",
   dob_one_digit_edit: "Fecha de nacimiento, un dígito distinto",

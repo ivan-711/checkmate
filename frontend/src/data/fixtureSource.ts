@@ -15,6 +15,7 @@ import type {
   TilesResponse,
   TimelineEvent,
 } from "@/api/types";
+import { GATE_BUCKET_MS } from "@/lib/buckets";
 import { FixtureIntake } from "./fixtureIntake";
 import type { ScenarioFixture } from "./scenario";
 import { DataError, EVENT_FEED_ROWS, type CaseData, type DataSource, type SuggestedCheckIn } from "./source";
@@ -81,7 +82,9 @@ export class FixtureSource implements DataSource {
    * has stored it (as the API would); filtered the way the API filters, on one page. */
   async getCandidatePairs(query: CandidatePairQuery): Promise<CandidatePairPage> {
     if (!this.current.resolved && !this.current.handedOff) return { items: [], nextCursor: null };
-    const { pair } = this.currentDetail();
+    const { pair: stored } = this.currentDetail();
+    // Stored only by the kiosk's hand-off, it reads as the API stores that pair.
+    const pair = this.current.resolved ? stored : { ...stored, origin: "FRONTDESK_HANDOFF" as const };
     const matches =
       (!query.band || pair.decision.band === query.band) &&
       (!query.status || pair.decision.status === query.status) &&
@@ -147,8 +150,11 @@ export class FixtureSource implements DataSource {
     const tiles = this.fixture.tiles.tiles.map((tile) => {
       if (tile.id === "HUMAN_REVIEW") return { ...tile, total: tile.total + reviews };
       if (tile.id !== "AGENT_GATE") return tile;
-      const buckets = [...tile.buckets.filter((b) => b.count > 0), ...gate];
-      return { ...tile, buckets, total: tile.total + gate.reduce((n, b) => n + b.count, 0) };
+      // Like the API, the tile holds the last windowMinutes only.
+      const since = this.now().getTime() - tile.windowMinutes * 60_000;
+      const recent = gate.filter((b) => Date.parse(b.bucket) + GATE_BUCKET_MS > since);
+      const buckets = [...tile.buckets.filter((b) => b.count > 0), ...recent];
+      return { ...tile, buckets, total: tile.total + recent.reduce((n, b) => n + b.count, 0) };
     });
     return { ...this.fixture.tiles, tiles };
   }

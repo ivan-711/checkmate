@@ -15,9 +15,11 @@ const CT_MINUTE = new Intl.DateTimeFormat("en-US", {
   hourCycle: "h23",
 });
 
-/** The five minutes a bucket counted, in CT: "22:10 to 22:15". */
+/** The five minutes a bucket counted, in CT: "22:10 to 22:15". A bucket the browser cannot
+ * read is shown as it came, so one odd row never takes the tile down. */
 export function bucketWindowCt(bucket: string): string {
   const start = new Date(bucket);
+  if (Number.isNaN(start.getTime())) return bucket;
   const end = new Date(start.getTime() + GATE_BUCKET_MS);
   return `${CT_MINUTE.format(start)} to ${CT_MINUTE.format(end)}`;
 }

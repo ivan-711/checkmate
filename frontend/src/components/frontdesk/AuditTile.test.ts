@@ -50,4 +50,12 @@ describe("AuditTile", () => {
     ]);
     expect(html).toContain("3 denied · 1 allowed");
   });
+
+  it("counts one bucket once, however the instant is written", () => {
+    const html = renderTile([
+      row("2026-10-18T03:10:00Z", "ALLOW", 1),
+      row("2026-10-18T03:10:00+00:00", "DENY", 1),
+    ]);
+    expect(html.match(/22:10 to 22:15/g)).toHaveLength(1);
+  });
 });

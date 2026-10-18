@@ -22,9 +22,7 @@ export const GateCard = forwardRef<
   const score = candidate.p.toFixed(2);
   // The registrar rail's rows for the same pair, feature by feature: the gate sends only its top
   // features, so a sum per field would neither be the field's total nor match the rail.
-  const rows = rankContributions(candidate.topContributions ?? [])
-    .slice(0, EVIDENCE_ROWS)
-    .map((c) => ({ ...c, label: t.feature[c.feature] ?? c.feature }));
+  const rows = rankContributions(candidate.topContributions ?? [], t.feature).slice(0, EVIDENCE_ROWS);
   return (
     <div
       ref={ref}
@@ -52,7 +50,7 @@ export const GateCard = forwardRef<
         </p>
         <ul className="mt-2 space-y-0.5">
           {rows.map((c) => (
-            <li key={c.label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <li key={c.feature} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
               <span>{c.label}</span>
               {c.missing ? (
                 <span className="text-right text-ink-3">{t.noEvidence}</span>

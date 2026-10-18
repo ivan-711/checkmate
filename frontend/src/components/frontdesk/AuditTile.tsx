@@ -7,13 +7,16 @@ import { bucketWindowCt } from "@/lib/buckets";
 
 const TILE_POLL_MS = 2_000; // UX spec 3.13: the FrontDesk tile refreshes every 2 s
 
+/** One row per bucket instant: "...03:10:00Z" and "...03:10:00+00:00" are the same bucket. */
 function countsByBucket(tile: Tile) {
   const rows = new Map<string, { allowed: number; denied: number }>();
   for (const b of tile.buckets) {
-    const row = rows.get(b.bucket) ?? { allowed: 0, denied: 0 };
+    const at = Date.parse(b.bucket);
+    const key = Number.isNaN(at) ? b.bucket : new Date(at).toISOString();
+    const row = rows.get(key) ?? { allowed: 0, denied: 0 };
     if (b.series === "ALLOW") row.allowed += b.count;
     if (b.series === "DENY") row.denied += b.count;
-    rows.set(b.bucket, row);
+    rows.set(key, row);
   }
   return [...rows.entries()].sort(([a], [b]) => a.localeCompare(b));
 }

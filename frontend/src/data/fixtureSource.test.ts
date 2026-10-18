@@ -170,7 +170,10 @@ describe("FixtureSource work queue", () => {
     const s = source();
     const { id } = await s.startIntake("EN");
     await s.sendTurn(id, scenario.frontdeskIntake.utteranceEn, "k1");
-    expect((await s.getCandidatePairs({})).items.map((p) => p.id)).toEqual([pairId]);
+    expect((await s.getCandidatePairs({})).items.map((p) => [p.id, p.origin])).toEqual([
+      [pairId, "FRONTDESK_HANDOFF"],
+    ]);
+    expect((await s.getCandidatePairs({ origin: "FRONTDESK_HANDOFF" })).items).toHaveLength(1);
     await s.review(pairId, approve, "key-queue-3");
     const page = await s.getCandidatePairs({});
     expect(page.items.map((p) => p.decision.status)).toEqual(["LINKED"]);
