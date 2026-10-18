@@ -8,14 +8,14 @@ Built at HackGB 2026 (UW-Green Bay, October 17 to 18) by a team of two. **Not fo
 
 ## How we used AI
 
-We used coding and research agents, and we reviewed, integrated and evaluated what they produced. We disclose this on every commit, which carries the `[AI-assisted]` tag, and in this section.
+We used coding and research agents, and we reviewed, integrated and evaluated what they produced. We disclose this in this section and on our commits: every commit we wrote carries the `[AI-assisted]` tag. The only commits on `main` without it are GitHub's initial commit and three merge commits that kept git's default message.
 
 At build time:
 - Coding agents built each lane in its own git worktree from a one-page build brief (`CLAUDE.md`, mirrored as `AGENTS.md`) and the lane's spec section.
 - A paired adversarial reviewer agent reviewed lane pull requests: it ran the app and the acceptance script, wrote tests meant to fail, and posted PASS or BLOCK on the pull request.
 - Codex, in a read-only sandbox, reviewed several pull requests. The build brief also called for GitHub Copilot code review, but it did not run on any merged pull request.
 - The evaluation harness ran on every merge to `main` and posted per-band precision and recall with n.
-- A human clicked every merge until 17:15 CT on Saturday. After that, the lead orchestration session merged pull requests under the owner's standing authorization, normally when CI, the paired reviewer's PASS and a second independent review were all green. Two small pull requests on Sunday morning (the evaluation sweep and the never-say list) merged on green CI and the lead session's own reading of the diff, with the owner's approval. Either of us could still click merge.
+- A human clicked every merge until 17:15 CT on Saturday. After that, the lead orchestration session merged pull requests under the owner's standing authorization, normally once CI was green, the paired reviewer had posted PASS and a second review had passed. On the subset of pull requests Codex reviewed, that second review was Codex's cross-review; on others it was the lead session's own review. Two small pull requests on Sunday morning (the evaluation sweep and the never-say list) merged on green CI and the lead session's own reading of the diff, with the owner's approval. Either of us could still click merge.
 
 Separately, the running app can use a model. In `LIVE` mode Gemini runs the intake conversation, the language handling and the tool arguments (`backend/frontdesk/gemini.py`). The API starts in `REPLAY` mode (`backend/app/config.py`, `docker-compose.yml`), where a committed transcript stands in for the model and plays through the real gate, matcher and database (`backend/frontdesk/replay.py`). That transcript is marked `AUTHORED`: the team wrote it from the call shapes a Gemini spike verified; it is not a recorded model run (`data/scenarios/hero/frontdesk_transcript.json`). In every mode, matching, the rules gate, the allergy rule and the approval are deterministic code or a human decision, so no language model is on the decision path.
 
@@ -78,7 +78,7 @@ Run the demo setup under [How to run](#how-to-run) first, then open http://127.0
 1. **Reset demo**. The API clears the demo state, reloads the hero scenario and records `DEMO_RESET`; the event log is kept (`backend/api/sessions.py`). The kiosk holds Send and "Use this" until the reset has finished (`frontend/e2e/frontdesk.api.spec.ts`).
 2. **"Use this"**. The kiosk offers a demo script line, the hero's check-in from the replay transcript; "Use this" puts it in the message box (`frontend/src/data/demoScript.ts`). Switch the kiosk to Español first for the Spanish line ("Usar este").
 3. **Send**. FrontDesk reads the check-in and asks to create a new chart. The gate checks the hero's existing charts and holds the request.
-4. The kiosk shows the gate card: `propose_new_chart` was denied by the identity gate, with the existing chart's score and band (`REVIEW`), policy `frontdesk-gate/1`, the evidence rows and "Sent to a registrar". The registrar workspace now holds the check-in, with two possible existing charts to decide.
+4. The kiosk shows the gate card: `propose_new_chart` was denied by the identity gate, with the top existing chart's score and band, policy `frontdesk-gate/1`, the evidence rows and "Sent to a registrar". The top chart is the ER chart. The shipped scorer gives it a raw `s` of exactly 4.0, which equals `c_high`, so it is in `AUTO_LINK` and the card shows 0.98 and AUTO-LINK; the Clinic chart scores 0.65, in `REVIEW` (`backend/core/band.py`). `AUTO_LINK` counts as REVIEW or higher, so the gate denies the new chart with `CANDIDATE_IN_REVIEW_OR_HIGHER` (`backend/policy/decide.py`). Auto-link is off in the demo, so no link is made. The registrar workspace now holds the check-in, with two possible existing charts to decide.
 5. **The Case tab.** It shows the hero's two records, one from ER FHIR and one from Clinic CSV.
 6. **Resolve identity.** The match run scores the loaded records; the hero pair appears in `REVIEW` with the evidence rail.
 7. **Approve link**, optionally add a note, then **confirm** ("Confirm approve").
@@ -90,7 +90,7 @@ In `REPLAY` mode the agent's replies come only from the transcript: a typed mess
 
 ## How to run
 
-Requires Docker, [uv](https://docs.astral.sh/uv/) (Python 3.12, `pyproject.toml`) and Node 20 or later (`frontend/package.json`). Everything binds to 127.0.0.1 (`docker-compose.yml`, `Makefile`, `frontend/package.json`).
+Requires Docker, [uv](https://docs.astral.sh/uv/) (Python 3.12, `pyproject.toml`) and Node 20 or later (`frontend/package.json`). The API and UI processes on the host bind to 127.0.0.1 (`Makefile`, `frontend/package.json`). Inside Docker the API container listens on 0.0.0.0 (`backend/Dockerfile`), and `docker-compose.yml` publishes the database and API ports only on 127.0.0.1.
 
 ### The demo setup: database in Docker, API and UI on the host
 
@@ -147,7 +147,7 @@ The harness measures the code the app runs: the synthetic corpus built from the 
 
 ### Held-out test partition
 
-Source: harness run 1c3f8f96 (local `eval/runs/`, gitignored; reproduce with the eval command below).
+Source: harness run 1c3f8f96, with a committed copy of the run's metrics in `docs/eval/run-1c3f8f96-metrics.json`. The run directory itself is in the gitignored `eval/runs/`; reproduce the run with the eval command below.
 
 - The run scored the development partition out of fold, then scored the test partition once. The test partition holds 144 of the 500 dependency components. They are kept out of the development scoring and the cutoff selection (manifest `regime`: "development + single test pass"; split rules in `eval/expectations/splits.json`).
 - Settings: seed 20261017, scorer `handset-1`, threshold row `provisional-1` (`c_low` 0.0, `c_high` 4.0). Every band number is computed at that row; auto-link is off in the app, so the `AUTO_LINK` rows describe the band only.
@@ -273,7 +273,7 @@ Contract routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the co
 | `frontend/` | W4 and wave 2 UI lanes | Next.js app: FrontDesk, Case and Work queue screens (`frontend/src/`), design rules (`frontend/DESIGN.md`), unit tests beside the code, Playwright specs (`frontend/e2e/`) |
 | `eval/` | W5, Q2, Q5 | Evaluation harness (`eval/harness/`), protected expectations (`eval/expectations/`), the G16 acceptance script (`eval/acceptance/`), the parallel seed sweep (`eval/sweep/`), tests (`eval/tests/`, `eval/tests_r5/`) |
 | `data/` | W1, W5 | `data/download.py` and `data/HASHES.json`; hero selector and export (`data/hero_select.py`, `data/hero_export.py`, `data/hero_overlay.py`), `data/fixture_check.py`, and the exported hero with the replay transcript in `data/scenarios/hero/`; raw data stays gitignored |
-| `docs/` | D1, D2, D3 | `docs/LICENSES.md`, `docs/devpost-outline.md` |
+| `docs/` | D1, D2, D3 | `docs/LICENSES.md`, `docs/devpost-outline.md`, the committed metrics of the held-out run (`docs/eval/run-1c3f8f96-metrics.json`) |
 | `tools/` | Q15 | Empty |
 | `.github/` | W5 | CI workflow `.github/workflows/ci.yml` |
 
@@ -306,4 +306,4 @@ The contract's default flag footer, `CARD_FOOTER` in `contracts/models/alerts.py
 - **No undo of an approved link.** The review endpoint takes `APPROVE` or `REJECT` only, and a reject of a linked pair is refused (`contracts/models/common.py`, `backend/api/reviews.py`); Reset demo clears every decision. Undo of a reset is not available through the API (`frontend/src/data/apiSource.ts`).
 - **Not on `main`:** the what-if route and the entity history route answer `501` (`backend/app/main.py`, `contracts/api_spec.py`).
 - **No authentication.** A registrar name is a recorded label, not an authenticated identity (`contracts/models/reviews.py`).
-- **One process on one laptop, bound to localhost** (`docker-compose.yml`, `Makefile`, `frontend/package.json`).
+- **One process on one laptop, reachable only from localhost** (`docker-compose.yml`, `Makefile`, `frontend/package.json`).
