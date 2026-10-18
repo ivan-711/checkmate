@@ -1,6 +1,9 @@
 import type {
   EventLogRow,
   EventType,
+  IntakeSession,
+  IntakeTurn,
+  Language,
   MatchDecision,
   ReviewRequest,
   ReviewResponse,
@@ -9,6 +12,7 @@ import type {
   TilesResponse,
   TimelineEvent,
 } from "@/api/types";
+import { FixtureIntake } from "./fixtureIntake";
 import type { ScenarioFixture } from "./scenario";
 import { DataError, EVENT_FEED_ROWS, type CaseData, type DataSource } from "./source";
 
@@ -37,12 +41,14 @@ export class FixtureSource implements DataSource {
   private previous: SessionState | null = null;
   private readonly keys = new Map<string, KeyedReview>();
   private sessionCount = 0;
+  private readonly intake: FixtureIntake;
 
   constructor(
     private readonly fixture: ScenarioFixture,
     private readonly now: () => Date = () => new Date(),
   ) {
     this.current = this.freshSession(null);
+    this.intake = new FixtureIntake(fixture, now);
   }
 
   async getSession(): Promise<SessionResponse> {
@@ -94,13 +100,49 @@ export class FixtureSource implements DataSource {
     return all.slice().reverse().slice(0, EVENT_FEED_ROWS); // one page, newest first, like GET /events
   }
 
-  /** The fixture tiles with HUMAN_REVIEW counting this session's registrar decisions. */
+  /** The fixture tiles with HUMAN_REVIEW counting this session's registrar decisions and
+   * AGENT_GATE counting every gate outcome so far (agent actions are not undone by a reset). */
   async getTiles(): Promise<TilesResponse> {
     const reviews = this.current.history.filter((d) => d.actorType === "REGISTRAR").length;
-    const tiles = this.fixture.tiles.tiles.map((tile) =>
-      tile.id === "HUMAN_REVIEW" ? { ...tile, total: tile.total + reviews } : tile,
-    );
+    const gate = this.intake.gateCounts;
+    const tiles = this.fixture.tiles.tiles.map((tile) => {
+      if (tile.id === "HUMAN_REVIEW") return { ...tile, total: tile.total + reviews };
+      if (tile.id !== "AGENT_GATE") return tile;
+      const added = (series: string) => (series === "ALLOW" || series === "DENY" ? gate[series] : 0);
+      // The fixture has one bucket per series (its 18:00 snapshot); new outcomes are added there.
+      const buckets = tile.buckets.map((b) => ({ ...b, count: b.count + added(b.series) }));
+      return { ...tile, buckets, total: tile.total + gate.ALLOW + gate.DENY };
+    });
     return { ...this.fixture.tiles, tiles };
+  }
+
+  async startIntake(language: Language): Promise<IntakeSession> {
+    const session = this.intake.start(language);
+    this.log("INTAKE_STARTED", { intakeSessionId: session.id });
+    return session;
+  }
+
+  async sendTurn(sessionId: string, text: string, idempotencyKey: string): Promise<IntakeTurn> {
+    const turn = this.intake.send(sessionId, text, idempotencyKey);
+    for (const call of turn.toolCalls ?? []) {
+      this.log("AGENT_TOOL_CALLED", {
+        intakeSessionId: sessionId,
+        toolName: call.toolName,
+        gate: call.gate.outcome,
+      });
+    }
+    if (
+      turn.registration.state === "PENDING_REGISTRAR" &&
+      turn.toolCalls?.some((c) => c.gate.handoffRequired)
+    ) {
+      // One row per hand-off pair (ADR-016 §6).
+      for (const pairId of turn.registration.handoffPairIds ?? []) {
+        this.log("INTAKE_HANDOFF_CREATED", { intakeSessionId: sessionId, pairId });
+      }
+    }
+    if (turn.degraded)
+      this.log("AGENT_TURN_DEGRADED", { intakeSessionId: sessionId, degraded: turn.degraded });
+    return turn;
   }
 
   async reset(): Promise<SessionResponse> {

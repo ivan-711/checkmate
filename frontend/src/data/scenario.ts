@@ -18,6 +18,8 @@ export interface ScenarioFixture {
   timelineIfApproved: TimelineEvent[];
   alertIfApproved: SafetyAlert;
   tiles: TilesResponse;
+  /** The kiosk's suggested check-in: the utterance the recorded agent turn answers. */
+  frontdeskIntake: { scenarioContextId: string; utteranceEn: string; utteranceEs: string };
 }
 
 export const scenario = raw as unknown as ScenarioFixture;
