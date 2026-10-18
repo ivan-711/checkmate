@@ -14,6 +14,7 @@ import { needsNewCheckIn } from "./checkIn";
 import { GateCard } from "./GateCard";
 import { HANDOFF_KEY, INTAKE_KEY, useHandoffPairs } from "./intake";
 import { ToolCallChip } from "./ToolCallChip";
+import { VitalsSlot } from "./vitals/VitalsSlot";
 
 const MAX_CHARS = 280; // UX 3.11 composer limit; the contract allows 500
 const COUNTER_FROM = 240;
@@ -360,6 +361,7 @@ export function KioskPane() {
             </button>
           </div>
         )}
+        <VitalsSlot language={language} />
       </div>
     </section>
   );

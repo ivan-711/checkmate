@@ -7,9 +7,10 @@
   },
   "scripts": {
     "gen:api": "openapi-typescript ../contracts/openapi.json -o src/api/schema.d.ts",
-    "predev": "npm run gen:api",
+    "vendor:vitallens": "node scripts/vendor-vitallens.mjs",
+    "predev": "npm run gen:api && npm run vendor:vitallens",
     "dev": "next dev -H 127.0.0.1 -p 3000",
-    "prebuild": "npm run gen:api",
+    "prebuild": "npm run gen:api && npm run vendor:vitallens",
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 3000",
     "lint": "eslint . --max-warnings 0",
@@ -27,7 +28,8 @@
     "openapi-fetch": "0.17.0",
     "react": "19.1.10",
     "react-dom": "19.1.10",
-    "sonner": "2.0.8"
+    "sonner": "2.0.8",
+    "vitallens": "0.4.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.3.7",
@@ -38,6 +40,7 @@
     "@types/react-dom": "19.3.0",
     "eslint": "9.39.5",
     "eslint-config-next": "15.5.28",
+    "jsdom": "30.1.1",
     "openapi-typescript": "7.13.0",
     "prettier": "3.9.10",
     "tailwindcss": "4.3.3",

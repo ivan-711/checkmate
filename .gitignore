@@ -48,3 +48,6 @@ playwright-report/
 # Editors
 .idea/
 .vscode/
+
+# Vendored browser bundles, copied from node_modules by frontend/scripts/vendor-vitallens.mjs
+frontend/public/vendor/
