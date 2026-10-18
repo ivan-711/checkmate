@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from functools import cache
+from pathlib import Path
 
 from contracts.models.policy import Language, PolicyOutcome, PolicyReason
 
@@ -100,62 +102,23 @@ def fold(value: str) -> str:
     return re.sub(r"\s+", " ", stripped.casefold()).strip()
 
 
-# Claims of an effect the model cannot know happened, and the say/never-say phrases. Folded form.
-EFFECT_CLAIMS: tuple[str, ...] = (
-    "created your chart",
-    "created a chart",
-    "created a new chart",
-    "your chart has been created",
-    "your chart is created",
-    "chart was created",
-    "chart has been created",
-    "registered you as a new patient",
-    "you are now registered",
-    "cree su expediente",
-    "cree un expediente",
-    "cree un nuevo expediente",
-    "su expediente fue creado",
-    "su expediente ha sido creado",
-    "se creo su expediente",
-    "se creo un expediente",
-    "ya esta registrado como paciente nuevo",
-    "lo registre como paciente nuevo",
-    "la registre como paciente nuevo",
-)
-NEVER_SAY: tuple[str, ...] = (
-    "would have died",
-    "saved a life",
-    "saved your life",
-    "prevented an adverse event",
-    "the ai caught",
-    "the ai decides",
-    "diagnos",
-    "99% accurate",
-    "hipaa",
-    "production-ready",
-    "can't be jailbroken",
-    "cannot be jailbroken",
-    "real patients",
-    "certified",
-    "guaranteed",
-    "error bound",
-    "verified your identity",
-    "verified the identity",
-    "verifies insurance",
-    "triage",
-    "vital signs",
-    "chatbot",
-    "habria muerto",
-    "salvo su vida",
-    "salvo una vida",
-    "diagnost",
-    "garantizado",
-    "pacientes reales",
-    "verifique su identidad",
-    "verificamos su identidad",
-    "triaje",
-    "signos vitales",
-)
+# The phrase lists live beside the prompt as data (handout/say-never-say.md), not as Python string
+# literals, so the repository-wide never-say scan of source files keeps its meaning.
+_PHRASES_DIR = Path(__file__).with_name("prompts")
+
+
+@cache
+def _phrases(name: str) -> tuple[str, ...]:
+    lines = (_PHRASES_DIR / name).read_text(encoding="utf-8").splitlines()
+    return tuple(fold(line) for line in lines if line.strip() and not line.startswith("#"))
+
+
+def effect_claims() -> tuple[str, ...]:
+    return _phrases("effect-claims.txt")
+
+
+def never_say() -> tuple[str, ...]:
+    return _phrases("never-say.txt")
 
 
 def banned_phrase(text: str, *, new_chart_created: bool) -> str | None:
@@ -163,10 +126,10 @@ def banned_phrase(text: str, *, new_chart_created: bool) -> str | None:
     turn really produced NEW_CHART_CREATED; never-say phrases are never allowed."""
     folded = fold(text)
     if not new_chart_created:
-        for phrase in EFFECT_CLAIMS:
+        for phrase in effect_claims():
             if phrase in folded:
                 return phrase
-    for phrase in NEVER_SAY:
+    for phrase in never_say():
         if phrase in folded:
             return phrase
     return None
