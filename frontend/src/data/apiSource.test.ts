@@ -386,4 +386,10 @@ describe("ApiSource after a reset", () => {
       code: "TURN_IN_PROGRESS",
     });
   });
+  it("getCandidatePair reads one pair by id", async () => {
+    vi.useRealTimers();
+    const calls = stubFetch({ [`GET /api/v1/candidate-pairs/${hero.pair.id}`]: () => ({ body: hero }) });
+    expect(await new ApiSource(ORIGIN).getCandidatePair(hero.pair.id)).toEqual(hero);
+    expect(calls).toHaveLength(1);
+  });
 });

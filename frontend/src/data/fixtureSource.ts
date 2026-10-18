@@ -17,7 +17,7 @@ import type {
 } from "@/api/types";
 import { FixtureIntake } from "./fixtureIntake";
 import type { ScenarioFixture } from "./scenario";
-import { DataError, EVENT_FEED_ROWS, type CaseData, type DataSource } from "./source";
+import { DataError, EVENT_FEED_ROWS, type CaseData, type DataSource, type SuggestedCheckIn } from "./source";
 
 interface SessionState {
   session: SessionResponse;
@@ -40,6 +40,7 @@ interface KeyedReview {
 export class FixtureSource implements DataSource {
   readonly mode = "REPLAY" as const;
   readonly canRestore = true;
+  readonly suggestedCheckIn: SuggestedCheckIn;
   private current: SessionState;
   private previous: SessionState | null = null;
   private readonly keys = new Map<string, KeyedReview>();
@@ -52,6 +53,8 @@ export class FixtureSource implements DataSource {
   ) {
     this.current = this.freshSession(null);
     this.intake = new FixtureIntake(fixture, now);
+    const { utteranceEn, utteranceEs } = fixture.frontdeskIntake;
+    this.suggestedCheckIn = { en: utteranceEn, es: utteranceEs, demoScript: false };
   }
 
   async getSession(): Promise<SessionResponse> {

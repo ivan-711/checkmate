@@ -35,11 +35,20 @@ export interface CaseData {
   alertsKnown: boolean;
 }
 
+/** The kiosk's suggested check-in in each language. demoScript is true when it is the hero
+ * transcript's line (API), false when it is the contract fixture's utterance. */
+export interface SuggestedCheckIn {
+  en: string;
+  es: string;
+  demoScript: boolean;
+}
+
 /** One data layer, two adapters. The UI branches on `mode` only for the badge. */
 export interface DataSource {
   readonly mode: Mode;
   /** Whether restore() works here; the Undo reset action is offered only when it does. */
   readonly canRestore: boolean;
+  readonly suggestedCheckIn: SuggestedCheckIn;
   /** The session the screen is showing; null when this tab has not reset yet in LOCAL. */
   getSession(): Promise<SessionResponse | null>;
   /** The session's Case pair, or the pair `pairId` names when the work queue opened one. */

@@ -115,6 +115,18 @@ describe("FixtureSource FrontDesk intake", () => {
       expect.arrayContaining(["INTAKE_STARTED", "AGENT_TOOL_CALLED", "INTAKE_HANDOFF_CREATED"]),
     );
   });
+
+  it("getCandidatePair reads the held pair with its current decision", async () => {
+    const s = new FixtureSource(scenario, () => NOW);
+    const id = scenario.pair.pair.id;
+    expect((await s.getCandidatePair(id)).pair.decision.status).toBe("PROPOSED");
+    await s.review(id, { action: "APPROVE", actor: "registrar:Registrar A" }, "k-approve");
+    const detail = await s.getCandidatePair(id);
+    expect(detail.pair.decision.status).toBe("LINKED");
+    expect(detail.history).toHaveLength(2);
+    await expect(s.getCandidatePair("other")).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
   it("quotes names verbatim even when the patient typed extra spaces", async () => {
     const s = new FixtureSource(scenario, () => NOW);
     const { id } = await s.startIntake("ES");

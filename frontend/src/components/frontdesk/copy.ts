@@ -31,9 +31,14 @@ export const COPY = {
     reading: "Reading your message",
     suggestLabel: "Try this check-in",
     suggestUse: "Use this",
+    constructed: "constructed scenario",
+    constructedKiosk:
+      "This check-in matches a synthetic patient built for the demo. All records are synthetic.",
     agentDown: "FrontDesk could not reach the agent service. Your message was not sent.",
     startFailed: "FrontDesk could not reach the agent service.",
     tryAgain: "Try again",
+    approved: "Your chart is confirmed. Please wait to be called.",
+    rejected: "A registrar is creating a new chart for you. Please wait to be called.",
     handoff:
       "I found a chart that may already be yours. A registrar will confirm it with you. Please have a seat.",
     tool: {
@@ -43,7 +48,6 @@ export const COPY = {
     },
     allowed: "Allowed",
     denied: "Denied by identity gate",
-    recorded: "recorded",
     detailDecision: "Gate decision",
     detailLatency: "Latency",
     gateTitle: "Blocked by identity gate",
@@ -83,9 +87,14 @@ export const COPY = {
     reading: "Leyendo su mensaje",
     suggestLabel: "Pruebe este registro",
     suggestUse: "Usar este",
+    constructed: "escenario construido",
+    constructedKiosk:
+      "Este registro corresponde a un paciente sintético creado para la demostración. Todos los registros son sintéticos.",
     agentDown: "FrontDesk no pudo conectar con el servicio del agente. Su mensaje no se envió.",
     startFailed: "FrontDesk no pudo conectar con el servicio del agente.",
     tryAgain: "Intentar de nuevo",
+    approved: "Su expediente está confirmado. Espere a que lo llamen.",
+    rejected: "El personal de admisión está creando un expediente nuevo para usted. Espere a que lo llamen.",
     handoff:
       "Encontré un expediente que podría ser suyo. El personal de admisión lo confirmará con usted. Por favor, tome asiento.",
     tool: {
@@ -96,7 +105,6 @@ export const COPY = {
     },
     allowed: "Permitido",
     denied: "Denegado por el control de identidad",
-    recorded: "grabado",
     detailDecision: "Decisión del control",
     detailLatency: "Latencia",
     gateTitle: "Bloqueado por el control de identidad",
