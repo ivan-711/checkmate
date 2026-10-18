@@ -3,6 +3,7 @@ import { ConstructedChip } from "@/components/ui/ConstructedChip";
 import { FlagHeadline } from "@/components/ui/FlagHeadline";
 import { footerWithoutRule } from "@/lib/display";
 import type { FlagState } from "@/lib/flagState";
+import { RuleResultTag } from "@/components/ui/RuleResultTag";
 
 const QUIET_LINES = {
   idle: "No safety check yet. It runs after a link is approved.",
@@ -38,6 +39,7 @@ export function FlagCard({ state }: { state: FlagState }) {
           Flagged for clinician review
         </h2>
         {alert.constructedScenario && <ConstructedChip />}
+        <RuleResultTag label="Rule result" />
         {/* The rule id sits once, in the header; the footer below carries the rule's limits. */}
         <span className="ml-auto font-mono text-[14px] text-ink-3">
           Rule <span data-testid="flag-card-rule-id">{alert.ruleId}</span> {alert.ruleVersion}
