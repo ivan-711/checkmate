@@ -358,6 +358,10 @@ kbd {
     height: calc(100dvh - var(--bar-h) - 16px);
     margin-top: 16px;
   }
+  .stage > .strip {
+    max-width: 100%;
+    overflow-x: auto;
+  }
 }
 
 @media (max-width: 600px) {
