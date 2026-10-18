@@ -40,6 +40,8 @@ export interface DataSource {
   /** The session the screen is showing; null when this tab has not reset yet in LOCAL. */
   getSession(): Promise<SessionResponse | null>;
   getCase(): Promise<CaseData>;
+  /** One pair by id with its current decision: the registrar's held check-in reads it. */
+  getCandidatePair(pairId: string): Promise<CandidatePairDetail>;
   /** UX "Resolve identity": block, score, band (POST /match-runs in LOCAL). */
   resolve(): Promise<void>;
   review(pairId: string, body: ReviewRequest, idempotencyKey: string): Promise<ReviewResponse>;

@@ -87,6 +87,14 @@ export class ApiSource implements DataSource {
     if (!res.data) fail(res.error);
   }
 
+  async getCandidatePair(pairId: string): Promise<CandidatePairDetail> {
+    const res = await this.client.GET("/api/v1/candidate-pairs/{pair_id}", {
+      params: { path: { pair_id: pairId } },
+    });
+    if (!res.data) fail(res.error);
+    return res.data;
+  }
+
   async review(pairId: string, body: ReviewRequest, idempotencyKey: string): Promise<ReviewResponse> {
     const res = await this.client.POST("/api/v1/candidate-pairs/{pair_id}/reviews", {
       params: { path: { pair_id: pairId }, header: { "Idempotency-Key": idempotencyKey } },
