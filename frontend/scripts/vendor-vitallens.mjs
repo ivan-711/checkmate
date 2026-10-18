@@ -10,6 +10,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = join(root, "node_modules", "vitallens", "dist");
 const out = join(root, "public", "vendor", "vitallens");
 
+if (process.env.NEXT_PUBLIC_VITALS !== "on") {
+  rmSync(out, { recursive: true, force: true });
+  console.log("vitallens: flag is off; browser bundle and model were not copied");
+  process.exit(0);
+}
+
 const bundle = join(dist, "vitallens.browser.js");
 if (!existsSync(bundle)) {
   throw new Error(`vitallens is not installed (${bundle} is missing); run npm ci in frontend/`);
