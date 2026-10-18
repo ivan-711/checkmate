@@ -17,6 +17,38 @@ export function foldText(text: string): string {
   return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+/** The exact words of `text` that match `value` (case and accents ignored), or null. */
+function quoted(text: string, value: string | null | undefined): string | null {
+  if (!value) return null;
+  const at = foldText(text).indexOf(foldText(value));
+  return at < 0 ? null : text.slice(at, at + value.length);
+}
+
+// A spoken date: "July 3, 1985" or "3 de julio de 1985".
+const SPOKEN_DATE = /\p{L}+ \d{1,2}, \d{4}|\d{1,2} de \p{L}+ de \d{4}/u;
+
+/** What the agent would pass: only values the patient said, each with its quote as evidence,
+ * as the tool schemas require. Names are written as said; the date is the record's ISO form. */
+function heardArgs(userText: string, fixture: ScenarioFixture) {
+  const { recordA, recordB } = fixture.pair;
+  const givenName =
+    quoted(userText, recordA.normalized.givenName) ?? quoted(userText, recordB.normalized.givenName);
+  const familyName =
+    quoted(userText, recordA.normalized.familyName) ?? quoted(userText, recordB.normalized.familyName);
+  const datePhrase = userText.match(SPOKEN_DATE)?.[0] ?? null;
+  const heard = {
+    ...(givenName && { givenName }),
+    ...(familyName && { familyName }),
+    ...(datePhrase && { birthDate: recordA.normalized.birthDate }),
+  };
+  const evidence = {
+    ...(givenName && { givenName }),
+    ...(familyName && { familyName }),
+    ...(datePhrase && { birthDate: datePhrase }),
+  };
+  return { ...heard, evidence };
+}
+
 interface KeyedTurn {
   text: string;
   turn: IntakeTurn;
@@ -83,11 +115,11 @@ export class FixtureIntake {
   }
 
   private recordedTurn(userText: string, language: Language): IntakeTurn {
-    const { pair, recordA, recordB, contributions } = this.fixture.pair;
+    const { pair, recordB, contributions } = this.fixture.pair;
     const existing = recordB.record;
-    // What the agent heard: the arriving patient's demographics, as the ER record holds them.
-    const { givenName, familyName, birthDate } = recordA.normalized;
-    const args = { givenName, familyName, birthDate };
+    const searchArgs = heardArgs(userText, this.fixture);
+    // The patient did not state their sex, so the agent passes UNKNOWN, as the authored transcript does.
+    const proposeArgs = { ...searchArgs, sex: "UNKNOWN", preferredLanguage: language };
     const candidate = {
       recordId: existing.id,
       sourceSystem: existing.sourceSystem,
@@ -97,7 +129,12 @@ export class FixtureIntake {
       negativeRulesFired: pair.decision.negativeRulesFired ?? [],
       topContributions: contributions,
     };
-    const call = (stepIndex: number, toolName: string, gate: ToolCallRecord["gate"]): ToolCallRecord => ({
+    const call = (
+      stepIndex: number,
+      toolName: string,
+      args: Record<string, unknown>,
+      gate: ToolCallRecord["gate"],
+    ): ToolCallRecord => ({
       id: crypto.randomUUID(),
       stepIndex,
       toolName,
@@ -116,14 +153,19 @@ export class FixtureIntake {
       degraded: null,
       // The server would create an intake record and a FRONTDESK_HANDOFF pair for it. The fixture
       // has one pair, so the hand-off points at it and the registrar decides the same pair as Case.
-      registration: { state: "PENDING_REGISTRAR", handoffPairIds: [pair.id] },
+      registration: {
+        state: "PENDING_REGISTRAR",
+        handoffPairIds: [pair.id],
+        intakeRecordId: crypto.randomUUID(),
+      },
       toolCalls: [
-        call(0, "search_patients", {
+        call(0, "search_patients", searchArgs, {
           outcome: "ALLOW",
           handoffRequired: false,
           policyVersion: POLICY_VERSION,
+          evidenceIds: [{ kind: "CANDIDATE_RECORD", id: existing.id }],
         }),
-        call(1, "propose_new_chart", {
+        call(1, "propose_new_chart", proposeArgs, {
           outcome: "DENY",
           reasonCode: "CANDIDATE_IN_REVIEW_OR_HIGHER",
           handoffRequired: true,

@@ -135,10 +135,10 @@ export class FixtureSource implements DataSource {
       turn.registration.state === "PENDING_REGISTRAR" &&
       turn.toolCalls?.some((c) => c.gate.handoffRequired)
     ) {
-      this.log("INTAKE_HANDOFF_CREATED", {
-        intakeSessionId: sessionId,
-        pairIds: turn.registration.handoffPairIds,
-      });
+      // One row per hand-off pair (ADR-016 §6).
+      for (const pairId of turn.registration.handoffPairIds ?? []) {
+        this.log("INTAKE_HANDOFF_CREATED", { intakeSessionId: sessionId, pairId });
+      }
     }
     if (turn.degraded)
       this.log("AGENT_TURN_DEGRADED", { intakeSessionId: sessionId, degraded: turn.degraded });
