@@ -1,9 +1,11 @@
-"""Invalid text at the intake boundary is a 422 VALIDATION_ERROR, never a 500.
+"""Text Postgres cannot hold never makes an intake route answer 500.
 
-Two causes, one test each per route. (1) JSON lets a string carry U+0000 and the frozen schema allows
-it, but Postgres text and jsonb cannot hold it: the insert raised DataError, the 500 CI's schemathesis
-job found on POST /intake-sessions. (2) Pydantic rejects an unpaired surrogate (``\\ud800``) as a 422,
-but the validation envelope echoed it back and could not be encoded to UTF-8 (UnicodeEncodeError).
+Two causes. (1) JSON and the frozen schema allow U+0000 in ``scenarioContextId`` and turn ``text``, but
+Postgres text and jsonb cannot hold it: the insert raised DataError, the 500 CI's schemathesis job found
+on POST /intake-sessions. The request is schema-compliant, so a 422 would be a rejected valid request
+(positive_data_acceptance): the routes drop U+0000 at the boundary and proceed. (2) Pydantic rejects an
+unpaired surrogate (``\\ud800``) as a 422, but the validation envelope echoed it back and could not be
+encoded to UTF-8 (UnicodeEncodeError); it stays a 422 with the echo escaped.
 The bodies are sent as raw bytes so the JSON escape reaches the server as written (the test client's
 encoder would refuse the surrogate itself).
 """
@@ -22,61 +24,91 @@ LONE_SURROGATE = "\\ud800"
 JSON_HEADERS = {"Content-Type": "application/json"}
 
 
-def _sessions_with_context(conn, marker: str) -> int:
+def _post_session(client, scenario_context_id_json: str):
+    body = '{"language":"EN","scenarioContextId":"' + scenario_context_id_json + '"}'
+    return client.post(f"{API}/intake-sessions", content=body.encode(), headers=JSON_HEADERS)
+
+
+def _post_turn(client, session_id: str, text_json: str):
+    return client.post(
+        f"{API}/intake-sessions/{session_id}/turns",
+        content=('{"text":"' + text_json + '"}').encode(),
+        headers=JSON_HEADERS | {"Idempotency-Key": new_key()},
+    )
+
+
+def _stored_context(conn, session_id: str) -> str | None:
     return conn.execute(
-        text("SELECT count(*) FROM intake_session WHERE strpos(scenario_context_id, :m) > 0"), {"m": marker}
+        text("SELECT scenario_context_id FROM intake_session WHERE id = :s"), {"s": uuid.UUID(session_id)}
     ).scalar_one()
 
 
-def _assert_validation_error(r, field: str) -> None:
+def _started_payload_context(conn, session_id: str) -> str | None:
+    return conn.execute(
+        text("SELECT payload->>'scenarioContextId' FROM event_log WHERE intake_session_id = :s AND event_type = :t"),
+        {"s": uuid.UUID(session_id), "t": "INTAKE_STARTED"},
+    ).scalar_one()
+
+
+def _stored_turn_texts(conn, session_id: str) -> list[str]:
+    rows = conn.execute(
+        text("SELECT user_text FROM intake_turn WHERE session_id = :s ORDER BY turn_index"),
+        {"s": uuid.UUID(session_id)},
+    )
+    return [r[0] for r in rows]
+
+
+@pytest.mark.parametrize(("sent", "stored"), [(f"hero{NUL}-a{NUL}", "hero-a"), (NUL, "")], ids=["embedded", "only-nul"])
+def test_nul_in_scenario_context_id_is_dropped_and_the_session_starts(client, db_conn, cleanup, sent, stored):
+    r = _post_session(client, sent)
+    assert r.status_code == 201, r.text
+    session_id = r.json()["id"]
+    cleanup[0].append(session_id)
+    assert _stored_context(db_conn, session_id) == stored
+    assert _started_payload_context(db_conn, session_id) == stored  # the jsonb event payload too
+
+
+@pytest.mark.parametrize(("sent", "stored"), [(f"Hel{NUL}lo", "Hello"), (NUL, "")], ids=["embedded", "only-nul"])
+def test_nul_in_turn_text_is_dropped_and_the_turn_runs(client, fake, db_conn, cleanup, sent, stored):
+    session = create_session(client, "EN")
+    cleanup[0].append(session["id"])
+    r = _post_turn(client, session["id"], sent)
+    assert r.status_code == 201, r.text
+    assert r.json()["userText"] == stored
+    assert _stored_turn_texts(db_conn, session["id"]) == [stored]
+    assert fake.requests  # the agent loop ran on the stripped text
+
+
+def test_create_session_still_keeps_other_control_characters(client, db_conn, cleanup):
+    # Only U+0000 is dropped; a schema-valid tab or U+0001 is stored as sent.
+    r = _post_session(client, "hero\\t\\u0001")
+    assert r.status_code == 201, r.text
+    cleanup[0].append(r.json()["id"])
+    assert _stored_context(db_conn, r.json()["id"]) == "hero\t\x01"
+
+
+def test_lone_surrogate_in_scenario_context_id_is_a_422(client, db_conn):
+    marker = uuid.uuid4().hex[:12]
+    r = _post_session(client, marker + LONE_SURROGATE)
     assert r.status_code == 422, r.text
     error = r.json()["error"]
     assert error["code"] == "VALIDATION_ERROR"
-    if isinstance(error["details"], list):  # Pydantic's errors, each naming where it failed
-        assert any(field in d["loc"] for d in error["details"]), error["details"]
-    else:  # the route's own boundary check
-        assert error["details"] == {"field": field}
+    assert any("scenarioContextId" in d["loc"] for d in error["details"])
+    assert error["details"][0]["input"] == marker + "\\ud800"  # echoed escaped, not the raw surrogate
     assert "X-Request-Id" in r.headers
+    written = db_conn.execute(
+        text("SELECT count(*) FROM intake_session WHERE strpos(scenario_context_id, :m) > 0"), {"m": marker}
+    ).scalar_one()
+    assert written == 0
 
 
-@pytest.mark.parametrize("bad", [NUL, LONE_SURROGATE], ids=["nul", "lone-surrogate"])
-def test_create_session_rejects_unstorable_scenario_context_id(client, db_conn, bad):
-    marker = uuid.uuid4().hex[:12]
-    body = '{"language":"EN","scenarioContextId":"' + marker + bad + '"}'
-    r = client.post(f"{API}/intake-sessions", content=body.encode(), headers=JSON_HEADERS)
-    _assert_validation_error(r, "scenarioContextId")
-    assert _sessions_with_context(db_conn, marker) == 0  # nothing was written before the refusal
-
-
-def test_surrogate_in_validation_details_is_escaped_not_dropped(client):
-    r = client.post(f"{API}/intake-sessions", content=b'{"scenarioContextId":"x\\ud800"}', headers=JSON_HEADERS)
-    assert r.status_code == 422, r.text
-    assert r.json()["error"]["details"][0]["input"] == "x\\ud800"  # escaped as text, not the raw surrogate
-
-
-def test_create_session_still_accepts_other_control_characters(client, cleanup):
-    # Only what the store cannot hold is refused; a schema-valid tab or U+0001 is still a 201.
-    body = '{"language":"EN","scenarioContextId":"hero\\t\\u0001"}'
-    r = client.post(f"{API}/intake-sessions", content=body.encode(), headers=JSON_HEADERS)
-    assert r.status_code == 201, r.text
-    cleanup[0].append(r.json()["id"])
-
-
-@pytest.mark.parametrize("bad", [NUL, LONE_SURROGATE], ids=["nul", "lone-surrogate"])
-def test_turn_rejects_unstorable_text(client, fake, db_conn, cleanup, bad):
+def test_lone_surrogate_in_turn_text_is_a_422(client, fake, db_conn, cleanup):
     session = create_session(client, "EN")
     cleanup[0].append(session["id"])
-    body = '{"text":"Hello' + bad + '"}'
-    r = client.post(
-        f"{API}/intake-sessions/{session['id']}/turns",
-        content=body.encode(),
-        headers=JSON_HEADERS | {"Idempotency-Key": new_key()},
-    )
-    _assert_validation_error(r, "text")
-    turns = db_conn.execute(
-        text("SELECT count(*) FROM intake_turn WHERE session_id = :s"), {"s": uuid.UUID(session["id"])}
-    ).scalar_one()
-    assert turns == 0
+    r = _post_turn(client, session["id"], "Hello" + LONE_SURROGATE)
+    assert r.status_code == 422, r.text
+    assert r.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert _stored_turn_texts(db_conn, session["id"]) == []
     assert fake.requests == []  # the model never saw the turn
 
 
