@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Rewind } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { IntakeSession, IntakeTurn, ToolCallRecord } from "@/api/types";
+import { ConstructedChip } from "@/components/ui/ConstructedChip";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { scenario } from "@/data/scenario";
@@ -109,16 +110,19 @@ export function KioskPane() {
     },
     onError: (_error, message) => {
       setFailedText(message.text);
-      setText(message.text); // the typed text goes back into the composer
+      setText((typed) => typed || message.text); // back into the composer, unless more was typed
     },
   });
 
   const gateCard = useRef<HTMLDivElement | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
+  const gateCount = turns.filter((turn) => (turn.toolCalls ?? []).some((c) => gateDenial(c))).length;
   useEffect(() => {
-    // The gate card always scrolls fully into view: it is the moment the demo is about.
-    gateCard.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [turns.length]);
+    // A new gate card always scrolls fully into view: it is the moment the demo is about.
+    if (gateCount === 0) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    gateCard.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+  }, [gateCount]);
 
   function submit() {
     const message = text.trim();
@@ -184,11 +188,16 @@ export function KioskPane() {
             {turns.length > 0 && (
               <button
                 type="button"
+                disabled={send.isPending}
                 onClick={() => {
                   setFailedText(null);
-                  queryClient.resetQueries({ queryKey: INTAKE_KEY });
+                  setText("");
+                  key.current = null;
+                  send.reset();
+                  void queryClient.resetQueries({ queryKey: INTAKE_KEY });
+                  composer.current?.focus();
                 }}
-                className="ml-auto font-semibold text-accent underline underline-offset-2"
+                className="ml-auto font-semibold text-accent underline underline-offset-2 disabled:text-ink-3"
               >
                 {t.startOver}
               </button>
@@ -197,7 +206,6 @@ export function KioskPane() {
           {session.isError ? (
             <div data-testid="kiosk-start-error" className="m-auto text-center text-[16px]">
               <p>{t.startFailed}</p>
-              <p className="text-ink-3">{session.error.message}</p>
               <button
                 type="button"
                 onClick={() => void session.refetch()}
@@ -289,6 +297,7 @@ export function KioskPane() {
             <q lang={language} className="min-w-0 flex-1 text-ink-2">
               {suggestion}
             </q>
+            <ConstructedChip label={t.constructed} explanation={t.constructedKiosk} />
             <button
               type="button"
               onClick={() => {

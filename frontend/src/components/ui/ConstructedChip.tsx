@@ -7,7 +7,11 @@ const EXPLANATION =
 
 /** Outlined, text only; the explanation shows on hover and on keyboard focus, and Escape hides it
  * (WCAG 1.4.13). A button, so assistive tech knows the chip takes focus for a reason. */
-export function ConstructedChip() {
+/** The label and explanation default to the Case wording; the kiosk passes its own (UX 10.9). */
+export function ConstructedChip({
+  label = "constructed scenario",
+  explanation = EXPLANATION,
+}: { label?: string; explanation?: string } = {}) {
   const tipId = useId();
   const [dismissed, setDismissed] = useState(false);
   return (
@@ -22,7 +26,7 @@ export function ConstructedChip() {
       onMouseLeave={() => setDismissed(false)}
       className="group relative inline-flex items-center rounded border border-ink-2 px-2 text-[14px] font-medium text-ink-2"
     >
-      constructed scenario
+      {label}
       <span
         role="tooltip"
         id={tipId}
@@ -30,7 +34,7 @@ export function ConstructedChip() {
           dismissed ? "invisible" : "invisible group-hover:visible group-focus:visible"
         }`}
       >
-        {EXPLANATION}
+        {explanation}
       </span>
     </button>
   );
