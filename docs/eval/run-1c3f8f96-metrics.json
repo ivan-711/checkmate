@@ -1,4 +1,5 @@
 {
+  "_withheld": "Withheld: every cell the harness marks do_not_read has its value and ci95 set to null. The harness marks a cell do_not_read when it rests on fewer than 30 dependency components or fewer than 100 pairs (eval/harness/metrics.py). That covers AUTO_LINK precision, KEEP_SEPARATE precision and the false-merge rate on the held-out test partition (test.band.auto_link.precision, test.band.keep_separate.precision, test.false_merge_rate), AUTO_LINK precision and the false-merge rate on the development partition, and the per-category, per-button and hard-negative cells on both partitions. Pair, entity and component counts are kept.",
   "fixtureHashes": {
     "records": "420d5d50cb5ca9bd3aac62582b9525a24ccbc7df2de7ea633450fe2bf503b340",
     "truth": "3f188c7aa680717c46e0e34ff0389b2ff4d886dd381d8d519b018922fd2d4e6f"
@@ -18,16 +19,13 @@
       "value": 57
     },
     "band.auto_link.precision": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 44,
       "n_entities": 45,
       "n_pairs": 57,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "band.auto_link.true_pair_share": {
@@ -129,16 +127,13 @@
       "value": 0.990456
     },
     "button.ACCENT_HYPHEN_SURNAME.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 6,
       "n_entities": 6,
       "n_pairs": 8,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "button.ACCENT_HYPHEN_SURNAME.kind": {
@@ -149,42 +144,33 @@
       "value": "robustness"
     },
     "button.ACCENT_HYPHEN_SURNAME.recall.lenient": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 6,
       "n_entities": 6,
       "n_pairs": 8,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "button.ACCENT_HYPHEN_SURNAME.recall.strict": {
-      "ci95": [
-        0.0,
-        0.833333
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 6,
       "n_entities": 6,
       "n_pairs": 8,
-      "value": 0.5,
+      "value": null,
       "zero_events": false
     },
     "button.CHANGE_BIRTH_YEAR.blocking_recall": {
-      "ci95": [
-        0.691358,
-        0.879131
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 66,
       "n_entities": 66,
       "n_pairs": 86,
-      "value": 0.790698,
+      "value": null,
       "zero_events": false
     },
     "button.CHANGE_BIRTH_YEAR.kind": {
@@ -194,42 +180,33 @@
       "value": "band_changer"
     },
     "button.CHANGE_BIRTH_YEAR.recall.lenient": {
-      "ci95": [
-        0.670455,
-        0.857143
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 66,
       "n_entities": 66,
       "n_pairs": 86,
-      "value": 0.767442,
+      "value": null,
       "zero_events": false
     },
     "button.CHANGE_BIRTH_YEAR.recall.strict": {
-      "ci95": [
-        0.0,
-        0.059524
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 66,
       "n_entities": 66,
       "n_pairs": 86,
-      "value": 0.023256,
+      "value": null,
       "zero_events": false
     },
     "button.REMOVE_ADDRESS.blocking_recall": {
-      "ci95": [
-        0.878788,
-        0.985915
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 50,
       "n_entities": 51,
       "n_pairs": 69,
-      "value": 0.942029,
+      "value": null,
       "zero_events": false
     },
     "button.REMOVE_ADDRESS.kind": {
@@ -239,16 +216,13 @@
       "value": "band_changer"
     },
     "button.REMOVE_ADDRESS.recall.lenient": {
-      "ci95": [
-        0.845037,
-        0.971025
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 50,
       "n_entities": 51,
       "n_pairs": 69,
-      "value": 0.913043,
+      "value": null,
       "zero_events": false
     },
     "button.REMOVE_ADDRESS.recall.strict": {
@@ -259,20 +233,17 @@
       "n_entities": 51,
       "n_pairs": 69,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "button.SWAP_DOB_DAY_MONTH.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 20,
       "n_entities": 20,
       "n_pairs": 30,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "button.SWAP_DOB_DAY_MONTH.kind": {
@@ -282,29 +253,23 @@
       "value": "robustness"
     },
     "button.SWAP_DOB_DAY_MONTH.recall.lenient": {
-      "ci95": [
-        0.821429,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 20,
       "n_entities": 20,
       "n_pairs": 30,
-      "value": 0.933333,
+      "value": null,
       "zero_events": false
     },
     "button.SWAP_DOB_DAY_MONTH.recall.strict": {
-      "ci95": [
-        0.099919,
-        0.4375
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 20,
       "n_entities": 20,
       "n_pairs": 30,
-      "value": 0.266667,
+      "value": null,
       "zero_events": false
     },
     "category.C1.blocking_recall": {
@@ -347,81 +312,63 @@
       "zero_events": false
     },
     "category.D1.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 20,
       "n_entities": 20,
       "n_pairs": 30,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "category.D1.recall.lenient": {
-      "ci95": [
-        0.821429,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 20,
       "n_entities": 20,
       "n_pairs": 30,
-      "value": 0.933333,
+      "value": null,
       "zero_events": false
     },
     "category.D1.recall.strict": {
-      "ci95": [
-        0.099919,
-        0.4375
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 20,
       "n_entities": 20,
       "n_pairs": 30,
-      "value": 0.266667,
+      "value": null,
       "zero_events": false
     },
     "category.D3.blocking_recall": {
-      "ci95": [
-        0.691358,
-        0.879131
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 66,
       "n_entities": 66,
       "n_pairs": 86,
-      "value": 0.790698,
+      "value": null,
       "zero_events": false
     },
     "category.D3.recall.lenient": {
-      "ci95": [
-        0.670455,
-        0.857143
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 66,
       "n_entities": 66,
       "n_pairs": 86,
-      "value": 0.767442,
+      "value": null,
       "zero_events": false
     },
     "category.D3.recall.strict": {
-      "ci95": [
-        0.0,
-        0.059524
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 66,
       "n_entities": 66,
       "n_pairs": 86,
-      "value": 0.023256,
+      "value": null,
       "zero_events": false
     },
     "category.L1.blocking_recall": {
@@ -464,29 +411,23 @@
       "zero_events": false
     },
     "category.L3.blocking_recall": {
-      "ci95": [
-        0.956522,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 50,
       "n_entities": 50,
       "n_pairs": 72,
-      "value": 0.986111,
+      "value": null,
       "zero_events": false
     },
     "category.L3.recall.lenient": {
-      "ci95": [
-        0.956522,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 50,
       "n_entities": 50,
       "n_pairs": 72,
-      "value": 0.986111,
+      "value": null,
       "zero_events": false
     },
     "category.L3.recall.strict": {
@@ -497,33 +438,27 @@
       "n_entities": 50,
       "n_pairs": 72,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "category.L7.blocking_recall": {
-      "ci95": [
-        0.878788,
-        0.985915
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 50,
       "n_entities": 51,
       "n_pairs": 69,
-      "value": 0.942029,
+      "value": null,
       "zero_events": false
     },
     "category.L7.recall.lenient": {
-      "ci95": [
-        0.845037,
-        0.971025
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 50,
       "n_entities": 51,
       "n_pairs": 69,
-      "value": 0.913043,
+      "value": null,
       "zero_events": false
     },
     "category.L7.recall.strict": {
@@ -534,124 +469,97 @@
       "n_entities": 51,
       "n_pairs": 69,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "category.S1.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 2,
       "n_entities": 2,
       "n_pairs": 4,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "category.S1.recall.lenient": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 2,
       "n_entities": 2,
       "n_pairs": 4,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "category.S1.recall.strict": {
-      "ci95": [
-        0.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 2,
       "n_entities": 2,
       "n_pairs": 4,
-      "value": 0.75,
+      "value": null,
       "zero_events": false
     },
     "category.S3.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 4,
       "n_entities": 4,
       "n_pairs": 7,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "category.S3.recall.lenient": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 4,
       "n_entities": 4,
       "n_pairs": 7,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "category.S3.recall.strict": {
-      "ci95": [
-        0.25,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 4,
       "n_entities": 4,
       "n_pairs": 7,
-      "value": 0.571429,
+      "value": null,
       "zero_events": false
     },
     "category.S5.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 4,
       "n_entities": 4,
       "n_pairs": 4,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "category.S5.recall.lenient": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 4,
       "n_entities": 4,
       "n_pairs": 4,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "category.S5.recall.strict": {
-      "ci95": [
-        0.0,
-        0.75
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 4,
       "n_entities": 4,
       "n_pairs": 4,
-      "value": 0.25,
+      "value": null,
       "zero_events": false
     },
     "category.S6.blocking_recall": {
@@ -685,81 +593,63 @@
       "zero_events": false
     },
     "category.T1.blocking_recall": {
-      "ci95": [
-        0.925532,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 61,
       "n_entities": 61,
       "n_pairs": 97,
-      "value": 0.969072,
+      "value": null,
       "zero_events": false
     },
     "category.T1.recall.lenient": {
-      "ci95": [
-        0.797977,
-        0.923812
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 61,
       "n_entities": 61,
       "n_pairs": 97,
-      "value": 0.865979,
+      "value": null,
       "zero_events": false
     },
     "category.T1.recall.strict": {
-      "ci95": [
-        0.009901,
-        0.13979
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": false,
       "n_components": 61,
       "n_entities": 61,
       "n_pairs": 97,
-      "value": 0.061856,
+      "value": null,
       "zero_events": false
     },
     "category.T3.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 4,
       "n_entities": 4,
       "n_pairs": 7,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "category.T3.recall.lenient": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 4,
       "n_entities": 4,
       "n_pairs": 7,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "category.T3.recall.strict": {
-      "ci95": [
-        0.4,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 4,
       "n_entities": 4,
       "n_pairs": 7,
-      "value": 0.857143,
+      "value": null,
       "zero_events": false
     },
     "corpus.components": {
@@ -776,7 +666,7 @@
       "n_entities": 45,
       "n_pairs": 57,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "hard_negative.N1.auto_linked_wrongly": {
@@ -787,20 +677,17 @@
       "n_entities": 30,
       "n_pairs": 36,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "hard_negative.N1.sent_to_review": {
-      "ci95": [
-        0.107124,
-        0.464286
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 15,
       "n_entities": 30,
       "n_pairs": 36,
-      "value": 0.277778,
+      "value": null,
       "zero_events": false
     },
     "hard_negative.N3.auto_linked_wrongly": {
@@ -811,20 +698,17 @@
       "n_entities": 30,
       "n_pairs": 50,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "hard_negative.N3.sent_to_review": {
-      "ci95": [
-        0.701711,
-        0.894764
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 15,
       "n_entities": 30,
       "n_pairs": 50,
-      "value": 0.8,
+      "value": null,
       "zero_events": false
     },
     "missed_match_rate.scorer": {
@@ -1056,16 +940,13 @@
       "value": 15
     },
     "test.band.auto_link.precision": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 11,
       "n_entities": 11,
       "n_pairs": 15,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.band.auto_link.true_pair_share": {
@@ -1088,16 +969,13 @@
       "value": 72
     },
     "test.band.keep_separate.precision": {
-      "ci95": [
-        0.044114,
-        0.338468
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 33,
       "n_entities": 44,
       "n_pairs": 72,
-      "value": 0.152778,
+      "value": null,
       "zero_events": false
     },
     "test.band.keep_separate.true_pair_share": {
@@ -1167,16 +1045,13 @@
       "value": 0.995149
     },
     "test.button.ACCENT_HYPHEN_SURNAME.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 3,
       "n_entities": 3,
       "n_pairs": 7,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.button.ACCENT_HYPHEN_SURNAME.kind": {
@@ -1187,42 +1062,33 @@
       "value": "robustness"
     },
     "test.button.ACCENT_HYPHEN_SURNAME.recall.lenient": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 3,
       "n_entities": 3,
       "n_pairs": 7,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.button.ACCENT_HYPHEN_SURNAME.recall.strict": {
-      "ci95": [
-        0.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 3,
       "n_entities": 3,
       "n_pairs": 7,
-      "value": 0.571429,
+      "value": null,
       "zero_events": false
     },
     "test.button.CHANGE_BIRTH_YEAR.blocking_recall": {
-      "ci95": [
-        0.384559,
-        0.788009
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 24,
       "n_entities": 24,
       "n_pairs": 34,
-      "value": 0.588235,
+      "value": null,
       "zero_events": false
     },
     "test.button.CHANGE_BIRTH_YEAR.kind": {
@@ -1232,16 +1098,13 @@
       "value": "band_changer"
     },
     "test.button.CHANGE_BIRTH_YEAR.recall.lenient": {
-      "ci95": [
-        0.384559,
-        0.788009
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 24,
       "n_entities": 24,
       "n_pairs": 34,
-      "value": 0.588235,
+      "value": null,
       "zero_events": false
     },
     "test.button.CHANGE_BIRTH_YEAR.recall.strict": {
@@ -1252,20 +1115,17 @@
       "n_entities": 24,
       "n_pairs": 34,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "test.button.REMOVE_ADDRESS.blocking_recall": {
-      "ci95": [
-        0.8125,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 23,
       "n_entities": 23,
       "n_pairs": 34,
-      "value": 0.911765,
+      "value": null,
       "zero_events": false
     },
     "test.button.REMOVE_ADDRESS.kind": {
@@ -1275,16 +1135,13 @@
       "value": "band_changer"
     },
     "test.button.REMOVE_ADDRESS.recall.lenient": {
-      "ci95": [
-        0.684041,
-        0.944444
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 23,
       "n_entities": 23,
       "n_pairs": 34,
-      "value": 0.823529,
+      "value": null,
       "zero_events": false
     },
     "test.button.REMOVE_ADDRESS.recall.strict": {
@@ -1295,20 +1152,17 @@
       "n_entities": 23,
       "n_pairs": 34,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "test.button.SWAP_DOB_DAY_MONTH.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 8,
       "n_entities": 8,
       "n_pairs": 11,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.button.SWAP_DOB_DAY_MONTH.kind": {
@@ -1318,55 +1172,43 @@
       "value": "robustness"
     },
     "test.button.SWAP_DOB_DAY_MONTH.recall.lenient": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 8,
       "n_entities": 8,
       "n_pairs": 11,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.button.SWAP_DOB_DAY_MONTH.recall.strict": {
-      "ci95": [
-        0.0,
-        0.333333
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 8,
       "n_entities": 8,
       "n_pairs": 11,
-      "value": 0.090909,
+      "value": null,
       "zero_events": false
     },
     "test.category.C1.blocking_recall": {
-      "ci95": [
-        0.659562,
-        0.942434
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 30,
       "n_entities": 32,
       "n_pairs": 44,
-      "value": 0.818182,
+      "value": null,
       "zero_events": false
     },
     "test.category.C1.recall.lenient": {
-      "ci95": [
-        0.437432,
-        0.789609
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 30,
       "n_entities": 32,
       "n_pairs": 44,
-      "value": 0.613636,
+      "value": null,
       "zero_events": false
     },
     "test.category.C1.recall.strict": {
@@ -1377,72 +1219,57 @@
       "n_entities": 32,
       "n_pairs": 44,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "test.category.D1.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 8,
       "n_entities": 8,
       "n_pairs": 11,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.category.D1.recall.lenient": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 8,
       "n_entities": 8,
       "n_pairs": 11,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.category.D1.recall.strict": {
-      "ci95": [
-        0.0,
-        0.333333
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 8,
       "n_entities": 8,
       "n_pairs": 11,
-      "value": 0.090909,
+      "value": null,
       "zero_events": false
     },
     "test.category.D3.blocking_recall": {
-      "ci95": [
-        0.384559,
-        0.788009
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 24,
       "n_entities": 24,
       "n_pairs": 34,
-      "value": 0.588235,
+      "value": null,
       "zero_events": false
     },
     "test.category.D3.recall.lenient": {
-      "ci95": [
-        0.384559,
-        0.788009
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 24,
       "n_entities": 24,
       "n_pairs": 34,
-      "value": 0.588235,
+      "value": null,
       "zero_events": false
     },
     "test.category.D3.recall.strict": {
@@ -1453,72 +1280,57 @@
       "n_entities": 24,
       "n_pairs": 34,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "test.category.L1.blocking_recall": {
-      "ci95": [
-        0.824931,
-        0.980795
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 32,
       "n_entities": 32,
       "n_pairs": 46,
-      "value": 0.913043,
+      "value": null,
       "zero_events": false
     },
     "test.category.L1.recall.lenient": {
-      "ci95": [
-        0.772727,
-        0.955556
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 32,
       "n_entities": 32,
       "n_pairs": 46,
-      "value": 0.869565,
+      "value": null,
       "zero_events": false
     },
     "test.category.L1.recall.strict": {
-      "ci95": [
-        0.0,
-        0.2
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 32,
       "n_entities": 32,
       "n_pairs": 46,
-      "value": 0.086957,
+      "value": null,
       "zero_events": false
     },
     "test.category.L3.blocking_recall": {
-      "ci95": [
-        0.868421,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 27,
       "n_entities": 27,
       "n_pairs": 39,
-      "value": 0.948718,
+      "value": null,
       "zero_events": false
     },
     "test.category.L3.recall.lenient": {
-      "ci95": [
-        0.868421,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 27,
       "n_entities": 27,
       "n_pairs": 39,
-      "value": 0.948718,
+      "value": null,
       "zero_events": false
     },
     "test.category.L3.recall.strict": {
@@ -1529,33 +1341,27 @@
       "n_entities": 27,
       "n_pairs": 39,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "test.category.L7.blocking_recall": {
-      "ci95": [
-        0.8125,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 23,
       "n_entities": 23,
       "n_pairs": 34,
-      "value": 0.911765,
+      "value": null,
       "zero_events": false
     },
     "test.category.L7.recall.lenient": {
-      "ci95": [
-        0.684041,
-        0.944444
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 23,
       "n_entities": 23,
       "n_pairs": 34,
-      "value": 0.823529,
+      "value": null,
       "zero_events": false
     },
     "test.category.L7.recall.strict": {
@@ -1566,46 +1372,37 @@
       "n_entities": 23,
       "n_pairs": 34,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "test.category.S1.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 3,
       "n_entities": 3,
       "n_pairs": 6,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.category.S1.recall.lenient": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 3,
       "n_entities": 3,
       "n_pairs": 6,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.category.S1.recall.strict": {
-      "ci95": [
-        0.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 3,
       "n_entities": 3,
       "n_pairs": 6,
-      "value": 0.666667,
+      "value": null,
       "zero_events": false
     },
     "test.category.S3.blocking_recall": {
@@ -1639,42 +1436,33 @@
       "zero_events": false
     },
     "test.category.S5.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 1,
       "n_entities": 1,
       "n_pairs": 3,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.category.S5.recall.lenient": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 1,
       "n_entities": 1,
       "n_pairs": 3,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.category.S5.recall.strict": {
-      "ci95": [
-        0.333333,
-        0.333333
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 1,
       "n_entities": 1,
       "n_pairs": 3,
-      "value": 0.333333,
+      "value": null,
       "zero_events": false
     },
     "test.category.S6.blocking_recall": {
@@ -1708,81 +1496,63 @@
       "zero_events": false
     },
     "test.category.T1.blocking_recall": {
-      "ci95": [
-        0.859155,
-        0.983051
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 41,
       "n_entities": 44,
       "n_pairs": 65,
-      "value": 0.923077,
+      "value": null,
       "zero_events": false
     },
     "test.category.T1.recall.lenient": {
-      "ci95": [
-        0.730148,
-        0.92425
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 41,
       "n_entities": 44,
       "n_pairs": 65,
-      "value": 0.830769,
+      "value": null,
       "zero_events": false
     },
     "test.category.T1.recall.strict": {
-      "ci95": [
-        0.0,
-        0.079365
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 41,
       "n_entities": 44,
       "n_pairs": 65,
-      "value": 0.030769,
+      "value": null,
       "zero_events": false
     },
     "test.category.T3.blocking_recall": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 2,
       "n_entities": 2,
       "n_pairs": 2,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.category.T3.recall.lenient": {
-      "ci95": [
-        1.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 2,
       "n_entities": 2,
       "n_pairs": 2,
-      "value": 1.0,
+      "value": null,
       "zero_events": false
     },
     "test.category.T3.recall.strict": {
-      "ci95": [
-        0.0,
-        1.0
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 2,
       "n_entities": 2,
       "n_pairs": 2,
-      "value": 0.5,
+      "value": null,
       "zero_events": false
     },
     "test.false_merge_rate": {
@@ -1793,7 +1563,7 @@
       "n_entities": 11,
       "n_pairs": 15,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "test.hard_negative.N1.auto_linked_wrongly": {
@@ -1804,7 +1574,7 @@
       "n_entities": 12,
       "n_pairs": 16,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "test.hard_negative.N1.sent_to_review": {
@@ -1815,7 +1585,7 @@
       "n_entities": 12,
       "n_pairs": 16,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "test.hard_negative.N3.auto_linked_wrongly": {
@@ -1826,20 +1596,17 @@
       "n_entities": 19,
       "n_pairs": 30,
       "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
-      "value": 0.0,
+      "value": null,
       "zero_events": true
     },
     "test.hard_negative.N3.sent_to_review": {
-      "ci95": [
-        0.387097,
-        0.814899
-      ],
+      "ci95": null,
       "do_not_read": true,
       "low_support": true,
       "n_components": 10,
       "n_entities": 19,
       "n_pairs": 30,
-      "value": 0.6,
+      "value": null,
       "zero_events": false
     },
     "test.missed_match_rate.scorer": {
