@@ -289,6 +289,8 @@ Contract routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the co
 
 Third-party licenses are listed in `docs/LICENSES.md`: every package in `uv.lock`, the direct dependencies of `frontend/` and `eval/acceptance/`, the container images, and the data sources.
 
+CheckMate's own code is released under the MIT License; see `LICENSE`. The data sources above keep their own terms.
+
 ## Not for clinical use
 
 CheckMate is a synthetic-data prototype for identity reconciliation and evidence display. Flags are rule-based, name their sources, are shown only after a person approves an identity link, and do not direct treatment. Not for clinical use. No clinician has reviewed the rule, the class table or the wording. Absence of a flag does not mean absence of a conflict.
