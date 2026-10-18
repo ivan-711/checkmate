@@ -275,7 +275,7 @@ Contract routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the co
 | `eval/` | W5, Q2, Q5 | Evaluation harness (`eval/harness/`), protected expectations (`eval/expectations/`), the G16 acceptance script (`eval/acceptance/`), the parallel seed sweep (`eval/sweep/`), tests (`eval/tests/`, `eval/tests_r5/`) |
 | `data/` | W1, W5 | `data/download.py` and `data/HASHES.json`; hero selector and export (`data/hero_select.py`, `data/hero_export.py`, `data/hero_overlay.py`), `data/fixture_check.py`, and the exported hero with the replay transcript in `data/scenarios/hero/`; raw data stays gitignored |
 | `docs/` | D1, D2, D3 | `docs/LICENSES.md`, `docs/devpost-outline.md`, the committed metrics of the held-out run (`docs/eval/run-1c3f8f96-metrics.json`) |
-| `tools/` | Q15, notify-imessage | The optional registrar notifier (`tools/notify/`, off unless started) |
+| `tools/` | Q15, notify-patient | The optional patient check-in notifier (`tools/notify/`, off unless started) |
 | `.github/` | W5 | CI workflow `.github/workflows/ci.yml` |
 
 ## Data provenance
@@ -301,7 +301,7 @@ The contract's default flag footer, `CARD_FOOTER` in `contracts/models/alerts.py
 ## Known limits and non-goals
 
 - **Synthetic data only.** The database holds only synthetic records and is dropped with one command (`docker-compose.yml`, `Makefile`); source datasets are never committed (`.gitignore`).
-- **Optional notifier.** `tools/notify` can send the registrar a generic iMessage ("CheckMate: a kiosk check-in is waiting for registrar review.") when a check-in is held. The text carries no patient data, travels through Apple's Messages service, and nothing is sent unless someone starts the notifier.
+- **Optional notifier.** `tools/notify` can text the patient a fixed iMessage at three check-in milestones: held for a registrar, confirmed by the registrar, and a new registration started. In the demo a stand-in contact receives it; in production it would use the number the patient typed. The text carries no patient record data, travels through Apple's Messages service, and nothing is sent unless someone starts the notifier.
 - **Hand-set scorer and thresholds.** The weights (`handset-1`) and the threshold row (`provisional-1`) are set by hand, not trained or calibrated (`backend/core/score.py`, `contracts/migrations/0002_provisional_thresholds.sql`). Thresholds are evaluation thresholds, not clinical ones. Auto-link stays off (`contracts/models/thresholds.py`).
 - **The hero is provisional.** The hero export is marked `provisional` and not `qualified`: two of its required selection criteria are unmet, `change_birth_year_keep_separate` and `swap_dob_day_month_robust` (`data/scenarios/hero/hero.json`).
 - **REPLAY is scripted.** The replay transcript was written by the team, not recorded from a model run, and answers only its scripted lines (`data/scenarios/hero/frontdesk_transcript.json`, `backend/frontdesk/replay.py`).
