@@ -61,6 +61,11 @@ for (const viewport of [
       await expect(steps.locator("li").last()).toHaveAttribute("data-testid", "gate-fact");
       await expect(fact).toHaveCSS("color", NEAR_BLACK);
       await expect(page.getByTestId("gate-card")).toContainText(c.ruleResult);
+      // Every rule-result tag reads on one line, in both languages.
+      await expect(page.getByTestId("rule-result-tag")).toHaveCount(2); // the fact line and the gate card
+      for (const tag of await page.getByTestId("rule-result-tag").all()) {
+        expect((await tag.boundingBox())!.height).toBeLessThan(32);
+      }
       await expect(page.getByTestId("tool-call-chip")).toHaveCount(2);
 
       await expect(page.getByTestId("kiosk-finish-held")).toHaveText(c.held);
