@@ -21,7 +21,8 @@ export default defineConfig({
     { name: "chromium-api", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 800 } } },
   ],
   webServer: {
-    command: `npm run build && npx next start -H 127.0.0.1 -p ${PORT}`,
+    // next build points next-env.d.ts at the folder it built; put the tracked file back after.
+    command: `npm run build && git checkout -- next-env.d.ts && npx next start -H 127.0.0.1 -p ${PORT}`,
     env: { NEXT_PUBLIC_CHECKMATE_SOURCE: "api", CHECKMATE_DIST_DIR: DIST },
     url: `http://127.0.0.1:${PORT}/`,
     reuseExistingServer: false,
