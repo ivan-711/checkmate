@@ -55,7 +55,8 @@ export class FixtureIntake {
   send(sessionId: string, text: string, idempotencyKey: string): IntakeTurn {
     const session = this.sessions.get(sessionId);
     if (!session) throw new DataError("NOT_FOUND", "Check-in not found.");
-    const seen = this.keys.get(idempotencyKey);
+    const keyId = `${sessionId}:${idempotencyKey}`; // keys are scoped to one check-in
+    const seen = this.keys.get(keyId);
     if (seen) {
       if (seen.text !== text) {
         throw new DataError(
@@ -77,27 +78,30 @@ export class FixtureIntake {
         : this.degradedTurn(session, text, turnIndex);
     for (const call of turn.toolCalls ?? []) this.gateCounts[call.gate.outcome] += 1;
     this.sessions.set(sessionId, { ...session, turns: [...turns, turn], registration: turn.registration });
-    this.keys.set(idempotencyKey, { text, turn });
+    this.keys.set(keyId, { text, turn });
     return turn;
   }
 
   private recordedTurn(userText: string, language: Language): IntakeTurn {
-    const { pair, recordB, contributions } = this.fixture.pair;
+    const { pair, recordA, recordB, contributions } = this.fixture.pair;
     const existing = recordB.record;
+    // What the agent heard: the arriving patient's demographics, as the ER record holds them.
+    const { givenName, familyName, birthDate } = recordA.normalized;
+    const args = { givenName, familyName, birthDate };
     const candidate = {
       recordId: existing.id,
       sourceSystem: existing.sourceSystem,
       p: pair.decision.p,
       band: pair.decision.band,
       pairId: pair.id,
-      negativeRulesFired: [],
+      negativeRulesFired: pair.decision.negativeRulesFired ?? [],
       topContributions: contributions,
     };
     const call = (stepIndex: number, toolName: string, gate: ToolCallRecord["gate"]): ToolCallRecord => ({
       id: crypto.randomUUID(),
       stepIndex,
       toolName,
-      args: null,
+      args,
       gate,
       effect: { status: "NONE" },
       candidates: [candidate],
@@ -110,6 +114,8 @@ export class FixtureIntake {
       assistantTextSource: "MODEL",
       agentMode: "REPLAY",
       degraded: null,
+      // The server would create an intake record and a FRONTDESK_HANDOFF pair for it. The fixture
+      // has one pair, so the hand-off points at it and the registrar decides the same pair as Case.
       registration: { state: "PENDING_REGISTRAR", handoffPairIds: [pair.id] },
       toolCalls: [
         call(0, "search_patients", {
