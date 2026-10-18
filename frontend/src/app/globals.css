@@ -247,6 +247,103 @@ kbd {
   padding-top: 4px;
 }
 
+/* The mark's halves slide shut when a link is approved (CONCEPT.md §5, touch 1). */
+.mark path {
+  transition: transform var(--t-fuse) var(--ease-fuse);
+}
+
+/* The compact layer hides the Commands label; the keycap stands alone. */
+@media (max-width: 1300px), (max-height: 760px) {
+  .compact-hidden {
+    display: none;
+  }
+  .compact-nomargin {
+    margin-left: 0;
+  }
+}
+
+/* The ⌘K command bar (cmdk), styled from the tokens; no library defaults. */
+.cmd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--scrim);
+  animation: cmd-fade 160ms var(--ease-out);
+}
+.cmd-box {
+  position: fixed;
+  top: 120px;
+  left: 50%;
+  z-index: 51;
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  transform: translateX(-50%);
+  background: var(--paper);
+  border-radius: 20px;
+  box-shadow:
+    0 30px 80px -20px rgba(40, 10, 35, 0.45),
+    0 0 0 1px var(--hair);
+  overflow: hidden;
+  animation: cmd-pop 220ms var(--ease-out);
+}
+.cmd-box [cmdk-input] {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--hair);
+  padding: 18px 22px;
+  font: inherit;
+  font-size: 18px;
+  color: var(--ink);
+  background: transparent;
+  outline: none;
+}
+.cmd-box [cmdk-input]::placeholder {
+  color: var(--ink-3);
+}
+.cmd-box [cmdk-list] {
+  padding: 8px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.cmd-box [cmdk-item] {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.cmd-box [cmdk-item][data-selected="true"] {
+  background: var(--mulberry-tint);
+}
+.cmd-box [cmdk-item] kbd {
+  margin-left: auto;
+}
+.cmd-box [cmdk-empty] {
+  padding: 14px;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+@keyframes cmd-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes cmd-pop {
+  from {
+    transform: translateX(-50%) scale(0.97) translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmd-overlay,
+  .cmd-box {
+    animation: none;
+  }
+  .mark path {
+    transition: none;
+  }
+}
+
 /* ───────── legacy rules kept until L2 (kiosk), L3 (Organism) and L4 (decision column) retire
    the components that use them. Nothing below is used by the Desk shell. ───────── */
 

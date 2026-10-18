@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   STORY_STEPS,
+  agoText,
   currentStep,
   deriveDeskState,
+  formatHeld,
+  groupEvents,
+  kioskStateFrom,
   stageHead,
   stepStatus,
   type DeskState,
@@ -140,5 +144,66 @@ describe("stageHead", () => {
       const text = Object.values(stageHead(state, ctx)).join(" ").toLowerCase();
       for (const word of banned) expect(text, `${state} says "${word}"`).not.toContain(word);
     }
+  });
+});
+
+describe("kioskStateFrom (the kiosk's default state, from the check-in on record)", () => {
+  it("is idle with no check-in, and working while a turn runs", () => {
+    expect(kioskStateFrom(undefined, false)).toBe("idle");
+    expect(kioskStateFrom("NONE", false)).toBe("idle");
+    expect(kioskStateFrom("NONE", true)).toBe("working");
+  });
+
+  it("is held while a registrar holds the check-in", () => {
+    expect(kioskStateFrom("PENDING_REGISTRAR", false)).toBe("held");
+  });
+
+  it("is done once the check-in has a chart", () => {
+    expect(kioskStateFrom("LINKED", false)).toBe("done");
+    expect(kioskStateFrom("NEW_CHART", false)).toBe("done");
+    expect(kioskStateFrom("RELEASED", false)).toBe("done");
+  });
+});
+
+describe("groupEvents (the Activity strip collapses repeats)", () => {
+  const row = (eventId: string, eventType: string, ts: string) => ({ eventId, eventType, ts });
+
+  it("collapses consecutive events of one type into a count, newest first", () => {
+    const groups = groupEvents([
+      row("4", "MATCH_RUN_COMPLETED", "t4"),
+      row("3", "PAIR_SCORED", "t3"),
+      row("2", "PAIR_SCORED", "t2"),
+      row("1", "DEMO_RESET", "t1"),
+    ]);
+    expect(groups).toEqual([
+      { eventType: "MATCH_RUN_COMPLETED", count: 1, ts: "t4", eventId: "4" },
+      { eventType: "PAIR_SCORED", count: 2, ts: "t3", eventId: "3" },
+      { eventType: "DEMO_RESET", count: 1, ts: "t1", eventId: "1" },
+    ]);
+  });
+
+  it("keeps the same type apart when another event sits between", () => {
+    const groups = groupEvents([row("3", "A", "t3"), row("2", "B", "t2"), row("1", "A", "t1")]);
+    expect(groups.map((g) => g.eventType)).toEqual(["A", "B", "A"]);
+  });
+
+  it("is empty for no events", () => {
+    expect(groupEvents([])).toEqual([]);
+  });
+});
+
+describe("live time on the stage", () => {
+  it("formats the held timer as m:ss", () => {
+    expect(formatHeld(0)).toBe("0:00");
+    expect(formatHeld(41)).toBe("0:41");
+    expect(formatHeld(125)).toBe("2:05");
+  });
+
+  it("reads a relative time honestly", () => {
+    expect(agoText(1)).toBe("just now");
+    expect(agoText(4)).toBe("4 s ago");
+    expect(agoText(59)).toBe("59 s ago");
+    expect(agoText(60)).toBe("1 min ago");
+    expect(agoText(7200)).toBe("120 min ago");
   });
 });
