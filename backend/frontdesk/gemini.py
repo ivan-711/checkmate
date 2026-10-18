@@ -17,7 +17,7 @@ from google.genai import Client, errors, types
 
 from backend.frontdesk.model import ErrorStep, Message, ModelRequest, ModelStep, TextStep, ToolCallStep
 from contracts.models.intake import AgentMode
-from contracts.version import MODEL_TIMEOUT_MS
+from contracts.version import AUTO_MODE_PROBE_S, MODEL_TIMEOUT_MS
 
 log = logging.getLogger("checkmate.frontdesk.gemini")
 
@@ -75,6 +75,18 @@ class GeminiAgentModel:
             log.warning("gemini transport error exception_class=%s", type(exc).__name__)
             return ErrorStep(kind="UNAVAILABLE", retryable=True, mode=self.mode)
         return step_from_response(response, _elapsed_ms(started), self.mode)
+
+
+def probe_live(*, api_key: str, model_id: str) -> bool:
+    """AUTO mode's session-start probe: one metadata read inside AUTO_MODE_PROBE_S. Any failure,
+    including the API refusing the short deadline, pins the session to REPLAY (fail closed)."""
+    try:
+        client = Client(api_key=api_key, http_options=types.HttpOptions(timeout=int(AUTO_MODE_PROBE_S * 1000)))
+        client.models.get(model=model_id)
+        return True
+    except (httpx.HTTPError, errors.APIError) as exc:
+        log.warning("gemini probe failed exception_class=%s code=%s", type(exc).__name__, getattr(exc, "code", None))
+        return False
 
 
 def contents_from_messages(messages: tuple[Message, ...]) -> list[types.Content]:
