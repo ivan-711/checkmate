@@ -1,8 +1,8 @@
 "use client";
 
-import { FilePlus2, Paperclip, Rewind, Search, ShieldAlert, ShieldCheck, Wrench } from "lucide-react";
+import { FilePlus2, Paperclip, Search, ShieldAlert, ShieldCheck, Wrench } from "lucide-react";
 import { useState } from "react";
-import type { AgentMode, ToolCallRecord } from "@/api/types";
+import type { ToolCallRecord } from "@/api/types";
 import type { KioskCopy } from "./copy";
 
 const TOOL_ICONS = {
@@ -25,12 +25,10 @@ function summary(call: ToolCallRecord, t: KioskCopy): string {
  * response, never from the agent's text. A denial that has a gate card does not expand. */
 export function ToolCallChip({
   call,
-  agentMode,
   t,
   hasGateCard,
 }: {
   call: ToolCallRecord;
-  agentMode: AgentMode;
   t: KioskCopy;
   hasGateCard: boolean;
 }) {
@@ -48,12 +46,6 @@ export function ToolCallChip({
       <span className={`ml-auto inline-flex items-center gap-1 text-[14px] font-semibold ${outcome.ink}`}>
         <outcome.Icon aria-hidden size={16} />
         {call.gate.outcome === "ALLOW" ? t.allowed : t.denied}
-        {agentMode === "REPLAY" && (
-          <span className="inline-flex items-center gap-0.5 font-normal text-ink-3">
-            <Rewind aria-hidden size={12} />
-            {t.recorded}
-          </span>
-        )}
       </span>
     </>
   );

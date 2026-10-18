@@ -202,6 +202,130 @@ test("FrontDesk shell: empty chat pane, ES/EN switch and the agent gate tile", a
   await expect(tile.getByText("agent_gate_5m · continuous aggregate", { exact: true })).toBeVisible();
 });
 
+test("FrontDesk check-in: the gate denies a new chart at REVIEW and hands it to a registrar", async ({
+  page,
+}) => {
+  await page.goto("/frontdesk");
+  await expect(page.getByTestId("agent-mode-badge")).toHaveText("Agent: REPLAY");
+  await page.getByRole("button", { name: "Use this" }).click();
+  await expect(page.getByTestId("kiosk-composer")).toBeFocused();
+  await page.keyboard.press("Enter");
+
+  const chips = page.getByTestId("tool-call-chip");
+  await expect(chips).toHaveCount(2);
+  await expect(chips.nth(0)).toHaveAttribute("data-outcome", "ALLOW");
+  await expect(chips.nth(1)).toHaveAttribute("data-outcome", "DENY");
+  const gate = page.getByTestId("gate-card");
+  await expect(gate).toBeInViewport();
+  await expect(gate).toContainText("Blocked by identity gate");
+  await expect(gate).toContainText("Policy frontdesk-gate/1");
+  await expect(gate).toContainText("Values hidden on this screen.");
+  await expect(gate).not.toHaveAttribute("role", "alert");
+  // The kiosk never shows the other chart's values.
+  const masked = scenario.pair.recordB.normalized;
+  for (const value of [masked.birthDate, masked.addressLine]) await expect(gate).not.toContainText(value!);
+  await expect(page.getByText("A registrar will confirm it with you.")).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("New chart request denied by the identity gate.");
+
+  const tile = page.getByRole("region", { name: "Agent actions per 5 minutes" });
+  await expect(tile.getByText("1 denied · 1 allowed")).toBeVisible();
+
+  await page.getByRole("button", { name: "Start over" }).click();
+  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
+  await expect(tile.getByText("1 denied · 1 allowed")).toBeVisible(); // the audit history stays
+});
+
+test("FrontDesk in Spanish: the gate card, band and evidence fields are in Spanish", async ({ page }) => {
+  await page.goto("/frontdesk");
+  await page.getByRole("button", { name: "Español" }).click();
+  await page.getByRole("button", { name: "Usar este" }).click();
+  await page.keyboard.press("Enter");
+  const gate = page.getByTestId("gate-card");
+  await expect(gate).toContainText("Bloqueado por el control de identidad");
+  await expect(gate).toContainText("REVISIÓN");
+  await expect(gate).toContainText("Fecha de nacimiento");
+  await expect(gate).not.toContainText("REVIEW ");
+  await page.getByRole("button", { name: "Empezar de nuevo" }).click();
+  await expect(page.getByTestId("kiosk-composer")).toBeFocused();
+  await expect(page.getByTestId("kiosk-composer")).toHaveValue("");
+});
+
+test("FrontDesk registrar: the held check-in is decided through the review step and the kiosk says what is next", async ({
+  page,
+}) => {
+  await page.goto("/frontdesk");
+  await expect(page.getByText("No held check-ins.")).toBeVisible();
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  const held = page.getByTestId("registrar-held");
+  await expect(held).toContainText("Held check-ins (1)");
+  await expect(held.getByTestId("source-card")).toHaveCount(2);
+
+  await review(page, "reject", "DIFFERENT_PERSON");
+  await expect(held.getByText(/Rejected by .* Records kept separate\./)).toBeVisible();
+  await expect(page.getByText("A registrar is creating a new chart for you.")).toBeVisible();
+
+  await review(page, "approve");
+  await expect(held.getByText(/Approved by /)).toBeVisible();
+  await expect(page.getByText("Your chart is confirmed. Please wait to be called.")).toBeVisible();
+  await expect(page.getByText("A registrar is creating a new chart for you.")).toHaveCount(0);
+  // The kiosk never shows the allergy or the flag card.
+  await expect(page.getByTestId("flag-card")).toHaveCount(0);
+});
+
+test("FrontDesk Start over: a new check-in starts at once and the next message is sent", async ({ page }) => {
+  await page.goto("/frontdesk");
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("registrar-held")).toBeVisible();
+  await page.getByRole("button", { name: "Start over" }).click();
+  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
+  await expect(page.getByText("No held check-ins.")).toBeVisible();
+  await page.getByTestId("kiosk-composer").fill("I have an appointment at three.");
+  await expect(page.getByTestId("kiosk-send")).toBeEnabled();
+  await page.getByTestId("kiosk-send").click();
+  await expect(page.getByText("automatic message")).toBeVisible();
+  await expect(page.getByTestId("kiosk-start-error")).toHaveCount(0);
+  await expect(page.getByText("could not reach the agent service")).toHaveCount(0);
+});
+
+test("FrontDesk Reset demo: clears the kiosk and the held check-in; the next message starts a new check-in", async ({
+  page,
+}) => {
+  await page.goto("/frontdesk");
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("gate-card")).toBeVisible();
+  await expect(page.getByTestId("registrar-held")).toBeVisible();
+  await page.getByRole("button", { name: "Reset demo" }).click();
+  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
+  await expect(page.getByTestId("gate-card")).toHaveCount(0);
+  await expect(page.getByTestId("registrar-held")).toHaveCount(0);
+  await expect(page.getByText("No held check-ins.")).toBeVisible();
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("gate-card")).toBeVisible();
+  await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (1)");
+  await expect(page.getByText("could not reach the agent service")).toHaveCount(0);
+});
+
+test("FrontDesk tool chips carry no mode-specific suffix", async ({ page }) => {
+  await page.goto("/frontdesk");
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("tool-call-chip")).toHaveCount(2);
+  await expect(page.getByTestId("tool-call-chip").filter({ hasText: "recorded" })).toHaveCount(0);
+});
+
+test("FrontDesk: other text gets the template answer and no tool runs", async ({ page }) => {
+  await page.goto("/frontdesk");
+  await page.getByTestId("kiosk-composer").fill("I have an appointment at three.");
+  await page.getByTestId("kiosk-send").click();
+  await expect(page.getByText("automatic message")).toBeVisible();
+  await expect(page.getByTestId("tool-call-chip")).toHaveCount(0);
+  await expect(page.getByTestId("gate-card")).toHaveCount(0);
+});
+
 for (const scheme of ["light", "dark"] as const) {
   test(`nothing on either screen renders in red (${scheme})`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
