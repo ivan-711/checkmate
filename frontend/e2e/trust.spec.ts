@@ -136,7 +136,8 @@ test("the flag card on Case is a rule result, neutral and never an alert", async
   await page.getByTestId("approve-button").click();
   await page.getByTestId("review-submit-button").click();
   const card = page.getByTestId("flag-card");
-  await expect(card.locator("header")).toContainText("Rule result");
+  // The tag sits in the notice's footer line, beside the constructed-scenario chip.
+  await expect(card.getByText("Rule result", { exact: true })).toBeVisible();
   await expect(card).not.toContainText("Verified");
   await expect(card).not.toHaveAttribute("role", "alert");
   await expect(card.getByTestId("flag-card-rule-id")).toHaveText("BL-AMOX-01");

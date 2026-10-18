@@ -34,7 +34,7 @@ test("REPLAY: the queue reads the fixture and Case keeps its golden record acros
   await page.getByTestId("approve-button").click();
   await page.getByTestId("review-note-input").fill("work queue round trip");
   await page.getByTestId("review-submit-button").click();
-  await expect(page.getByRole("heading", { name: "Golden record" })).toBeVisible();
+  await expect(page.getByTestId("golden-record")).toBeVisible();
 
   await tab(page, "Work queue");
   await expect(page).toHaveURL(/\/queue$/);
@@ -51,8 +51,8 @@ test("REPLAY: the queue reads the fixture and Case keeps its golden record acros
 
   await tab(page, "Case");
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { name: "Golden record" })).toBeVisible();
-  await expect(page.getByRole("article", { name: "ER FHIR record" })).toHaveCount(0);
+  await expect(page.getByTestId("golden-record")).toBeVisible();
+  await expect(page.getByRole("article", { name: "Emergency room record" })).toHaveCount(0);
   expect(api).toEqual([]);
 });
 
