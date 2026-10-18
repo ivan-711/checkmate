@@ -17,7 +17,9 @@ describe("Joined", () => {
   it("is the golden record, headed by the patient's name from the API, focusable after a link", () => {
     const html = render();
     expect(html).toContain('data-testid="golden-record"');
-    expect(html).toMatch(/<h2[^>]*id="golden-heading"[^>]*tabindex="-1"[^>]*>PLACEHOLDER-GIVEN PLACEHOLDER FAMILY</);
+    expect(html).toMatch(
+      /<h2[^>]*id="golden-heading"[^>]*tabindex="-1"[^>]*>PLACEHOLDER-GIVEN PLACEHOLDER FAMILY</,
+    );
     expect(html).toContain('aria-labelledby="golden-heading"');
     expect(html).toContain("Patient record · linked");
   });
@@ -36,16 +38,35 @@ describe("Joined", () => {
     const html = render();
     const tabs = html.match(/data-testid="crosswalk-chip"/g);
     expect(tabs).toHaveLength(2);
-    expect(html).toMatch(/data-testid="crosswalk-chip"[^>]*data-source-system="ER_FHIR"[\s\S]*?PLACEHOLDER-1/);
-    expect(html).toMatch(/data-testid="crosswalk-chip"[^>]*data-source-system="CLINIC_CSV"[\s\S]*?PLACEHOLDER-2/);
+    expect(html).toMatch(
+      /data-testid="crosswalk-chip"[^>]*data-source-system="ER_FHIR"[\s\S]*?PLACEHOLDER-1/,
+    );
+    expect(html).toMatch(
+      /data-testid="crosswalk-chip"[^>]*data-source-system="CLINIC_CSV"[\s\S]*?PLACEHOLDER-2/,
+    );
   });
 
   it("counts what the record holds when the golden fields carry clinical rows, and says nothing otherwise", () => {
     expect(render()).not.toContain("Holds");
     const clinical: GoldenField[] = [
-      { field: "allergy", value: { display: "penicillin V", status: "active" }, rule: "UNION", crosswalk: { sourceSystem: "CLINIC_CSV", sourceRecordId: "PLACEHOLDER-2" } },
-      { field: "activeMedicationOrder", value: { display: "amoxicillin", status: "active" }, rule: "UNION", crosswalk: { sourceSystem: "ER_FHIR", sourceRecordId: "PLACEHOLDER-1" } },
-      { field: "activeMedicationOrder", value: { display: "lisinopril", status: "active" }, rule: "UNION", crosswalk: { sourceSystem: "ER_FHIR", sourceRecordId: "PLACEHOLDER-1" } },
+      {
+        field: "allergy",
+        value: { display: "penicillin V", status: "active" },
+        rule: "UNION",
+        crosswalk: { sourceSystem: "CLINIC_CSV", sourceRecordId: "PLACEHOLDER-2" },
+      },
+      {
+        field: "activeMedicationOrder",
+        value: { display: "amoxicillin", status: "active" },
+        rule: "UNION",
+        crosswalk: { sourceSystem: "ER_FHIR", sourceRecordId: "PLACEHOLDER-1" },
+      },
+      {
+        field: "activeMedicationOrder",
+        value: { display: "lisinopril", status: "active" },
+        rule: "UNION",
+        crosswalk: { sourceSystem: "ER_FHIR", sourceRecordId: "PLACEHOLDER-1" },
+      },
     ];
     const withClinical: Entity = { ...entity, golden: [...(entity.golden ?? []), ...clinical] };
     expect(render({ entity: withClinical })).toMatch(/Holds[\s\S]*?1 allergy · 2 active orders/);

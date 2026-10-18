@@ -77,7 +77,9 @@ describe("seamPoints", () => {
 
 describe("seamPolygon", () => {
   it("writes a CSS polygon in px", () => {
-    expect(seamPolygon("er", false)).toMatch(/^polygon\((-?[\d.]+px -?[\d.]+px)(, ?-?[\d.]+px -?[\d.]+px)+\)$/);
+    expect(seamPolygon("er", false)).toMatch(
+      /^polygon\((-?[\d.]+px -?[\d.]+px)(, ?-?[\d.]+px -?[\d.]+px)+\)$/,
+    );
     expect(seamPolygon("cl", true)).toMatch(/^polygon\(/);
   });
 });

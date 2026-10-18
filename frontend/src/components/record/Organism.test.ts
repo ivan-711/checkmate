@@ -18,7 +18,9 @@ describe("Organism", () => {
     const html = render();
     const cardsHtml = html.match(/data-testid="source-card"/g);
     expect(cardsHtml).toHaveLength(2);
-    expect(html.indexOf('data-source-system="ER_FHIR"')).toBeLessThan(html.indexOf('data-source-system="CLINIC_CSV"'));
+    expect(html.indexOf('data-source-system="ER_FHIR"')).toBeLessThan(
+      html.indexOf('data-source-system="CLINIC_CSV"'),
+    );
     expect(html).not.toContain('data-testid="golden-record"');
     expect(html).not.toContain('data-testid="flag-card"');
     expect(html).not.toContain("org-node");

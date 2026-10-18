@@ -152,7 +152,11 @@ describe("reviewable", () => {
   });
 
   it("a rejection for not enough evidence reopens only after Resolve again", () => {
-    const rejected = { ...decision, status: "REJECTED" as const, reasonCode: "INSUFFICIENT_EVIDENCE" as const };
+    const rejected = {
+      ...decision,
+      status: "REJECTED" as const,
+      reasonCode: "INSUFFICIENT_EVIDENCE" as const,
+    };
     expect(reviewable(rejected, false)).toBe(false);
     expect(reviewable(rejected, true)).toBe(true);
   });

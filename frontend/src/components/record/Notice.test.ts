@@ -9,7 +9,13 @@ const render = (props: Partial<NoticeProps> = {}) =>
   renderToStaticMarkup(createElement(Notice, { alert, mode: "instant", ...props }));
 
 // The acceptance script's never-say list (eval/acceptance/g16.spec.ts).
-const NEVER_SAY = ["prevented", "would have died", "the ai caught", "contraindicated for this patient", "fatal"];
+const NEVER_SAY = [
+  "prevented",
+  "would have died",
+  "the ai caught",
+  "contraindicated for this patient",
+  "fatal",
+];
 
 /** Everything before the Details fold is what the notice shows without a click. */
 function split(html: string): { shown: string; folded: string } {

@@ -146,7 +146,9 @@ export function EvidenceRail({ detail, thresholds }: Props) {
               ) : (
                 <>
                   <Dots logit={c.logit} />
-                  <span className="text-right font-mono text-[14px] leading-none text-ink">{signed(c.logit)}</span>
+                  <span className="text-right font-mono text-[14px] leading-none text-ink">
+                    {signed(c.logit)}
+                  </span>
                 </>
               )}
             </li>

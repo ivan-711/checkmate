@@ -34,7 +34,10 @@ export interface OrganismProps {
 /** The stage change this render is showing: from the last stage to this one. Held in state so it
  * stays the same across re-renders until the stage changes again. */
 function useStageChange(stage: DeskState): { from: DeskState | undefined; to: DeskState } {
-  const [change, setChange] = useState<{ from: DeskState | undefined; to: DeskState }>({ from: undefined, to: stage });
+  const [change, setChange] = useState<{ from: DeskState | undefined; to: DeskState }>({
+    from: undefined,
+    to: stage,
+  });
   if (change.to !== stage) setChange({ from: change.to, to: stage });
   return change.to === stage ? change : { from: change.to, to: stage };
 }

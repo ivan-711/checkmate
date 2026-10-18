@@ -59,7 +59,10 @@ export function Header() {
             data-testid="synthetic-notice"
             className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-[13px] leading-[1.2] text-ink-2"
           >
-            <span aria-hidden="true" className="block h-[7px] w-[7px] rounded-full border-[1.5px] border-ink-2" />
+            <span
+              aria-hidden="true"
+              className="block h-[7px] w-[7px] rounded-full border-[1.5px] border-ink-2"
+            />
             Synthetic data. Not for clinical use.
           </p>
         </div>

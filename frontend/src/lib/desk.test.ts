@@ -138,7 +138,15 @@ describe("stageHead", () => {
   });
 
   it("never uses the words the flag must never say", () => {
-    const banned = ["prevented", "would have died", "the ai caught", "contraindicated", "fatal", "thinking", "diagnosed"];
+    const banned = [
+      "prevented",
+      "would have died",
+      "the ai caught",
+      "contraindicated",
+      "fatal",
+      "thinking",
+      "diagnosed",
+    ];
     const states: DeskState[] = ["idle", "held", "review", "confirm", "linked", "rejected"];
     for (const state of states) {
       const text = Object.values(stageHead(state, ctx)).join(" ").toLowerCase();

@@ -163,7 +163,9 @@ export interface EventGroup {
 }
 
 /** Consecutive events of one type collapse into one row with a count ("Pairs scored ×12"). */
-export function groupEvents(rows: readonly { eventId: string; eventType: string; ts: string }[]): EventGroup[] {
+export function groupEvents(
+  rows: readonly { eventId: string; eventType: string; ts: string }[],
+): EventGroup[] {
   const groups: EventGroup[] = [];
   for (const row of rows) {
     const last = groups[groups.length - 1];

@@ -77,14 +77,18 @@ export function bodyVariants(side: Side): Variants {
   return {
     linked: ({ mode }: FragmentCustom = AT_ONCE) =>
       mode === "morph"
-        ? { clipPath: seamPolygon(side, true), transition: { clipPath: { duration: FUSE_S, ease: EASE_FUSE } } }
+        ? {
+            clipPath: seamPolygon(side, true),
+            transition: { clipPath: { duration: FUSE_S, ease: EASE_FUSE } },
+          }
         : {},
   };
 }
 
 /** The field text sinks away as the fuse begins. */
 export const contentVariants: Variants = {
-  linked: ({ mode }: FragmentCustom = AT_ONCE) => (mode === "morph" ? { opacity: 0, transition: { duration: TEXT_OUT_S } } : {}),
+  linked: ({ mode }: FragmentCustom = AT_ONCE) =>
+    mode === "morph" ? { opacity: 0, transition: { duration: TEXT_OUT_S } } : {},
 };
 
 /** The fill deepens the tint into mulberry, then holds until the joined record is fully in: opacity
@@ -142,7 +146,17 @@ function markedName(name: string, side: Side, diff: NameDiff | null | undefined)
   );
 }
 
-function Row({ field, label, children, missing }: { field: string; label: string; children: ReactNode; missing?: boolean }) {
+function Row({
+  field,
+  label,
+  children,
+  missing,
+}: {
+  field: string;
+  label: string;
+  children: ReactNode;
+  missing?: boolean;
+}) {
   return (
     <div data-field={field}>
       <dt>{label}</dt>
@@ -193,11 +207,17 @@ export function Fragment({ card, side, diff, custom = AT_ONCE }: FragmentProps) 
           <CopyId id={record.sourceLocalId} />
           <h3 className="org-nm">
             <span data-field="given">{given ?? <span className="org-missing">Not given</span>}</span>
-            <span data-field="family">{family ? markedName(family, side, diff) : <span className="org-missing">Not given</span>}</span>
+            <span data-field="family">
+              {family ? markedName(family, side, diff) : <span className="org-missing">Not given</span>}
+            </span>
           </h3>
           <dl>
             <Row field="dob" label="Born" missing={!normalized.birthDate}>
-              {normalized.birthDate ? <span className="tabular-nums">{normalized.birthDate}</span> : "Not given"}
+              {normalized.birthDate ? (
+                <span className="tabular-nums">{normalized.birthDate}</span>
+              ) : (
+                "Not given"
+              )}
             </Row>
             <Row field="sex" label="Sex" missing={!normalized.sex}>
               {normalized.sex ? sexLabel(normalized.sex) : "Not given"}
@@ -206,7 +226,11 @@ export function Fragment({ card, side, diff, custom = AT_ONCE }: FragmentProps) 
               {address ?? "Not given"}
             </Row>
             <Row field="phone" label="Phone" missing={!normalized.phoneE164}>
-              {normalized.phoneE164 ? <span className="tabular-nums">{phoneLabel(normalized.phoneE164)}</span> : "Not given"}
+              {normalized.phoneE164 ? (
+                <span className="tabular-nums">{phoneLabel(normalized.phoneE164)}</span>
+              ) : (
+                "Not given"
+              )}
             </Row>
           </dl>
         </motion.div>

@@ -48,7 +48,10 @@ export function Notice({ alert, mode, cards = [] }: NoticeProps) {
   const [expanded, setExpanded] = useState(false);
   const { allergy, order } = flagFacts(alert);
   const nameOf = (system: string) =>
-    sourceName(system, cards.find((c) => c.record.sourceSystem === system)?.displayLabel ?? sourceSystemLabel(system));
+    sourceName(
+      system,
+      cards.find((c) => c.record.sourceSystem === system)?.displayLabel ?? sourceSystemLabel(system),
+    );
   const { initial, animate, transition } = entrance(mode);
   return (
     <motion.article
@@ -96,7 +99,9 @@ export function Notice({ alert, mode, cards = [] }: NoticeProps) {
                 </a>
               </p>
             )}
-            <p className="org-n-limits">{footerWithoutRule(alert.cardFooter, alert.ruleId, alert.ruleVersion)}</p>
+            <p className="org-n-limits">
+              {footerWithoutRule(alert.cardFooter, alert.ruleId, alert.ruleVersion)}
+            </p>
           </div>
         </details>
       </motion.div>

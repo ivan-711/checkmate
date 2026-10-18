@@ -3,10 +3,23 @@ import type { Band, CandidatePairDetail, ThresholdSet } from "@/api/types";
 import { scenario } from "@/data/scenario";
 import { BAND_RINGS, orbitPlacement, ringForBand } from "./orbit";
 
-const thresholds: ThresholdSet = { thresholdsId: "t", cLow: 0, cHigh: 2, autoLinkEnabled: false, isCalibrated: false };
+const thresholds: ThresholdSet = {
+  thresholdsId: "t",
+  cLow: 0,
+  cHigh: 2,
+  autoLinkEnabled: false,
+  isCalibrated: false,
+};
 const kiosk = "kiosk-record";
 
-function handoff(id: string, otherSystem: string, otherLabel: string, p: number, logit: number, band: Band): CandidatePairDetail {
+function handoff(
+  id: string,
+  otherSystem: string,
+  otherLabel: string,
+  p: number,
+  logit: number,
+  band: Band,
+): CandidatePairDetail {
   const { pair, recordA, recordB } = scenario.pair;
   return {
     ...scenario.pair,
@@ -18,8 +31,16 @@ function handoff(id: string, otherSystem: string, otherLabel: string, p: number,
       recordBId: `${id}-other`,
       decision: { ...pair.decision, p, logit, band },
     },
-    recordA: { ...recordA, record: { ...recordA.record, id: kiosk, sourceSystem: "AGENT_INTAKE" }, displayLabel: "Kiosk" },
-    recordB: { ...recordB, record: { ...recordB.record, id: `${id}-other`, sourceSystem: otherSystem }, displayLabel: otherLabel },
+    recordA: {
+      ...recordA,
+      record: { ...recordA.record, id: kiosk, sourceSystem: "AGENT_INTAKE" },
+      displayLabel: "Kiosk",
+    },
+    recordB: {
+      ...recordB,
+      record: { ...recordB.record, id: `${id}-other`, sourceSystem: otherSystem },
+      displayLabel: otherLabel,
+    },
   };
 }
 
@@ -45,7 +66,12 @@ describe("orbitPlacement", () => {
   });
 
   it("names the other record, never the kiosk record, whichever side it sits on", () => {
-    const flipped = { ...er, pair: { ...er.pair, recordAId: er.pair.recordBId, recordBId: kiosk }, recordA: er.recordB, recordB: er.recordA };
+    const flipped = {
+      ...er,
+      pair: { ...er.pair, recordAId: er.pair.recordBId, recordBId: kiosk },
+      recordA: er.recordB,
+      recordB: er.recordA,
+    };
     const { charts } = orbitPlacement([flipped], thresholds, kiosk);
     expect(charts[0].sourceSystem).toBe("ER_FHIR");
   });

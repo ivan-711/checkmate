@@ -21,7 +21,11 @@ export function StoryStepper() {
   const { desk, kiosk, facts } = useDesk();
   const current = currentStep(desk, kiosk, facts.flagRaised);
   return (
-    <ol data-testid="story-stepper" aria-label="Story" className="stepper flex items-center gap-1 whitespace-nowrap text-[14px]">
+    <ol
+      data-testid="story-stepper"
+      aria-label="Story"
+      className="stepper flex items-center gap-1 whitespace-nowrap text-[14px]"
+    >
       {STORY_STEPS.map((step, i) => {
         const status = stepStatus(step.id, current);
         return (
