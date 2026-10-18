@@ -75,9 +75,17 @@ _MESSAGES: dict[str, dict[Language, str]] = {
 }
 
 
+# backend.policy.decide names the allow keys by the short tool word.
+_KEY_ALIASES = {
+    "gate.allow.search": "gate.allow.search_patients",
+    "gate.allow.propose": "gate.allow.propose_new_chart",
+    "gate.allow.attach": "gate.allow.attach_history",
+}
+
+
 def message_for(message_key: str, outcome: PolicyOutcome, reason: PolicyReason | None, language: Language) -> str:
     """Template text for a gate decision; the key wins, the outcome/reason pair is the fallback."""
-    entry = _MESSAGES.get(message_key)
+    entry = _MESSAGES.get(_KEY_ALIASES.get(message_key, message_key))
     if entry is None:
         fallback = (
             f"gate.allow.{message_key}" if outcome == PolicyOutcome.ALLOW else f"gate.deny.{reason.value.lower()}"
