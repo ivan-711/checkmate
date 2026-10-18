@@ -144,7 +144,7 @@ def _script(
                 step_index=0,
                 latency_ms=TOOL_STEP_LATENCY_MS,
                 model=ToolCallModelStep(type="TOOL_CALL", tool_name="propose_new_chart", args=args),
-                expect=expect,
+                expect=expect.model_copy(),  # own instance: a shared one would take the last script's hash
             ),
             TranscriptStep(
                 step_index=1,
@@ -255,9 +255,12 @@ if __name__ == "__main__":
 def fill_hashes(transcript: Transcript, engine) -> Transcript:
     """Return a copy of ``transcript`` whose tool steps carry the engine's ToolResult hashes.
 
-    One fresh intake session per script (``turnIndex 0`` entries), every turn of that script in order.
-    The database must hold the records the scripts expect (the hero's Clinic record for the returning
-    patient); the gate decides, the recorder only observes.
+    One fresh intake session per script (``turnIndex 0`` entries), every turn of that script in order,
+    and what the script wrote (its session, handoff pairs, intake record) is purged before the next
+    script, because an intake record is itself a candidate for the next session with the same
+    demographics. Every hash is therefore recorded from the state a demo reset leaves: the database
+    must hold the records the scripts expect (the hero's Clinic record), nothing from earlier intakes.
+    The purge is why this only runs against a database whose name contains ``test``.
     """
     from backend.frontdesk import loop, store
     from backend.frontdesk.replay import RecordingAgentModel, ReplayAgentModel, TranscriptPins
@@ -270,6 +273,10 @@ def fill_hashes(transcript: Transcript, engine) -> Transcript:
         hero_scenario_sha256=transcript.hero_scenario_sha256,
         scenario_context_id=transcript.scenario_context_id,
     )
+    _require_test_database(engine)
+    # Record against a hash-free copy: a stale hash would make the inner adapter diverge mid-script
+    # and the steps after it would never be requested, let alone observed.
+    blank = _without_hashes(transcript)
     recorded: dict[tuple[int, str], list] = {}
     for first in (t for t in transcript.turns if t.turn_index == 0):
         language = _language_of(first)
@@ -287,7 +294,7 @@ def fill_hashes(transcript: Transcript, engine) -> Transcript:
             )
         with tempfile.TemporaryDirectory() as scratch:
             recorder = RecordingAgentModel(
-                ReplayAgentModel(transcript, pacing=False), Path(scratch) / "recording.json", pins
+                ReplayAgentModel(blank, pacing=False), Path(scratch) / "recording.json", pins
             )
             for turn in _script_turns(transcript, first):
                 loop.run_turn(
@@ -295,15 +302,23 @@ def fill_hashes(transcript: Transcript, engine) -> Transcript:
                 )
             for turn in recorder.transcript().turns:
                 recorded[(turn.turn_index, fold(turn.user_text_folded))] = turn.steps
-    filled = transcript.model_copy(deep=True)
+        _purge_intake_session(engine, session_id)
+    filled = _without_hashes(transcript)  # a hash this run did not observe is null, never a stale value
     for turn in filled.turns:
-        steps = recorded.get((turn.turn_index, fold(turn.user_text_folded)))
-        if steps is None:
-            continue
+        steps = recorded.get((turn.turn_index, fold(turn.user_text_folded)), [])
         for step, seen in zip(turn.steps, steps, strict=False):
             if step.expect is not None and seen.expect is not None:
                 step.expect.tool_result_sha256 = seen.expect.tool_result_sha256
     return filled
+
+
+def _without_hashes(transcript: Transcript) -> Transcript:
+    copy = transcript.model_copy(deep=True)
+    for turn in copy.turns:
+        for step in turn.steps:
+            if step.expect is not None:
+                step.expect.tool_result_sha256 = None
+    return copy
 
 
 def _language_of(turn: TranscriptTurn):
@@ -319,3 +334,37 @@ def _script_turns(transcript: Transcript, first: TranscriptTurn) -> list[Transcr
     """The script starting at ``first``: turn 0 then every higher turn index (one script per index > 0)."""
     later = sorted((t for t in transcript.turns if t.turn_index > 0), key=lambda t: t.turn_index)
     return [first, *later]
+
+
+def _require_test_database(engine) -> None:
+    name = (engine.url.database or "").rsplit("/", 1)[-1]
+    if "test" not in name:
+        raise SystemExit(f"--fill-hashes purges the intake rows it writes; refusing to run on database {name!r}")
+
+
+def _purge_intake_session(engine, session_id) -> None:
+    """Remove one fill run's rows: events, handoff pairs and decisions, the intake record, the session."""
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        record = conn.execute(
+            text("SELECT intake_record_id FROM intake_session WHERE id = :s"), {"s": session_id}
+        ).scalar()
+        pairs = [
+            r[0]
+            for r in conn.execute(
+                text(
+                    "SELECT id FROM candidate_pair WHERE intake_session_id = :s OR record_a_id = :r OR record_b_id = :r"
+                ),
+                {"s": session_id, "r": record},
+            )
+        ]
+        conn.execute(
+            text("DELETE FROM event_log WHERE intake_session_id = :s OR pair_id = ANY(:p)"),
+            {"s": session_id, "p": pairs},
+        )
+        conn.execute(text("DELETE FROM match_decision WHERE pair_id = ANY(:p)"), {"p": pairs})
+        conn.execute(text("DELETE FROM candidate_pair WHERE id = ANY(:p)"), {"p": pairs})
+        conn.execute(text("DELETE FROM intake_session WHERE id = :s"), {"s": session_id})
+        if record is not None:
+            conn.execute(text("DELETE FROM source_record WHERE id = :r"), {"r": record})

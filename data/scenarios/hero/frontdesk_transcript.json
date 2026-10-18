@@ -1,19 +1,20 @@
 {
   "transcriptVersion": 1,
   "kind": "AUTHORED",
-  "recordedAt": "2026-10-18T00:11:21Z",
+  "recordedAt": "2026-10-18T01:02:46Z",
   "modelId": "authored (not a recorded model run)",
   "promptVersion": "fd-prompt/1",
   "toolSchemaVersion": "fd-tools/1",
   "scorerVersion": "handset-1",
   "thresholdSetId": "provisional-1",
-  "heroScenarioSha256": "6a977f64c6a51d65460ec4467fb850bb51b7fd3823ba4a2e19828a511890b60f",
+  "heroScenarioSha256": "e761581beb49f1023e4f7d21c02bc94a3e7752cdfdb7accfdb0bd1ed5d50dd36",
   "scenarioContextId": "hero-er-arrival",
   "authoring": {
     "constructed": true,
     "note": "authored from the spike's verified call shapes; not a recorded model run",
     "heroEntityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
-    "heroRecordId": "d2b173e2-0e9a-5021-a674-d1b4f730ce3d"
+    "heroRecordId": "d2b173e2-0e9a-5021-a674-d1b4f730ce3d",
+    "toolResultHashesFilledAt": "2026-10-18T01:02:46+00:00"
   },
   "turns": [
     {
@@ -48,7 +49,7 @@
           "expect": {
             "gateOutcome": "DENY",
             "reasonCode": "CANDIDATE_IN_REVIEW_OR_HIGHER",
-            "toolResultSha256": null
+            "toolResultSha256": "a4cd6b7006381d2aeca921b2ca57628f9b7bdeffadd38c958326c57bb96adba0"
           }
         },
         {
@@ -94,7 +95,7 @@
           "expect": {
             "gateOutcome": "DENY",
             "reasonCode": "CANDIDATE_IN_REVIEW_OR_HIGHER",
-            "toolResultSha256": null
+            "toolResultSha256": "7b4759ebeb614dc6ea9aceba844331c6db1f78dda085fc147b02fc0adba0fcc7"
           }
         },
         {
@@ -138,7 +139,7 @@
           "expect": {
             "gateOutcome": "ALLOW",
             "reasonCode": null,
-            "toolResultSha256": null
+            "toolResultSha256": "51ec6a320837bb50a94e15649312e2461043763fca247cf3deddff94f95476b6"
           }
         },
         {
@@ -182,7 +183,7 @@
           "expect": {
             "gateOutcome": "ALLOW",
             "reasonCode": null,
-            "toolResultSha256": null
+            "toolResultSha256": "69317d54f41d663509a5d9da3a969cd72a2d0d291af3b9cf2650753fe87a04d0"
           }
         },
         {

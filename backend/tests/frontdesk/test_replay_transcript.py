@@ -123,6 +123,12 @@ def test_assistant_text_is_plain_and_never_claims_a_chart(transcript):
 def test_authoring_script_reproduces_the_committed_file(tmp_path: Path):
     built = author_transcript.build_transcript(HERO_DIR)
     committed = load_transcript(TRANSCRIPT)
+    # the hashes and the fill timestamp come from a --fill-hashes run, not from the hero files
+    for turn in committed.turns:
+        for step in turn.steps:
+            if step.expect is not None:
+                step.expect.tool_result_sha256 = None
+    committed.authoring.pop("toolResultHashesFilledAt", None)
     assert built.model_dump(exclude={"recorded_at"}) == committed.model_dump(exclude={"recorded_at"})
     out = tmp_path / "t.json"
     author_transcript.write_transcript(built, out)
@@ -131,36 +137,36 @@ def test_authoring_script_reproduces_the_committed_file(tmp_path: Path):
 
 def test_fill_hashes_records_real_result_hashes_that_then_replay_cleanly(hero_clinic_record, intake_sessions):
     """The recorder around the replay adapter learns each ToolResult hash from the engine; the filled
-    transcript then plays through the routes with the divergence check active and never diverges."""
+    transcript then plays through the loop with the divergence check active and never diverges."""
     import uuid
 
     from sqlalchemy import text as sql
 
-    from backend.frontdesk.replay import ReplayAgentModel, TextModelStep
-    from backend.tests.frontdesk.conftest import engine
-
-    filled = author_transcript.fill_hashes(load_transcript(TRANSCRIPT), engine)
-    with engine.connect() as conn:  # fill_hashes opened its own sessions; collect them for the purge
-        intake_sessions.extend(
-            str(r[0])
-            for r in conn.execute(
-                sql("SELECT id FROM intake_session WHERE scenario_context_id = :c AND model_id IS NULL"),
-                {"c": filled.scenario_context_id},
-            )
-        )
-    for turn in filled.turns:
-        tool_steps = [s for s in turn.steps if isinstance(s.model, ToolCallModelStep)]
-        assert tool_steps and all(
-            s.expect is not None and s.expect.tool_result_sha256 and len(s.expect.tool_result_sha256) == 64
-            for s in tool_steps
-        )
-        assert all(s.expect is None for s in turn.steps if isinstance(s.model, TextModelStep))
-
-    # replay the filled transcript: the text step after each tool call requires the hash to match
     from backend.frontdesk import loop, store
+    from backend.frontdesk.replay import ReplayAgentModel, TextModelStep
+    from backend.tests.frontdesk.conftest import engine, purge_session
     from contracts.models.intake import AgentMode, IntakeTurn, TurnRequest
     from contracts.models.policy import Language
 
+    filled = author_transcript.fill_hashes(load_transcript(TRANSCRIPT), engine)
+    with engine.connect() as conn:  # fill_hashes purges its own sessions and intake records
+        left = conn.execute(
+            sql("SELECT count(*) FROM intake_session WHERE scenario_context_id = :c"), {"c": filled.scenario_context_id}
+        ).scalar_one()
+    assert left == 0
+    hashes = set()
+    for turn in filled.turns:
+        tool_steps = [s for s in turn.steps if isinstance(s.model, ToolCallModelStep)]
+        assert tool_steps
+        for step in tool_steps:
+            assert step.expect is not None and step.expect.tool_result_sha256
+            assert len(step.expect.tool_result_sha256) == 64
+            hashes.add(step.expect.tool_result_sha256)
+        assert all(s.expect is None for s in turn.steps if isinstance(s.model, TextModelStep))
+    assert len(hashes) == len(filled.turns), "ES and EN results differ by message, so every script has its own hash"
+
+    # Replay from the same clean state the fill used: an intake record is a candidate for the next
+    # session with the same demographics, so every session is purged right after its turn.
     model = ReplayAgentModel(filled, pacing=False)
     for turn in filled.turns:
         sid = uuid.uuid4()
@@ -176,10 +182,18 @@ def test_fill_hashes_records_real_result_hashes_that_then_replay_cleanly(hero_cl
                 tool_schema_version=filled.tool_schema_version,
                 model_id=None,
             )
-        intake_sessions.append(str(sid))
         _, response = loop.run_turn(
             engine, model, session_id=sid, key=str(uuid.uuid4()), body=TurnRequest(text=turn.user_text)
         )
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            purge_session(conn, str(sid))
         played = IntakeTurn.model_validate(response)
         assert played.degraded is None, played.degraded
         assert played.assistant_text == turn.steps[-1].model.text
+
+
+def test_built_scripts_do_not_share_expectation_objects():
+    """A shared StepExpect would make every script take the last recorded hash."""
+    built = author_transcript.build_transcript(HERO_DIR)
+    expects = [id(t.steps[0].expect) for t in built.turns]
+    assert len(set(expects)) == len(expects)
