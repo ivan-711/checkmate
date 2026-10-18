@@ -47,7 +47,11 @@ class GeminiAgentModel:
         self._http_options = types.HttpOptions(
             timeout=MODEL_TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=SDK_ATTEMPTS)
         )
-        self._client = Client(api_key=api_key, http_options=self._http_options)
+        try:
+            self._client = Client(api_key=api_key, http_options=self._http_options)
+        except Exception as exc:  # noqa: BLE001 — a client that cannot be built degrades each step, never a 500
+            log.warning("gemini client unavailable exception_class=%s", type(exc).__name__)
+            self._client = None
 
     def _config(self, req: ModelRequest) -> types.GenerateContentConfig:
         declarations = [
@@ -65,11 +69,14 @@ class GeminiAgentModel:
         )
 
     def next_step(self, req: ModelRequest) -> ModelStep:
+        if self._client is None:
+            return ErrorStep(kind="UNAVAILABLE", retryable=False, mode=self.mode)
         started = time.perf_counter()
         try:
             response = self._client.models.generate_content(
                 model=self._model_id, contents=contents_from_messages(req.messages), config=self._config(req)
             )
+            return step_from_response(response, _elapsed_ms(started), self.mode)
         except httpx.TimeoutException as exc:
             log.warning("gemini timeout exception_class=%s", type(exc).__name__)
             return ErrorStep(kind="TIMEOUT", retryable=True, mode=self.mode)
@@ -83,7 +90,10 @@ class GeminiAgentModel:
             # failure (connection refused, DNS) is none of those.
             log.warning("gemini transport error exception_class=%s", type(exc).__name__)
             return ErrorStep(kind="UNAVAILABLE", retryable=False, mode=self.mode)
-        return step_from_response(response, _elapsed_ms(started), self.mode)
+        except Exception as exc:  # noqa: BLE001 — a parse or auth error from the library degrades the turn
+            # Not retried: an unknown failure is not one of ADR-016 §8's retryable cases.
+            log.warning("gemini unexpected error exception_class=%s", type(exc).__name__)
+            return ErrorStep(kind="UNAVAILABLE", retryable=False, mode=self.mode)
 
 
 def retry_after_seconds(exc: errors.APIError) -> float | None:

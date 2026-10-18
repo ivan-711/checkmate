@@ -7,8 +7,9 @@ import uuid
 import jsonschema
 from sqlalchemy import text
 
+from backend.frontdesk import gemini
 from backend.frontdesk.tools import tool_result_schema
-from backend.tests.frontdesk.conftest import API, create_session, error, new_key, tool_call, turn
+from backend.tests.frontdesk.conftest import API, HOLDER, create_session, error, new_key, tool_call, turn
 from backend.tests.policy.seed import CLINIC_DEMOGRAPHICS, ER_DEMOGRAPHICS, insert_record
 from backend.tests.policy.test_gate_db import PROPOSE_ARGS, UNRELATED_ARGS, UNRELATED_TEXT, USER_TEXT
 from contracts.models.common import SourceKind
@@ -372,3 +373,27 @@ def test_four_identical_searches_then_text_never_let_the_model_text_through(clie
 def test_get_unknown_session_is_404(client):
     r = client.get(f"{API}/intake-sessions/{uuid.uuid4()}")
     assert r.status_code == 404 and r.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_unexpected_library_exception_degrades_the_turn_not_a_500(client, fake, db_conn, cleanup, monkeypatch):
+    """The real LIVE adapter over a client whose call raises something that is neither an API error
+    nor an httpx error: the turn degrades to the template with an AGENT_TURN_DEGRADED row."""
+
+    class _Models:
+        def generate_content(self, **kwargs):
+            raise RuntimeError("response parse failed")
+
+    class _Client:
+        models = _Models()
+
+    monkeypatch.setattr(gemini, "Client", lambda **kwargs: _Client())
+    HOLDER.model = gemini.GeminiAgentModel(api_key="not-a-real-key", model_id="fixture-model")
+    session = create_session(client, "EN")
+    cleanup[0].append(session["id"])
+    r = turn(client, session["id"], "Hello")
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["degraded"] == "UNAVAILABLE" and body["assistantTextSource"] == "TEMPLATE"
+    assert body["assistantText"] == "One moment, a registrar will help you."
+    degraded = events(db_conn, session["id"], "AGENT_TURN_DEGRADED")
+    assert len(degraded) == 1 and degraded[0]._mapping["outcome"] == "UNAVAILABLE"

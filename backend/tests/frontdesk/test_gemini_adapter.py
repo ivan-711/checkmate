@@ -299,3 +299,23 @@ def test_auto_pins_replay_without_a_key_or_model_id_and_never_probes(monkeypatch
     assert adapters.pin_mode(_auto_settings(key_present=False)) == AgentMode.REPLAY
     monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-key")
     assert adapters.pin_mode(_auto_settings(model_id=None)) == AgentMode.REPLAY
+
+
+@pytest.mark.parametrize("outcome", [RuntimeError("boom SECRET-DETAILS"), ValueError("bad SECRET-DETAILS"), object()])
+def test_any_other_library_exception_degrades_instead_of_raising(monkeypatch, caplog, outcome):
+    """Second layer, item 3: a parse error, an auth error or anything else from the library (or a
+    response the mapper cannot read) is an ErrorStep, never an exception and never a 500."""
+    adapter, _ = _adapter(monkeypatch, outcome)
+    with caplog.at_level("WARNING", logger="checkmate.frontdesk.gemini"):
+        step = adapter.next_step(_request())
+    assert step == ErrorStep(kind="UNAVAILABLE", retryable=False, mode=AgentMode.LIVE)
+    assert "SECRET-DETAILS" not in caplog.text and "not-a-real-key" not in caplog.text
+
+
+def test_a_client_that_cannot_be_built_degrades_every_step(monkeypatch):
+    def broken(**kwargs):
+        raise ValueError("bad client options")
+
+    monkeypatch.setattr(gemini, "Client", broken)
+    adapter = gemini.GeminiAgentModel(api_key="not-a-real-key", model_id="fixture-model")
+    assert adapter.next_step(_request()) == ErrorStep(kind="UNAVAILABLE", retryable=False, mode=AgentMode.LIVE)
