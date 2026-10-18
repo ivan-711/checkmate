@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CheckMate Open Graph card</title>
+    <style>
+      /* CONCEPT.md §4 tokens. The render runs outside the app's stylesheet, so render-assets.mjs
+         fills them in from one table; nothing here is a hex of its own. */
+      :root {
+        --mulberry: {{mulberry}};
+        --porcelain: {{porcelain}};
+        --ink: {{ink}};
+        --ink-2: {{ink2}};
+      }
+      @font-face {
+        font-family: "Bricolage Grotesque Variable";
+        src: url("{{fontDisplay}}") format("woff2");
+        font-weight: 200 800;
+      }
+      @font-face {
+        font-family: "Instrument Sans Variable";
+        src: url("{{fontText}}") format("woff2");
+        font-weight: 400 700;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        box-sizing: border-box;
+        width: {{width}}px;
+        height: {{height}}px;
+        padding: 0 96px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        background: var(--porcelain);
+        color: var(--ink);
+        font-family: "Instrument Sans Variable", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      /* The top-bar lockup at card scale: the mark carries the mulberry, the wordmark stays ink. */
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 34px;
+        color: var(--mulberry);
+      }
+      .brand svg {
+        width: 132px;
+        height: 132px;
+        flex: none;
+      }
+      h1 {
+        margin: 0;
+        font: 720 124px/1 "Bricolage Grotesque Variable", sans-serif;
+        letter-spacing: -0.035em;
+        color: var(--ink);
+      }
+      p {
+        margin: 44px 0 0;
+        font: 400 46px/1.25 "Instrument Sans Variable", sans-serif;
+        color: var(--ink-2);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="brand">
+      {{mark}}
+      <h1>CheckMate</h1>
+    </div>
+    <p>A bilingual AI check-in kiosk<br />that can’t open duplicate charts</p>
+  </body>
+</html>

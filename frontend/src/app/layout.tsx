@@ -16,9 +16,19 @@ const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
 });
 
+const PITCH = "A bilingual AI check-in kiosk that can’t open duplicate charts";
+
 export const metadata: Metadata = {
+  // The demo has no public origin; link previews resolve /og.png against the dev server.
+  metadataBase: new URL("http://localhost:3000"),
   title: "CheckMate",
   description: "Synthetic-data prototype for identity reconciliation. Not for clinical use.",
+  // public/og.png, rendered by scripts/render-assets.mjs from the mark and the pitch.
+  openGraph: {
+    title: "CheckMate",
+    description: PITCH,
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "CheckMate. " + PITCH }],
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
