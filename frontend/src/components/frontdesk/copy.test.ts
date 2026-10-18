@@ -1,20 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { COPY, kioskField, sourceSystemLabel } from "./copy";
+import { FEATURE_LABELS } from "@/lib/display";
+import { COPY, sourceSystemLabel } from "./copy";
 
 describe("FrontDesk copy", () => {
-  it("maps scorer features to the five fields the kiosk names", () => {
-    expect(kioskField("given_jw_folded")).toBe("name");
-    expect(kioskField("family_metaphone")).toBe("name");
-    expect(kioskField("dob_day_month_swap")).toBe("dob");
-    expect(kioskField("missing_phone")).toBe("phone");
-    expect(kioskField("zip_match")).toBe("address");
-    expect(kioskField("sex_match")).toBe("sex");
-    expect(kioskField("something_new")).toBeNull();
+  it("names every feature the registrar rail names, with the rail's words in English", () => {
+    expect(COPY.en.feature).toBe(FEATURE_LABELS);
+    expect(Object.keys(COPY.es.feature).sort()).toEqual(Object.keys(FEATURE_LABELS).sort());
+    expect(COPY.es.feature.given_jw_folded).toBe("Nombre, sin contar acentos");
+    expect(COPY.es.feature.family_dmeta).toBe("Apellido, pronunciación");
+    expect(COPY.es.feature).not.toHaveProperty("family_nickname"); // given names only, as in the rail
   });
 
   it("has the same keys in English and Spanish", () => {
     expect(Object.keys(COPY.es).sort()).toEqual(Object.keys(COPY.en).sort());
-    expect(COPY.es.field.dob).toBe("Fecha de nacimiento");
+    expect(COPY.es.feature.dob_exact).toBe("Fecha de nacimiento");
     expect(COPY.es.band.REVIEW).toBe("REVISIÓN");
   });
 

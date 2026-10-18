@@ -17,8 +17,9 @@ const NAME_FEATURES = {
 
 // The features backend/core/features.py computes for each name; only given names have
 // nickname and initial checks.
-const GIVEN_FEATURES = Object.keys(NAME_FEATURES) as (keyof typeof NAME_FEATURES)[];
-const FAMILY_FEATURES = GIVEN_FEATURES.filter((f) => f !== "nickname" && f !== "initial");
+export type NameFeature = keyof typeof NAME_FEATURES;
+export const GIVEN_FEATURES = Object.keys(NAME_FEATURES) as NameFeature[];
+export const FAMILY_FEATURES = GIVEN_FEATURES.filter((f) => f !== "nickname" && f !== "initial");
 
 function nameLabels(
   prefix: "given" | "family",
@@ -59,10 +60,14 @@ export interface RankedContribution extends Contribution {
   missing: boolean;
 }
 
-/** Sorted by absolute weight; a missing feature is "no evidence", never negative. */
-export function rankContributions(contributions: Contribution[]): RankedContribution[] {
+/** Sorted by absolute weight; a missing feature is "no evidence", never negative. The kiosk
+ * passes its own language's labels. */
+export function rankContributions(
+  contributions: Contribution[],
+  labels: Record<string, string> = FEATURE_LABELS,
+): RankedContribution[] {
   return contributions
-    .map((c) => ({ ...c, label: FEATURE_LABELS[c.feature] ?? c.feature, missing: c.value == null }))
+    .map((c) => ({ ...c, label: labels[c.feature] ?? c.feature, missing: c.value == null }))
     .sort((a, b) => Number(a.missing) - Number(b.missing) || Math.abs(b.logit) - Math.abs(a.logit));
 }
 

@@ -67,8 +67,13 @@ function Turn({
           </li>
         );
       })}
-      {handedOff && <Agent text={t.handoff} automatic t={t} />}
-      <Agent text={turn.assistantText} automatic={turn.assistantTextSource === "TEMPLATE"} t={t} />
+      {/* A hand-off closes the turn with the gate's automatic line (UX 3.11). The agent's reply
+          would say the same thing again, and the model never speaks for the gate. */}
+      {handedOff ? (
+        <Agent text={t.handoff} automatic t={t} />
+      ) : (
+        <Agent text={turn.assistantText} automatic={turn.assistantTextSource === "TEMPLATE"} t={t} />
+      )}
     </>
   );
 }

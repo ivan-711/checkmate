@@ -116,6 +116,28 @@ describe("FixtureSource FrontDesk intake", () => {
     );
   });
 
+  it("the AGENT_GATE tile counts each outcome in the 5-minute bucket it happened in, as agent_gate_5m does", async () => {
+    const s = new FixtureSource(scenario, () => new Date("2026-10-18T03:13:42Z"));
+    const { id } = await s.startIntake("EN");
+    await s.sendTurn(id, utteranceEn, "k1");
+    const counted = gateTile(await s.getTiles()).buckets.filter((b) => b.count > 0);
+    expect(counted.map((b) => [b.bucket, b.series, b.count])).toEqual([
+      ["2026-10-18T03:10:00Z", "ALLOW", 1],
+      ["2026-10-18T03:10:00Z", "DENY", 1],
+    ]);
+  });
+
+  it("the AGENT_GATE tile shows only the last windowMinutes, as the API does", async () => {
+    let now = new Date("2026-10-18T03:13:42Z");
+    const s = new FixtureSource(scenario, () => now);
+    const { id } = await s.startIntake("EN");
+    await s.sendTurn(id, utteranceEn, "k1");
+    now = new Date("2026-10-18T04:16:00Z"); // the 03:10 bucket ended at 03:15, over an hour ago
+    const tile = gateTile(await s.getTiles());
+    expect(tile.buckets.filter((b) => b.count > 0)).toEqual([]);
+    expect(tile.total).toBe(0);
+  });
+
   it("getCandidatePair reads the held pair with its current decision", async () => {
     const s = new FixtureSource(scenario, () => NOW);
     const id = scenario.pair.pair.id;
