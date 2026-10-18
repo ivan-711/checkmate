@@ -108,6 +108,75 @@ def test_contents_rebuilt_with_user_role_for_function_responses(monkeypatch):
     assert contents[2].parts[0].function_response.response == {"status": "ALLOWED"}
 
 
+class _ScriptedModels:
+    """Answers each generate call with the next scripted response and keeps the contents it was sent."""
+
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = []
+
+    def generate_content(self, **kwargs):
+        self.calls.append(kwargs)
+        return self.responses.pop(0)
+
+
+def _scripted_adapter(monkeypatch, responses) -> tuple[gemini.GeminiAgentModel, _ScriptedModels]:
+    client = _Client(None)
+    client.models = _ScriptedModels(responses)
+    monkeypatch.setattr(gemini, "Client", lambda **kwargs: client)
+    return gemini.GeminiAgentModel(api_key="not-a-real-key", model_id="fixture-model"), client.models
+
+
+def _signed_call(name: str, signature: bytes, call_id: str) -> types.Part:
+    return types.Part(
+        function_call=types.FunctionCall(name=name, args={"evidence": {}}, id=call_id), thought_signature=signature
+    )
+
+
+def _second_call_contents(monkeypatch, first_parts) -> tuple[types.Content, list[types.Content]]:
+    """Run two steps the way the loop does: the tool call, then the tool result sent back."""
+    first = _response(first_parts)
+    adapter, models = _scripted_adapter(monkeypatch, [first, _response([types.Part.from_text(text="Gracias")])])
+    user = Message(role="user", text="Me llamo Sofia")
+    step = adapter.next_step(_request((user,)))
+    assert isinstance(step, ToolCallStep)
+    adapter.next_step(
+        _request(
+            (
+                user,
+                Message(role="model", tool_call=step),
+                Message(role="function", tool_call=step, tool_result={"status": "ALLOWED"}),
+            )
+        )
+    )
+    return first.candidates[0].content, models.calls[1]["contents"]
+
+
+def test_second_call_echoes_the_models_function_call_content_with_its_thought_signature(monkeypatch):
+    """Measured live 20:36 (gemini-3.6-flash): rebuilding the call without its thought signature gets
+    400 INVALID_ARGUMENT "Function call is missing a thought_signature in functionCall parts" on the
+    second call of every turn. The model's own Content goes back unchanged within the turn."""
+    original, contents = _second_call_contents(
+        monkeypatch, [_signed_call("search_patients", b"opaque-signature", "call-1")]
+    )
+    assert [c.role for c in contents] == ["user", "model", gemini.FUNCTION_RESPONSE_ROLE]
+    assert contents[1] == original
+    assert contents[1].parts[0].thought_signature == b"opaque-signature"
+    assert contents[2].parts[0].function_response.id == "call-1"
+    assert contents[2].parts[0].function_response.name == "search_patients"
+
+
+def test_parallel_calls_echo_only_the_first_call_so_counts_match(monkeypatch):
+    """The loop answers one call per step; the API needs one response per call it is shown, and only
+    the first call of a parallel set carries the signature."""
+    thought = types.Part(text="plan", thought=True)
+    first = _signed_call("search_patients", b"sig-first", "call-1")
+    second = types.Part(function_call=types.FunctionCall(name="propose_new_chart", args={}, id="call-2"))
+    _, contents = _second_call_contents(monkeypatch, [thought, first, second])
+    assert contents[1].parts == [thought, first]
+    assert [c.role for c in contents] == ["user", "model", gemini.FUNCTION_RESPONSE_ROLE]
+
+
 @pytest.mark.parametrize(
     "exc, kind, retryable",
     [

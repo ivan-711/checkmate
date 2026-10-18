@@ -6,7 +6,7 @@ Pinned in Q1-INTERFACES.md (Q1.2 -> Q1.4). Adapters never raise to the loop: eve
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, Protocol
 from uuid import UUID
 
@@ -32,6 +32,10 @@ class ToolCallStep:
     model_call_id: str | None
     latency_ms: int
     mode: AgentMode
+    # LIVE only: the model's own reply content, opaque to the loop, echoed back unchanged on the next
+    # call in the same turn (Gemini 3 rejects a function call sent back without its thought signature).
+    # Kept in memory for the turn; never stored, never compared.
+    model_content: object | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True)

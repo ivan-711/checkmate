@@ -166,15 +166,34 @@ def probe_live(*, api_key: str, model_id: str) -> bool:
         return False
 
 
+def echo_content(content: types.Content | None) -> types.Content | None:
+    """The model's reply content to send back with this step's function response, as returned.
+
+    Gemini 3 validates the thought signature on the current turn's functionCall parts and answers
+    400 INVALID_ARGUMENT when it is missing, so the content is not rebuilt. Calls after the first are
+    dropped: the loop answers one call per step, the API wants one response per call it is shown,
+    and only the first call of a parallel set carries the signature."""
+    parts = (content.parts or []) if content is not None else []
+    first = next((i for i, p in enumerate(parts) if p.function_call is not None), None)
+    if first is None:
+        return None
+    kept = parts[: first + 1] + [p for p in parts[first + 1 :] if p.function_call is None]
+    return content if len(kept) == len(parts) else content.model_copy(update={"parts": kept})
+
+
 def contents_from_messages(messages: tuple[Message, ...]) -> list[types.Content]:
-    """Rebuild the conversation for one call: user turns, the model's own tool calls echoed back,
-    and one function response per call with the role the live API accepts."""
+    """Rebuild the conversation for one call: user turns, the model's own tool-call content echoed
+    back unchanged (thought signature included), and one function response per call with the role
+    the live API accepts. Earlier turns carry only text, so no signature is needed for them."""
     contents: list[types.Content] = []
     for m in messages:
         if m.role == "user":
             contents.append(types.Content(role="user", parts=[types.Part.from_text(text=m.text or "")]))
         elif m.role == "model":
-            if m.tool_call is not None:
+            if m.tool_call is not None and isinstance(m.tool_call.model_content, types.Content):
+                contents.append(m.tool_call.model_content)
+            elif m.tool_call is not None:
+                # REPLAY steps carry no model content; LIVE always does (see echo_content).
                 part = types.Part.from_function_call(name=m.tool_call.tool_name, args=dict(m.tool_call.args))
                 if m.tool_call.model_call_id:
                     part.function_call.id = m.tool_call.model_call_id
@@ -211,6 +230,7 @@ def step_from_response(response: types.GenerateContentResponse, latency_ms: int,
             model_call_id=call.id,
             latency_ms=latency_ms,
             mode=mode,
+            model_content=echo_content(first.content),
         )
     text = (response.text or "").strip()
     if not text:
