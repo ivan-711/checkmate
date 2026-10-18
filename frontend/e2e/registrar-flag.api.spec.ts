@@ -46,12 +46,16 @@ test("approving both held pairs: the approval that raises the flag shows it, and
   // Read from the API's alert: an allergy with its reaction, an active order, each with its source.
   await expect(headline).toHaveText(/^\S.* allergy \(.+\) from .+ · active \S.* order from .+$/);
   await expect(headline).not.toContainText("Documented allergy");
-  await expect(summary.getByTestId("registrar-flag-count")).toHaveText("1 allergy surfaced");
+  await expect(summary.getByTestId("registrar-flag-count")).toHaveText("1 safety flag on the linked chart");
   const openCase = summary.getByRole("link", { name: "Open case" });
   await expect(openCase).toBeFocused();
   await expect(summary).toBeInViewport();
   await expect(page.getByRole("status")).toContainText("Link approved. Flagged for clinician review:");
   await expect(summary.locator("[aria-live], [role=alert], [role=status]")).toHaveCount(0);
+  // Nothing in the summary widens the page (the chip's tooltip once ran 23 px past the edge).
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+  ).toBeLessThanOrEqual(0);
   const text = ((await headline.textContent()) ?? "").trim();
 
   await openCase.click();

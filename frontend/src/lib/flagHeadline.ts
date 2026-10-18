@@ -52,13 +52,15 @@ export function flagFacts(alert: Pick<SafetyAlert, "cardText">): { allergy: stri
   };
 }
 
-/** One line for a raised flag, e.g. "Penicillin V allergy (anaphylaxis) · active amoxicillin order". */
+/** One line for a flag, e.g. "Penicillin V allergy (anaphylaxis) · active amoxicillin order". */
 export function flagHeadline(alert: Pick<SafetyAlert, "cardText">): string {
   const { allergy, order } = flagFacts(alert);
   return `${allergy} · ${order}`;
 }
 
-/** "1 allergy surfaced", "2 allergies surfaced": one per alert the approval raised. */
-export function surfacedLine(count: number): string {
-  return `${count} ${count === 1 ? "allergy" : "allergies"} surfaced`;
+/** Counts flags, not allergies: one alert is one allergy-and-order finding, so one allergy against
+ * two orders is two flags. The review response lists every active flag on the linked chart (kept
+ * ones included), so the line says where the flags are, never that this approval made them. */
+export function flagCountLine(count: number): string {
+  return `${count} safety ${count === 1 ? "flag" : "flags"} on the linked chart`;
 }

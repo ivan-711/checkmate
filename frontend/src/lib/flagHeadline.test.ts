@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { scenario } from "@/data/scenario";
-import { flagHeadline, surfacedLine } from "./flagHeadline";
+import { flagCountLine, flagHeadline } from "./flagHeadline";
 
 // Card texts in the shapes backend/rule/bl_amox_01.py renders (rule v1): tier A carries the label
 // citation, tier B does not; refs are FHIR ids or CSV rows; the reaction is "<name>, <severity>",
@@ -108,9 +108,9 @@ describe("flagHeadline", () => {
   });
 });
 
-describe("surfacedLine", () => {
-  it("counts the allergies an approval surfaced, in the singular and the plural", () => {
-    expect(surfacedLine(1)).toBe("1 allergy surfaced");
-    expect(surfacedLine(2)).toBe("2 allergies surfaced");
+describe("flagCountLine", () => {
+  it("counts flags (one per allergy-and-order alert) in the singular and the plural", () => {
+    expect(flagCountLine(1)).toBe("1 safety flag on the linked chart");
+    expect(flagCountLine(2)).toBe("2 safety flags on the linked chart");
   });
 });

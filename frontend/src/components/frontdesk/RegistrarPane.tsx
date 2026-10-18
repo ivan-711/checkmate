@@ -13,13 +13,13 @@ import { FlagHeadline } from "@/components/ui/FlagHeadline";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { differingFields } from "@/lib/display";
-import { flagHeadline, surfacedLine } from "@/lib/flagHeadline";
+import { flagCountLine, flagHeadline } from "@/lib/flagHeadline";
 import { COPY } from "./copy";
-import { HANDOFF_KEY, handoffPairKey, raisedAlertsKey, useIntakeSession } from "./intake";
+import { approvalAlertsKey, HANDOFF_KEY, handoffPairKey, useIntakeSession } from "./intake";
 
-/** What an approval raised, one line per alert, with the way to the full flag card on the Case
- * screen. Neutral like the flag card: no red, no alert role; the pane announces it once, politely. */
-function RaisedFlag({
+/** The linked chart's flags after an approval, one line per flag, with the way to the full flag
+ * card on the Case screen. Neutral like the flag card: no red, no alert role; announced once, politely. */
+function ChartFlags({
   alerts,
   pairId,
   focusOnMount,
@@ -36,7 +36,7 @@ function RaisedFlag({
     openCase.current?.focus();
     onFocused();
   }, [focusOnMount, onFocused]);
-  const headingId = `raised-flag-${pairId}`;
+  const headingId = `chart-flags-${pairId}`;
   return (
     <section
       data-testid="registrar-flag-summary"
@@ -54,7 +54,7 @@ function RaisedFlag({
         <FlagHeadline key={alert.id} alert={alert} testId="registrar-flag-headline" />
       ))}
       <p data-testid="registrar-flag-count" className="text-[16px] text-ink-2">
-        {surfacedLine(alerts.length)}
+        {flagCountLine(alerts.length)}
       </p>
       <Link
         ref={openCase}
@@ -78,8 +78,8 @@ function HeldPair({ pairId, index, total }: { pairId: string; index: number; tot
     queryFn: () => source.getCandidatePair(pairId),
   });
   // Written only by this pane's own approval (below); never fetched.
-  const raised = useQuery<SafetyAlert[]>({
-    queryKey: raisedAlertsKey(pair.data?.pair.decision.id ?? ""),
+  const approvalAlerts = useQuery<SafetyAlert[]>({
+    queryKey: approvalAlertsKey(pair.data?.pair.decision.id ?? ""),
     queryFn: skipToken,
     gcTime: Infinity,
   }).data;
@@ -104,17 +104,17 @@ function HeldPair({ pairId, index, total }: { pairId: string; index: number; tot
 
   const detail = pair.data;
   const { decision } = detail.pair;
-  const alerts = decision.status === "LINKED" ? (raised ?? []) : [];
+  const alerts = decision.status === "LINKED" ? (approvalAlerts ?? []) : [];
 
   function onDecided(response: ReviewResponse) {
     void queryClient.invalidateQueries({ queryKey: HANDOFF_KEY });
-    const surfaced = response.decision.status === "LINKED" ? (response.alerts ?? []) : [];
+    const flags = response.decision.status === "LINKED" ? (response.alerts ?? []) : [];
     if (response.decision.status === "LINKED")
-      queryClient.setQueryData(raisedAlertsKey(response.decision.id), surfaced);
-    if (surfaced.length > 0) {
-      // The flag is what this approval changed: say it once and land on the way to the case.
-      const lines = surfaced.map(flagHeadline).join("; ");
-      announce(`Link approved. Flagged for clinician review: ${lines}. ${surfacedLine(surfaced.length)}.`);
+      queryClient.setQueryData(approvalAlertsKey(response.decision.id), flags);
+    if (flags.length > 0) {
+      // The linked chart now carries these flags: say them once and land on the way to the case.
+      const lines = flags.map(flagHeadline).join("; ");
+      announce(`Link approved. Flagged for clinician review: ${lines}. ${flagCountLine(flags.length)}.`);
       setFocusOpenCase(true);
       return;
     }
@@ -146,7 +146,7 @@ function HeldPair({ pairId, index, total }: { pairId: string; index: number; tot
       </p>
       <ReviewPanel detail={detail} onDecided={onDecided}>
         {alerts.length > 0 && (
-          <RaisedFlag alerts={alerts} pairId={pairId} focusOnMount={focusOpenCase} onFocused={focused} />
+          <ChartFlags alerts={alerts} pairId={pairId} focusOnMount={focusOpenCase} onFocused={focused} />
         )}
       </ReviewPanel>
     </article>
