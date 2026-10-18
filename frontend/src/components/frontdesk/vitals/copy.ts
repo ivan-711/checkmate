@@ -19,7 +19,7 @@ export const VITALS_COPY = {
     unsteady: "Couldn't get a steady reading, that's fine.",
     unavailable: "The camera isn't available. That's fine, your check-in continues.",
     preview: "Camera preview",
-    footer: "Wellness estimate. Not a diagnosis. Not saved, not sent to staff, not used for check-in.",
+    footer: "Wellness estimate only. Not saved, not sent to staff, not used for check-in.",
   },
   es: {
     heading: "Pulso (opcional)",
@@ -38,7 +38,7 @@ export const VITALS_COPY = {
     unavailable: "La cámara no está disponible. No pasa nada, su registro continúa.",
     preview: "Vista previa de la cámara",
     footer:
-      "Estimación de bienestar. No es un diagnóstico. No se guarda, no se envía al personal y no se usa para el registro.",
+      "Solo una estimación de bienestar. No se guarda, no se envía al personal y no se usa para el registro.",
   },
 } satisfies Record<KioskLanguage, unknown>;
 
