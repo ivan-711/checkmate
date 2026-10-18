@@ -273,6 +273,50 @@ test("FrontDesk registrar: the held check-in is decided through the review step 
   await expect(page.getByTestId("flag-card")).toHaveCount(0);
 });
 
+test("FrontDesk Start over: a new check-in starts at once and the next message is sent", async ({ page }) => {
+  await page.goto("/frontdesk");
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("registrar-held")).toBeVisible();
+  await page.getByRole("button", { name: "Start over" }).click();
+  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
+  await expect(page.getByText("No held check-ins.")).toBeVisible();
+  await page.getByTestId("kiosk-composer").fill("I have an appointment at three.");
+  await expect(page.getByTestId("kiosk-send")).toBeEnabled();
+  await page.getByTestId("kiosk-send").click();
+  await expect(page.getByText("automatic message")).toBeVisible();
+  await expect(page.getByTestId("kiosk-start-error")).toHaveCount(0);
+  await expect(page.getByText("could not reach the agent service")).toHaveCount(0);
+});
+
+test("FrontDesk Reset demo: clears the kiosk and the held check-in; the next message starts a new check-in", async ({
+  page,
+}) => {
+  await page.goto("/frontdesk");
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("gate-card")).toBeVisible();
+  await expect(page.getByTestId("registrar-held")).toBeVisible();
+  await page.getByRole("button", { name: "Reset demo" }).click();
+  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
+  await expect(page.getByTestId("gate-card")).toHaveCount(0);
+  await expect(page.getByTestId("registrar-held")).toHaveCount(0);
+  await expect(page.getByText("No held check-ins.")).toBeVisible();
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("gate-card")).toBeVisible();
+  await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (1)");
+  await expect(page.getByText("could not reach the agent service")).toHaveCount(0);
+});
+
+test("FrontDesk tool chips carry no mode-specific suffix", async ({ page }) => {
+  await page.goto("/frontdesk");
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("tool-call-chip")).toHaveCount(2);
+  await expect(page.getByTestId("tool-call-chip").filter({ hasText: "recorded" })).toHaveCount(0);
+});
+
 test("FrontDesk: other text gets the template answer and no tool runs", async ({ page }) => {
   await page.goto("/frontdesk");
   await page.getByTestId("kiosk-composer").fill("I have an appointment at three.");
