@@ -12,6 +12,9 @@ export const INTAKE_KEY = ["intake-session"] as const;
 export const HANDOFF_KEY = ["handoff-pair"] as const;
 export const handoffPairKey = (pairId: string) => [...HANDOFF_KEY, pairId] as const;
 
+/** Shared key for the kiosk turn mutation, including buttons rendered outside its hook instance. */
+export const SEND_TURN_KEY = ["send-intake-turn"] as const;
+
 const INTAKE_HASH = hashKey(INTAKE_KEY);
 
 /** Calls onChange after the kiosk's check-in changes, never inside a render. The cache notifies

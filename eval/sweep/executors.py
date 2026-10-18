@@ -106,6 +106,19 @@ class ModalExecutor:
         return [r for r in merged if r is not None]
 
 
+def executor_ran(results: Sequence[dict]) -> str:
+    """The executor that actually produced the results, which is not always the one asked for: an entry that
+    fell back to the local pool says so (``fallbackFrom``), and the sweep file must say so too."""
+    ran = " + ".join(sorted({r["executor"] for r in results}))
+    fell_back = [r for r in results if r.get("fallbackFrom")]
+    if not fell_back:
+        return ran
+    origin = " + ".join(sorted({r["fallbackFrom"] for r in fell_back}))
+    if len(fell_back) == len(results):
+        return f"{ran} (fallback from {origin})"
+    return f"{ran} ({len(fell_back)} of {len(results)} entries fell back from {origin})"
+
+
 def select_executor(
     name: str, *, token_present: TokenCheck = modal_token_present, workers: int | None = None
 ) -> tuple[LocalPoolExecutor | ModalExecutor, str]:

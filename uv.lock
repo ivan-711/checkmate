@@ -216,6 +216,7 @@ dev = [
     { name = "ruff" },
     { name = "schemathesis" },
     { name = "scikit-learn" },
+    { name = "scipy" },
 ]
 train = [
     { name = "scikit-learn" },
@@ -244,6 +245,7 @@ dev = [
     { name = "ruff", specifier = ">=0.6" },
     { name = "schemathesis", specifier = "==4.31.1" },
     { name = "scikit-learn", specifier = ">=1.6,<2" },
+    { name = "scipy", specifier = ">=1.18.1,<2" },
 ]
 train = [{ name = "scikit-learn", specifier = ">=1.6,<2" }]
 
