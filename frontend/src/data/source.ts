@@ -42,6 +42,8 @@ export interface SuggestedCheckIn {
   en: string;
   es: string;
   demoScript: boolean;
+  /** A second demo line, a patient with no chart, offered only where the replay can play it. */
+  newPatient?: { en: string; es: string };
 }
 
 /** One data layer, two adapters. The UI branches on `mode` only for the badge. */
