@@ -17,9 +17,13 @@ export const metadata: Metadata = {
   metadataBase: siteOrigin(process.env.NEXT_PUBLIC_SITE_ORIGIN),
   title: "CheckMate",
   description: "Synthetic-data prototype for identity reconciliation. Not for clinical use.",
-  // public/, rendered by scripts/render-assets.mjs. app/icon.svg is picked up by file convention.
+  // public/, rendered by scripts/render-assets.mjs. Setting icons makes Next drop the app/icon.svg
+  // link it adds by file convention, so the SVG tab icon is named here as well.
   manifest: "/manifest.webmanifest",
-  icons: { apple: "/apple-touch-icon.png" },
+  icons: {
+    icon: { url: "/icon.svg", type: "image/svg+xml", sizes: "any" },
+    apple: "/apple-touch-icon.png",
+  },
   // public/og.png, rendered by scripts/render-assets.mjs from the mark and the pitch.
   openGraph: {
     title: "CheckMate",

@@ -9,10 +9,15 @@ async function loadMetadata() {
 describe("root metadata", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it("links the web manifest and the apple touch icon", async () => {
+  it("links the web manifest, the apple touch icon and still the SVG tab icon", async () => {
     const metadata = await loadMetadata();
     expect(metadata.manifest).toBe("/manifest.webmanifest");
-    expect(metadata.icons).toMatchObject({ apple: "/apple-touch-icon.png" });
+    // Once metadata.icons is set, Next drops the app/icon.svg link it would add by file convention
+    // (next/dist/lib/metadata/resolve-metadata.js), so the SVG has to be named here too.
+    expect(metadata.icons).toEqual({
+      icon: { url: "/icon.svg", type: "image/svg+xml", sizes: "any" },
+      apple: "/apple-touch-icon.png",
+    });
   });
 
   it("resolves og:image against NEXT_PUBLIC_SITE_ORIGIN, defaulting to the local dev server", async () => {
