@@ -21,7 +21,7 @@ export function StoryStepper() {
   const { desk, kiosk, facts } = useDesk();
   const current = currentStep(desk, kiosk, facts.flagRaised);
   return (
-    <ol data-testid="story-stepper" aria-label="Story" className="flex items-center gap-1 text-[14px]">
+    <ol data-testid="story-stepper" aria-label="Story" className="stepper flex items-center gap-1 whitespace-nowrap text-[14px]">
       {STORY_STEPS.map((step, i) => {
         const status = stepStatus(step.id, current);
         return (
@@ -32,7 +32,7 @@ export function StoryStepper() {
             aria-current={status === "current" ? "step" : undefined}
             className="flex items-center gap-2"
           >
-            {i > 0 && <span aria-hidden="true" className="mr-1 h-px w-3 bg-hair-strong" />}
+            {i > 0 && <span aria-hidden="true" className="stepper-rule mr-1 h-px w-3 bg-hair-strong" />}
             <span
               aria-hidden="true"
               className={`grid h-[18px] w-[18px] place-items-center rounded-full border-[1.5px] ${STATUS_RING[status]}`}

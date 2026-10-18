@@ -6,7 +6,7 @@ export default function NotFound() {
   return (
     <div className="flex h-[calc(100dvh-var(--bar-h))] flex-col items-center justify-center gap-5 text-center">
       <span className="text-mulberry">
-        <Mark apart size={84} />
+        <Mark size={84} className="mark-apart" />
       </span>
       <h1 className="font-display text-[44px] font-bold leading-[1.02] tracking-[-0.03em]">Nothing here</h1>
       <p className="max-w-[40ch] text-[18px] text-ink-2">
