@@ -56,6 +56,18 @@ Runtime packages are reached from `[project].dependencies` in `pyproject.toml`; 
 
 Added when the frontend lane (W4) merges and `frontend/package-lock.json` exists on `main`.
 
+### `frontend/` runtime dependencies added by the redesign
+
+Versions come from `frontend/package-lock.json`. Licenses come from `node_modules/<package>/package.json`, installed from that lock file. When this branch meets `main`, these five rows join the `frontend/` table there.
+
+| Package | Version | License | Scope | Source |
+|---|---|---|---|---|
+| motion | 14.3.0 | MIT | runtime | https://github.com/motiondivision/motion |
+| cmdk | 1.1.1 | MIT | runtime | https://github.com/pacocoursey/cmdk |
+| @fontsource-variable/bricolage-grotesque | 5.3.0 | OFL-1.1 | runtime | https://github.com/fontsource/font-files |
+| @fontsource-variable/instrument-sans | 5.3.0 | OFL-1.1 | runtime | https://github.com/fontsource/font-files |
+| @fontsource/dm-mono | 5.3.0 | OFL-1.1 | runtime | https://github.com/fontsource/font-files |
+
 ## Container images and build tools
 
 | Component | Where | Version | License |

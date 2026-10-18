@@ -174,12 +174,13 @@ body {
   outline-color: var(--paper);
 }
 
+/* No opacity: the keycap takes its control's own text colour, so it keeps that colour's contrast
+   (the header hint is --ink-2 on --porcelain, 6.77:1; at opacity 0.62 it was 2.86:1). */
 kbd {
   font: 500 12px/1 var(--f-mono);
   padding: 4px 6px;
   border-radius: 6px;
   border: 1px solid currentColor;
-  opacity: 0.62;
   margin-left: 10px;
 }
 
