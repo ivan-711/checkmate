@@ -10,6 +10,11 @@ import { useDataSource } from "@/data/DataSourceProvider";
 export const SESSION_CHANGE_KEY = ["session-change"] as const;
 /** Resolve's key, so Reset waits for a match run in flight for the same reason. */
 export const RESOLVE_KEY = ["resolve"] as const;
+/** The newest match-run receipt Resolve returned in this tab. The work queue draws its funnel
+ * from it and never starts a run itself; a session change drops it, the pairs it counted gone. */
+export const LATEST_MATCH_RUN_KEY = ["latest-match-run"] as const;
+/** Every work-queue read (pages and row details); GETs only. */
+export const WORK_QUEUE_KEY = ["work-queue"] as const;
 
 /** One click, no confirmation; a 5 s "Undo reset" toast covers a stray click. */
 export function ResetButton() {
@@ -32,7 +37,9 @@ export function ResetButton() {
       // check-in, and the registrar pane drops the old one.
       queryClient.resetQueries({ queryKey: INTAKE_KEY }),
       queryClient.resetQueries({ queryKey: HANDOFF_KEY }),
+      queryClient.resetQueries({ queryKey: WORK_QUEUE_KEY }),
     ]);
+    queryClient.removeQueries({ queryKey: LATEST_MATCH_RUN_KEY });
   }
 
   const restore = useMutation({

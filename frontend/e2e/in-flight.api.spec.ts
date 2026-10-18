@@ -2,7 +2,7 @@ import { expect, test, type Route } from "@playwright/test";
 
 // Run by `npm run e2e:api` (playwright.api.config.ts) against the API-mode build and a running API:
 // the match-run response is held open with a route so the screen can be checked mid-run.
-// It presses Reset demo on that API, so point CHECKMATE_API_ORIGIN away from a live demo session.
+// It presses Reset demo on that API; the config refuses to run unless CHECKMATE_API_ORIGIN names it.
 test("Approve, Reject and Resolve are disabled while a match run is in flight", async ({ page }) => {
   await page.goto("/");
   // Fails, never skips, if the build is not in API mode.
