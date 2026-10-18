@@ -66,10 +66,12 @@ _INSERT_BLOCK_KEY = text(
 _SET_INTAKE = text(
     "UPDATE intake_session SET intake_record_id = :record_id, intake_args_sha256 = :sha WHERE id = :session_id"
 )
+# A pair a match run already created keeps its origin but is attached to the session, so the
+# registrar's later decision on it is found by the gate and the board alike.
 _UPSERT_PAIR = text(
     "INSERT INTO candidate_pair (id, record_a_id, record_b_id, block_keys, origin, intake_session_id) "
     "VALUES (:id, :a, :b, '{}', :origin, :session_id) "
-    "ON CONFLICT (record_a_id, record_b_id) DO UPDATE SET origin = candidate_pair.origin RETURNING id"
+    "ON CONFLICT (record_a_id, record_b_id) DO UPDATE SET intake_session_id = EXCLUDED.intake_session_id RETURNING id"
 )
 _CURRENT_DECISION = text(
     "SELECT version, status FROM match_decision WHERE pair_id = :pair_id ORDER BY version DESC LIMIT 1 FOR UPDATE"
@@ -184,8 +186,8 @@ def create_handoff_pairs(
         ).scalar_one()
         pair_ids.append(pair_id)
         current = conn.execute(_CURRENT_DECISION, {"pair_id": pair_id}).one_or_none()
-        if current is not None and current.status == DecisionStatus.PROPOSED.value:
-            continue
+        if current is not None and current.status in (DecisionStatus.PROPOSED.value, DecisionStatus.LINKED.value):
+            continue  # already in the queue, or already a chart: nothing to re-propose
         entry = per_candidate.get(str(candidate.record_id), {})
         matcher = entry.get("matcher") or {}
         decision_id = uuid.uuid4()

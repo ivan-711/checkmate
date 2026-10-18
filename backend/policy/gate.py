@@ -64,11 +64,13 @@ _RECORD = text(
     "nr.address_line, nr.zip5 FROM source_record sr JOIN normalized_record nr ON nr.record_id = sr.id "
     "WHERE sr.id = ANY(CAST(:ids AS uuid[]))"
 )
-_HANDOFF_STATUS = text(
+# Every pair between the intake record and a candidate, whatever its origin (ADR-016 §2 rule 1 has no
+# origin restriction): a match run may have created the pair before the gate did.
+_PAIR_STATUS = text(
     "SELECT cp.id AS pair_id, cp.record_a_id, cp.record_b_id, d.id AS decision_id, d.status "
     "FROM candidate_pair cp JOIN LATERAL (SELECT id, status FROM match_decision WHERE pair_id = cp.id "
     "ORDER BY version DESC LIMIT 1) d ON true "
-    "WHERE cp.origin = 'FRONTDESK_HANDOFF' AND cp.intake_session_id = :session_id"
+    "WHERE cp.record_a_id = :intake_record_id OR cp.record_b_id = :intake_record_id"
 )
 
 
@@ -96,12 +98,14 @@ def _sticky_ids(conn: Connection, session_id: UUID) -> set[UUID]:
     return {r.record_id for r in conn.execute(_STICKY, {"session_id": session_id})}
 
 
-def _handoff_status(conn: Connection, session_id: UUID) -> dict[UUID, tuple[UUID, UUID, DecisionStatus]]:
-    """candidate record id -> (pair id, decision id, status) for this session's handoff pairs."""
+def _pair_status(conn: Connection, intake_record_id: UUID | None) -> dict[UUID, tuple[UUID, UUID, DecisionStatus]]:
+    """candidate record id -> (pair id, latest decision id, status) over every pair with the intake record."""
+    if intake_record_id is None:
+        return {}
     out = {}
-    for r in conn.execute(_HANDOFF_STATUS, {"session_id": session_id}):
-        for record_id in (r.record_a_id, r.record_b_id):
-            out[record_id] = (r.pair_id, r.decision_id, DecisionStatus(r.status))
+    for r in conn.execute(_PAIR_STATUS, {"intake_record_id": intake_record_id}):
+        other = r.record_b_id if r.record_a_id == intake_record_id else r.record_a_id
+        out[other] = (r.pair_id, r.decision_id, DecisionStatus(r.status))
     return out
 
 
@@ -130,7 +134,7 @@ def _score(conn: Connection, session_id: UUID, args: SearchArgs | ProposeArgs, s
     probe = normalize_record(demographics_of(args))
     ids = _candidate_ids_by_block(conn, probe) | _sticky_ids(conn, session_id)
     ids.discard(session.intake_record_id)
-    statuses = _handoff_status(conn, session_id)
+    statuses = _pair_status(conn, session.intake_record_id)
     candidates: list[ScoredCandidate] = []
     entries: list[dict] = []
     if ids:
