@@ -26,6 +26,7 @@ from contracts.models.policy import (
     ProposeArgs,
     SearchArgs,
     SessionFacts,
+    Sex,
     ToolName,
 )
 
@@ -101,12 +102,25 @@ def _text_grounded(value: str, quote: str) -> bool:
     return fold(value) != "" and fold(value) in fold(quote)
 
 
+# EN/ES words a patient uses to state a sex; the quote must contain one that agrees with the value.
+SEX_WORDS: dict[str, frozenset[str]] = {
+    Sex.FEMALE.value: frozenset(
+        {"female", "woman", "girl", "f", "mujer", "femenino", "femenina", "senora", "senorita"}
+    ),
+    Sex.MALE.value: frozenset({"male", "man", "boy", "m", "hombre", "masculino", "varon", "senor"}),
+}
+
+
+def _sex_grounded(value: str, quote: str) -> bool:
+    return bool(set(_TOKEN.findall(fold(quote))) & SEX_WORDS.get(value, frozenset()))
+
+
 # field -> how the value is compared with its quote
 _FIELD_CHECKS = {
     "given_name": _name_grounded,
     "family_name": _name_grounded,
     "birth_date": _birth_date_grounded,
-    "sex": lambda value, quote: True,  # the quote alone grounds it; stated sex has no canonical word form
+    "sex": _sex_grounded,
     "phone": _digits_grounded,
     "address_line": _text_grounded,
     "postal_code": _digits_grounded,
@@ -125,6 +139,8 @@ def demographics_grounded(args: SearchArgs | ProposeArgs, user_texts: Sequence[s
         value = getattr(args, field_name)
         if value is None:
             continue
+        if field_name == "sex" and value == Sex.UNKNOWN:
+            continue  # UNKNOWN is the absence of a stated sex (lead fact); no quote needed, any quote ignored
         quote = getattr(evidence, field_name)
         if not quote or not _quote_in_text(quote, folded_texts):
             return False

@@ -101,13 +101,42 @@ def test_unrelated_demographics_are_allowed(conn):
     assert ev.highest_band is None
 
 
-def test_sticky_candidate_stays_when_new_args_no_longer_block(conn):
+def test_sticky_review_candidate_keeps_blocking_after_the_model_changes_the_demographics(conn):
+    """ADR-016 §2(b), §8(3): a candidate once scored REVIEW or higher in this session stays blocking
+    until a registrar resolves it, even when the new arguments no longer resemble it."""
+    er, clinic = near_duplicates(conn)
+    sid = insert_session(conn)
+    search = evaluate(
+        conn,
+        session_id=sid,
+        tool_name="search_patients",
+        raw_args={k: v for k, v in PROPOSE_ARGS.items() if k != "preferredLanguage"},
+        user_texts=(USER_TEXT,),
+        session=FACTS,
+    )
+    hits = {c.record_id: c.band.value for c in search.candidates if c.record_id in (er, clinic)}
+    assert set(hits) == {er, clinic} and all(b in ("REVIEW", "AUTO_LINK") for b in hits.values())
+    insert_tool_call(conn, sid, list(hits), bands=hits)  # what the executor writes for that search
+    ev = propose(conn, sid, UNRELATED_ARGS, (UNRELATED_TEXT,))
+    assert ev.decision.reason_code == PolicyReason.CANDIDATE_IN_REVIEW_OR_HIGHER
+    assert {e.id for e in ev.decision.evidence_ids} >= {er, clinic}
+    by_id = {c["recordId"]: c for c in ev.evidence_snapshot["candidates"]}
+    for rid in (er, clinic):
+        entry = by_id[str(rid)]
+        assert entry["bandNow"] == "KEEP_SEPARATE" and entry["bandSticky"] == hits[rid] and entry["band"] == hits[rid]
+    sticky = [c for c in ev.candidates if c.record_id in (er, clinic)]
+    assert all(c.band.value == hits[c.record_id] for c in sticky)
+
+
+def test_sticky_keep_separate_candidate_does_not_block(conn):
     er, _clinic = near_duplicates(conn)
     sid = insert_session(conn)
-    insert_tool_call(conn, sid, [er])
+    insert_tool_call(conn, sid, [er], bands={er: "KEEP_SEPARATE"})
     ev = propose(conn, sid, UNRELATED_ARGS, (UNRELATED_TEXT,))
-    assert {c.record_id for c in ev.candidates} == {er}
-    assert ev.decision.outcome == PolicyOutcome.ALLOW  # unrelated person: KEEP_SEPARATE, so it does not block
+    assert {c.record_id for c in ev.candidates} == {er}  # still considered: the sticky set is re-read
+    assert ev.decision.outcome == PolicyOutcome.ALLOW
+    entry = ev.evidence_snapshot["candidates"][0]
+    assert (entry["bandNow"], entry["bandSticky"], entry["band"]) == ("KEEP_SEPARATE", "KEEP_SEPARATE", "KEEP_SEPARATE")
 
 
 def test_rejected_handoff_pair_releases_the_gate(conn):

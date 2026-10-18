@@ -2,7 +2,7 @@
   "entityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
   "provisional": true,
   "qualified": false,
-  "pinned": true,
+  "pinned": false,
   "unmetCriteria": [
     "change_birth_year_keep_separate",
     "swap_dob_day_month_robust"
