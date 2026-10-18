@@ -165,7 +165,7 @@ export function EvidenceRail({ detail, thresholds }: Props) {
         </button>
       )}
       <p className="mb-4 mt-1.5 text-[13px] leading-snug text-ink-2">
-        {thresholds && !thresholds.isCalibrated && "Hand-set demo weights, not calibrated. "}
+        {thresholds && !thresholds.isCalibrated && "Hand-set demo weights. Not a probability. "}
         Ask the patient for a phone number or photo ID.
       </p>
     </section>
