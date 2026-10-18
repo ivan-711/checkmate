@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Query, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import DBAPIError, OperationalError, SQLAlchemyError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
@@ -95,6 +97,26 @@ app.add_middleware(
     allow_headers=["Content-Type", "Idempotency-Key", "Authorization"],
     expose_headers=["X-Request-Id"],
 )
+
+
+def _encodable(value):
+    """Each validation error echoes its input; an unpaired surrogate there has no UTF-8 form, so the
+    envelope itself failed to render (UnicodeEncodeError, a 500). Escape just those characters."""
+    if isinstance(value, str):
+        return value.encode("utf-8", "backslashreplace").decode("utf-8")
+    if isinstance(value, list):
+        return [_encodable(v) for v in value]
+    if isinstance(value, dict):
+        return {_encodable(k): _encodable(v) for k, v in value.items()}  # a body key is client text too
+    return value
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation(_: Request, exc: RequestValidationError):
+    """The contract's envelope and message, with details that always encode: a 422, never a 500."""
+    return error_envelope(
+        ErrorCode.VALIDATION_ERROR, "request failed validation", _encodable(jsonable_encoder(exc.errors()))
+    )
 
 
 @app.exception_handler(ApiError)
