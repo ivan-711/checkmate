@@ -136,6 +136,19 @@ test("Cancel returns focus to the button that opened the step", async ({ page })
   }
 });
 
+test("a double-click on Approve opens the confirm sheet and records nothing", async ({ page }) => {
+  await resolved(page);
+  // Confirm sits where Approve was: the second click of a double-click must not confirm the link.
+  await page.getByTestId("approve-button").dblclick();
+  await expect(page.getByTestId("confirm-sheet")).toBeVisible();
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId("golden-record")).toHaveCount(0);
+  await expect(page.locator('[data-testid="event-row"][data-event-type="LINK_APPROVED"]')).toHaveCount(0);
+  // A plain click on Confirm still links.
+  await page.getByTestId("review-submit-button").click();
+  await expect(page.getByTestId("golden-record")).toBeVisible();
+});
+
 test("a recorded reject moves focus to the decision line", async ({ page }) => {
   await resolved(page);
   await review(page, "reject", "INSUFFICIENT_EVIDENCE");

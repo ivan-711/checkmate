@@ -334,6 +334,11 @@ export function ReviewPanel({
           type="submit"
           data-testid="review-submit-button"
           disabled={blocked}
+          // Confirm opens where Approve was: the second click of a double-click on Approve lands
+          // here and must not confirm the link. Keyboard and single clicks have detail 0 or 1.
+          onClick={(e) => {
+            if (e.detail > 1) e.preventDefault();
+          }}
           className={PRIMARY_BUTTON}
         >
           {decide.isPending ? copy.pending : copy.confirm}
