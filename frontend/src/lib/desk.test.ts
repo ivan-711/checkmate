@@ -7,6 +7,7 @@ import {
   formatHeld,
   groupEvents,
   kioskStateFrom,
+  newChartStageHead,
   stageHead,
   stepStatus,
   type DeskState,
@@ -100,6 +101,19 @@ describe("the story stepper", () => {
     expect(stepStatus("compare", "compare")).toBe("current");
     expect(stepStatus("link", "compare")).toBe("upcoming");
     expect(stepStatus("flag", "compare")).toBe("upcoming");
+  });
+});
+
+describe("newChartStageHead", () => {
+  it("names the new patient by given name and says nothing waits", () => {
+    const head = newChartStageHead("Teodoro Quintanilla Abasolo");
+    expect(head.eyebrow).toBe("New patient");
+    expect(head.title).toBe("New chart for Teodoro");
+    expect(head.subtitle).toContain("Nothing waits for the registrar");
+  });
+
+  it("falls back to a plain title when the name is empty", () => {
+    expect(newChartStageHead("  ").title).toBe("New chart opened");
   });
 });
 

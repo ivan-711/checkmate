@@ -146,6 +146,18 @@ export function stageHead(desk: DeskState, ctx: StageHeadContext): StageHead {
   }
 }
 
+/** The stage header once the gate let the kiosk open a new chart: the new patient, not the
+ * records on file, since that check-in matched none of them. */
+export function newChartStageHead(name: string): StageHead {
+  const given = name.trim().split(/\s+/)[0] || null;
+  return {
+    eyebrow: "New patient",
+    title: given ? `New chart for ${given}` : "New chart opened",
+    subtitle:
+      "No record on file scored close enough, so the gate let FrontDesk open a new chart. Nothing waits for the registrar.",
+  };
+}
+
 /** The kiosk's default state from the check-in on record (the Registration state the contract
  * returns). The kiosk (L2) sets "working" itself while a turn runs; this is the fallback. */
 export function kioskStateFrom(state: RegistrationState | undefined, turnRunning: boolean): KioskState {
