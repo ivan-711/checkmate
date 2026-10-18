@@ -6,7 +6,8 @@ export const MIN_TEXT_PX = 16;
 export const BODY_TEXT_PX = 18;
 
 /** Every visible text in the patient kiosk below `min` px, as "<size>px <text>". The band chip and
- * the constructed-scenario chip are the shared micro chips DESIGN.md keeps at 14 px on every screen. */
+ * the constructed-scenario chip (with its tooltip) are the shared micro type, 14 px on every
+ * screen (DESIGN.md type table; ux-spec type.micro: chips, badges, tooltips). */
 export function kioskTextBelow(page: Page, min = MIN_TEXT_PX): Promise<string[]> {
   return page.locator('section[aria-labelledby="kiosk-label"]').evaluate((kiosk, min) => {
     const walker = document.createTreeWalker(kiosk, NodeFilter.SHOW_TEXT);
