@@ -358,4 +358,32 @@ describe("ApiSource after a reset", () => {
     expect(detail).toBeNull();
     expect(resolved).toBe(false);
   });
+  it("FrontDesk: opens a check-in and sends a turn with its Idempotency-Key", async () => {
+    vi.useRealTimers();
+    const session = { id: "s-1", agentMode: "LIVE", registration: { state: "NONE", handoffPairIds: [] } };
+    const turn = { turnIndex: 0, userText: "hi", assistantText: "ok", toolCalls: [] };
+    const calls = stubFetch({
+      "POST /api/v1/intake-sessions": () => ({ status: 201, body: session }),
+      "POST /api/v1/intake-sessions/s-1/turns": () => ({ status: 201, body: turn }),
+    });
+    const api = new ApiSource(ORIGIN);
+    expect(await api.startIntake("ES", "hero-er-arrival")).toEqual(session);
+    expect(await api.sendTurn("s-1", "hi", "key-1")).toEqual(turn);
+    expect(calls[0].body).toEqual({ language: "ES", scenarioContextId: "hero-er-arrival" });
+    expect(calls[1].body).toEqual({ text: "hi" });
+    expect(calls[1].headers.get("Idempotency-Key")).toBe("key-1");
+  });
+
+  it("FrontDesk: a turn conflict surfaces the API error code", async () => {
+    vi.useRealTimers();
+    stubFetch({
+      "POST /api/v1/intake-sessions/s-1/turns": () => ({
+        status: 409,
+        body: { error: { code: "TURN_IN_PROGRESS", message: "A turn is running." } },
+      }),
+    });
+    await expect(new ApiSource(ORIGIN).sendTurn("s-1", "hi", "k")).rejects.toMatchObject({
+      code: "TURN_IN_PROGRESS",
+    });
+  });
 });

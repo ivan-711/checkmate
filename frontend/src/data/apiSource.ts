@@ -6,6 +6,9 @@ import type {
   CandidatePairQuery,
   ErrorEnvelope,
   EventLogRow,
+  IntakeSession,
+  IntakeTurn,
+  Language,
   MatchRunResponse,
   ReviewRequest,
   ReviewResponse,
@@ -146,6 +149,21 @@ export class ApiSource implements DataSource {
 
   async getTiles() {
     const res = await this.client.GET("/api/v1/metrics/tiles");
+    if (!res.data) fail(res.error);
+    return res.data;
+  }
+
+  async startIntake(language: Language, scenarioContextId: string): Promise<IntakeSession> {
+    const res = await this.client.POST("/api/v1/intake-sessions", { body: { language, scenarioContextId } });
+    if (!res.data) fail(res.error);
+    return res.data;
+  }
+
+  async sendTurn(sessionId: string, text: string, idempotencyKey: string): Promise<IntakeTurn> {
+    const res = await this.client.POST("/api/v1/intake-sessions/{session_id}/turns", {
+      params: { path: { session_id: sessionId }, header: { "Idempotency-Key": idempotencyKey } },
+      body: { text },
+    });
     if (!res.data) fail(res.error);
     return res.data;
   }

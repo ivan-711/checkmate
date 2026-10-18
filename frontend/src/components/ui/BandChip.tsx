@@ -14,14 +14,15 @@ export const BAND_LABELS = {
   KEEP_SEPARATE: BANDS.KEEP_SEPARATE.label,
 } as const satisfies Record<Band, string>;
 
-export function BandChip({ band }: { band: Band }) {
+/** `label` replaces the English text where the screen is in another language (the kiosk). */
+export function BandChip({ band, label: override }: { band: Band; label?: string }) {
   const { label, Icon, className } = BANDS[band];
   return (
     <span
       className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[14px] font-semibold ${className}`}
     >
       <Icon aria-hidden size={16} />
-      {label}
+      {override ?? label}
     </span>
   );
 }

@@ -135,3 +135,10 @@ export function compactLane<T extends { occurredAt: string; isConstructed?: bool
   const shown = sorted.filter((e, i) => i >= cutoff || e.isConstructed);
   return { shown, hidden: sorted.length - shown.length };
 }
+
+/** The rule's footer without a leading "Rule <id> <version>." when the card already shows the
+ * rule in its header; any other footer is returned unchanged. */
+export function footerWithoutRule(footer: string, ruleId: string, ruleVersion: string): string {
+  const prefix = `Rule ${ruleId} ${ruleVersion}.`;
+  return footer.startsWith(prefix) ? footer.slice(prefix.length).trimStart() : footer;
+}

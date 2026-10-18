@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 // Run by `npm run e2e:api` against the API-mode build and a running API. It presses Reset demo
-// on that API, so point CHECKMATE_API_ORIGIN away from a live demo session.
+// on that API; the config refuses to run unless CHECKMATE_API_ORIGIN names it.
 // The queue is read-only: opening it, refocusing the window and reloading it send GETs only.
 // Reset on a fresh corpus database ingests every record and can take about 40 s.
 const RESET_MS = 90_000;
