@@ -48,7 +48,14 @@ def make_model(mode: AgentMode, settings: Settings) -> AgentModel:
         return replay.maybe_record(live, settings.gemini_model_id)  # FRONTDESK_RECORD_TO, Q1.4
     # Q1.4: the committed transcript plays through the real engine; a transcript that does not load
     # fails closed into UNAVAILABLE, so the turn degrades to the template instead of raising.
-    return replay.build_replay_model() or UnavailableAgentModel(AgentMode.REPLAY)
+    replay_model = replay.build_replay_model()
+    if replay_model is None:
+        return UnavailableAgentModel(AgentMode.REPLAY)
+    if settings.frontdesk_offscript_reader:  # FRONTDESK_OFFSCRIPT_READER=on; default off
+        from backend.frontdesk.offscript import OffscriptReplayModel
+
+        return OffscriptReplayModel(replay_model)
+    return replay_model
 
 
 def pin_mode(settings: Settings) -> AgentMode:

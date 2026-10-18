@@ -84,7 +84,7 @@ Run the demo setup under [How to run](#how-to-run) first, then open http://127.0
 
 For another run, press **Reset demo**, or **Start over** in the kiosk, which runs the same reset.
 
-In `REPLAY` mode the agent's replies come only from the transcript: a typed message must match a scripted line (case, accents and spacing ignored), and anything else gets the template line (`backend/frontdesk/replay.py`).
+In `REPLAY` mode the agent's replies come only from the transcript: a typed message must match a scripted line (case, accents and spacing ignored), and anything else gets the template line (`backend/frontdesk/replay.py`). With FRONTDESK_OFFSCRIPT_READER=on, text that matches no scripted line is read by a deterministic rules-based reader (no model) and goes through the same gate, so you can try a made-up patient.
 
 ## How to run
 
