@@ -61,7 +61,10 @@ HTTP_TIMEOUT_S = 3.0
 # Long enough for the one-time macOS Automation prompt, which blocks osascript until answered.
 OSASCRIPT_TIMEOUT_S = 60.0
 PAGE_LIMIT = 200  # the frozen schema's maximum for list endpoints
-MAX_PAGES = 10  # bounds one read of a list endpoint
+MAX_PAGES = 10  # bounds one read of the candidate-pair list; a demo holds a handful of hand-offs
+# The event feed is drained before the watermark moves, or an intake older than the cut could be skipped for good.
+# A match run writes hundreds of events; this cap (100,000 events) only guards against a runaway feed.
+EVENT_MAX_PAGES = 500
 # Events are re-read this far back each poll: an event can commit after a newer one was already read.
 EVENT_OVERLAP_S = 30
 
@@ -166,9 +169,9 @@ def current_session(fetch: Fetch, api_base: str) -> DemoSession:
     return DemoSession(str(session_id) if session_id else None, str(created_at) if created_at else None)
 
 
-def _pages(fetch: Fetch, url: str, query: dict) -> Iterator[dict]:
+def _pages(fetch: Fetch, url: str, query: dict, max_pages: int = MAX_PAGES) -> Iterator[dict]:
     query = dict(query)
-    for _ in range(MAX_PAGES):
+    for _ in range(max_pages):
         body = fetch(f"{url}?{urllib.parse.urlencode(query)}")
         if not isinstance(body, dict) or not isinstance(body.get("items"), list):
             raise ApiUnavailable("unexpected list shape")
@@ -220,7 +223,7 @@ def intake_ids_since(fetch: Fetch, api_base: str, since: str | None) -> tuple[se
     query: dict = {"limit": PAGE_LIMIT}
     if since:
         query["since"] = since
-    for body in _pages(fetch, api_base + EVENTS_PATH, query):
+    for body in _pages(fetch, api_base + EVENTS_PATH, query, max_pages=EVENT_MAX_PAGES):
         for item in body["items"]:
             if not isinstance(item, dict):
                 continue

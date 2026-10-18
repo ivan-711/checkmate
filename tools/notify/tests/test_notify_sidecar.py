@@ -301,6 +301,33 @@ def test_events_are_read_from_the_demo_session_start():
     assert dict(urllib.parse.parse_qsl(first.partition("?")[2]))["since"] == T0.isoformat()
 
 
+class PagedEventsApi(FakeApi):
+    """Pages the event feed 200 at a time, newest first, like the real cursor."""
+
+    def __call__(self, url: str) -> object:
+        path, _, raw_query = url.removeprefix(API).partition("?")
+        if path != EVENTS_PATH:
+            return super().__call__(url)
+        self.urls.append(url)
+        rows = sorted(self.events, key=lambda e: e["ts"], reverse=True)
+        start = int(dict(urllib.parse.parse_qsl(raw_query)).get("cursor", 0))
+        end = start + 200
+        return {"items": rows[start:end], "nextCursor": str(end) if end < len(rows) else None}
+
+
+def test_a_new_chart_behind_a_long_event_backlog_is_still_found():
+    api, rec = PagedEventsApi(), Recorder()
+    n = make_notifier(api, rec)
+    n.poll_once()
+    api.checkin("intake-9", "NEW_CHART")  # the oldest event in this window
+    for i in range(2_500):  # a match run's PAIR_SCORED events land after it, more than ten pages
+        ts = (api.created_at + timedelta(seconds=2, microseconds=i + 1)).isoformat()
+        api.events.append({"ts": ts, "eventType": "PAIR_SCORED", "intakeSessionId": None})
+    n.poll_once()
+    n.poll_once()
+    assert rec.sent == [MESSAGES[NEW_CHART]]
+
+
 def test_api_down_does_not_crash_and_recovers():
     api, rec = FakeApi(), Recorder()
     n = make_notifier(api, rec)
