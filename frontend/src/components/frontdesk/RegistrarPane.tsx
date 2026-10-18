@@ -5,7 +5,6 @@ import { IdCard, ShieldCheck } from "lucide-react";
 import { EvidenceRail } from "@/components/case/EvidenceRail";
 import { ReviewPanel } from "@/components/case/ReviewPanel";
 import { SourceCardView } from "@/components/case/SourceCardView";
-import { BandChip } from "@/components/ui/BandChip";
 import { differingFields } from "@/lib/display";
 import { useHandoffPair, useIntakeSession } from "./intake";
 
@@ -54,10 +53,6 @@ export function RegistrarPane() {
           Possible existing chart
         </h3>
         <span className="ml-auto text-[14px] text-ink-2">Held check-ins ({held})</span>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-[32px] font-bold tabular-nums">{decision.p.toFixed(2)}</span>
-        <BandChip band={decision.band} />
       </div>
       <p>
         FrontDesk asked to create a new chart. The identity gate denied it because an existing chart scored{" "}
