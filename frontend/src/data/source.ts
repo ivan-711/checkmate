@@ -12,6 +12,7 @@ import type {
   SafetyAlert,
   SessionResponse,
   SourceCard,
+  ThresholdSet,
   TilesResponse,
   TimelineEvent,
 } from "@/api/types";
@@ -68,6 +69,8 @@ export interface DataSource {
   /** The newest EVENT_FEED_ROWS rows of the append-only event feed, newest first. */
   getEvents(): Promise<EventLogRow[]>;
   getTiles(): Promise<TilesResponse>;
+  /** The threshold set the bands were decided with (c_low, c_high; auto-link always off in the demo). */
+  getThresholds(): Promise<ThresholdSet>;
   /** FrontDesk: opens a check-in. The server picks the agent mode and reports it as agentMode. */
   startIntake(language: Language, scenarioContextId: string): Promise<IntakeSession>;
   /** One typed message. The key is minted once per message and reused when it is retried. */
