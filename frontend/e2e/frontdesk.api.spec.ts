@@ -1,4 +1,4 @@
-import { expect, test, type Route } from "@playwright/test";
+import { expect, test, type Page, type Response, type Route } from "@playwright/test";
 import { BODY_TEXT_PX, fontSizePx, kioskTextBelow } from "./kioskText";
 
 // Run by `npm run e2e:api` against the API-mode build and an API in REPLAY with the corpus hero.
@@ -96,3 +96,78 @@ for (const lang of [
     expect(await kioskTextBelow(page)).toEqual([]);
   });
 }
+
+const isReset = (r: Response) =>
+  r.request().method() === "POST" && new URL(r.url()).pathname === "/api/v1/sessions";
+
+/** Reset demo, waited for: the first Reset after an API start can take 20 s on the corpus. */
+async function resetDemo(page: Page) {
+  await Promise.all([
+    page.waitForResponse(isReset, { timeout: 60_000 }),
+    page.getByTestId("reset-button").click(),
+  ]);
+  await expect(page.getByTestId("reset-button")).toBeEnabled({ timeout: 30_000 });
+}
+
+test("Start over in LOCAL resets the demo: the next check-in meets the hero's ER chart, not its own earlier entry", async ({
+  page,
+}) => {
+  test.setTimeout(120_000); // two resets on the corpus (the first can take 20 s) and two turns
+  await page.goto("/frontdesk");
+  await expect(page.getByTestId("agent-mode-badge")).toBeVisible();
+  await resetDemo(page);
+  const useThis = page.getByRole("button", { name: "Use this" });
+  await expect(useThis).toBeEnabled({ timeout: 30_000 });
+  await useThis.click();
+  await page.keyboard.press("Enter");
+  const gate = page.getByTestId("gate-card");
+  await expect(gate).toBeVisible({ timeout: 30_000 });
+  await expect(gate).toContainText("ER FHIR");
+  await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (2)");
+
+  // Every check-in leaves an intake record on the server. Only a reset removes it: without one,
+  // the next check-in's gate matches this check-in's own record (AUTO-LINK, sorted first) and
+  // shows it instead of the hero chart, the registrar holds three pairs, one of them
+  // intake-to-intake, and the replay diverges.
+  await Promise.all([
+    page.waitForResponse(isReset, { timeout: 60_000 }),
+    page.getByRole("button", { name: "Start over" }).click(),
+  ]);
+  await expect(page.getByText("Your conversation will appear here.")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("No held check-ins.")).toBeVisible();
+  await expect(useThis).toBeEnabled({ timeout: 30_000 });
+  await useThis.click();
+  await page.keyboard.press("Enter");
+  await expect(gate).toBeVisible({ timeout: 30_000 });
+  await expect(gate).toContainText("ER FHIR");
+  await expect(gate).not.toContainText("Frontdesk Intake");
+  await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (2)");
+});
+
+test("Use this is locked while the first turn is being read, and gone once the turn has landed", async ({
+  page,
+}) => {
+  test.setTimeout(90_000); // a reset on the corpus, then a turn
+  await page.goto("/frontdesk");
+  await resetDemo(page);
+  const useThis = page.getByRole("button", { name: "Use this" });
+  await expect(useThis).toBeEnabled({ timeout: 30_000 });
+  await useThis.click();
+  await expect(page.getByTestId("kiosk-send")).toBeEnabled({ timeout: 30_000 });
+
+  let held: Route | null = null;
+  await page.route("**/api/v1/intake-sessions/*/turns", (route) => {
+    held = route;
+  });
+  await page.getByTestId("kiosk-send").click();
+  await expect.poll(() => held !== null).toBe(true);
+  await expect(page.getByText("Reading your message")).toBeVisible();
+  // Pressed now, it would refill the composer with the line a later Enter sends again as turn 1,
+  // which the replay cannot play: the same check-in would then end on the template reply.
+  await expect(useThis).toBeDisabled();
+
+  await held!.continue();
+  await page.unroute("**/api/v1/intake-sessions/*/turns");
+  await expect(page.getByTestId("gate-card")).toBeVisible({ timeout: 30_000 });
+  await expect(useThis).toHaveCount(0);
+});

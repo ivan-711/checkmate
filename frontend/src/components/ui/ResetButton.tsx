@@ -8,6 +8,9 @@ import { useDataSource } from "@/data/DataSourceProvider";
 /** Reset and Undo share this key so the case screen can hold Resolve until the new session has
  * loaded: a match run that overlaps a reset gets a 503 and leaves no candidate pair. */
 export const SESSION_CHANGE_KEY = ["session-change"] as const;
+/** Reset demo alone, under SESSION_CHANGE_KEY so it counts as a session change wherever one is
+ * awaited; the header button reads "Resetting..." whichever control started it. */
+const RESET_KEY = [...SESSION_CHANGE_KEY, "reset"] as const;
 /** Resolve's key, so Reset waits for a match run in flight for the same reason. */
 export const RESOLVE_KEY = ["resolve"] as const;
 /** The newest match-run receipt Resolve returned in this tab. The work queue draws its funnel
@@ -16,13 +19,11 @@ export const LATEST_MATCH_RUN_KEY = ["latest-match-run"] as const;
 /** Every work-queue read (pages and row details); GETs only. */
 export const WORK_QUEUE_KEY = ["work-queue"] as const;
 
-/** One click, no confirmation; a 5 s "Undo reset" toast covers a stray click. */
-export function ResetButton() {
+/** The Reset demo and Undo mutations with the cache refresh a session change needs. The header
+ * button and, in LOCAL mode, the kiosk's Start over run the same reset through this hook. */
+export function useDemoReset() {
   const source = useDataSource();
   const queryClient = useQueryClient();
-  const resolving = useIsMutating({ mutationKey: RESOLVE_KEY }) > 0;
-  // Counts Undo as well as Reset, so a reset never races a restore still in flight.
-  const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
 
   // Reset, not invalidate, the case: its panels remount, so no half-typed note or stale
   // error survives. Tiles keep showing their values while they refetch.
@@ -50,7 +51,7 @@ export function ResetButton() {
   });
 
   const reset = useMutation({
-    mutationKey: SESSION_CHANGE_KEY,
+    mutationKey: RESET_KEY,
     mutationFn: () => source.reset(),
     onSuccess: async (session) => {
       await refreshAfterSessionChange();
@@ -65,6 +66,17 @@ export function ResetButton() {
     onError: (error) => toast(`Reset failed: ${error.message}`),
   });
 
+  return { reset, restore };
+}
+
+/** One click, no confirmation; a 5 s "Undo reset" toast covers a stray click. */
+export function ResetButton() {
+  const { reset } = useDemoReset();
+  const resolving = useIsMutating({ mutationKey: RESOLVE_KEY }) > 0;
+  // Counts Undo as well as Reset, so a reset never races a restore still in flight.
+  const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
+  const resetting = useIsMutating({ mutationKey: RESET_KEY }) > 0;
+
   return (
     <button
       type="button"
@@ -73,7 +85,7 @@ export function ResetButton() {
       disabled={sessionChanging || resolving}
       className="h-11 rounded-md border border-border-strong bg-surface px-4 text-[16px] font-semibold text-ink-1 hover:bg-sunken disabled:text-ink-3"
     >
-      {reset.isPending ? "Resetting..." : "Reset demo"}
+      {resetting ? "Resetting..." : "Reset demo"}
     </button>
   );
 }

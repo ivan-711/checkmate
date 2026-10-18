@@ -43,7 +43,8 @@ export interface SuggestedCheckIn {
   demoScript: boolean;
 }
 
-/** One data layer, two adapters. The UI branches on `mode` only for the badge. */
+/** One data layer, two adapters. The UI branches on `mode` only for the badge and for the
+ * kiosk's Start over, which in LOCAL has to be the demo reset. */
 export interface DataSource {
   readonly mode: Mode;
   /** Whether restore() works here; the Undo reset action is offered only when it does. */

@@ -12,6 +12,10 @@ export const INTAKE_KEY = ["intake-session"] as const;
 export const HANDOFF_KEY = ["handoff-pair"] as const;
 export const handoffPairKey = (pairId: string) => [...HANDOFF_KEY, pairId] as const;
 
+/** The kiosk's message in flight. The suggestion bar and Start over wait for it, so a second
+ * message never lands in the same check-in while the first is being read. */
+export const SEND_TURN_KEY = ["send-turn"] as const;
+
 const INTAKE_HASH = hashKey(INTAKE_KEY);
 
 /** Calls onChange after the kiosk's check-in changes, never inside a render. The cache notifies

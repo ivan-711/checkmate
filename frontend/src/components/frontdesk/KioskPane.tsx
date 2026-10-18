@@ -5,7 +5,7 @@ import { Check, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { IntakeSession, IntakeTurn, ToolCallRecord } from "@/api/types";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
-import { SESSION_CHANGE_KEY } from "@/components/ui/ResetButton";
+import { SESSION_CHANGE_KEY, useDemoReset } from "@/components/ui/ResetButton";
 import { RuleResultTag } from "@/components/ui/RuleResultTag";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { useDataSource } from "@/data/DataSourceProvider";
@@ -14,7 +14,7 @@ import { DataError } from "@/data/source";
 import { COPY, type KioskCopy, type KioskLanguage } from "./copy";
 import { needsNewCheckIn } from "./checkIn";
 import { GateCard } from "./GateCard";
-import { HANDOFF_KEY, INTAKE_KEY, useHandoffPairs } from "./intake";
+import { HANDOFF_KEY, INTAKE_KEY, SEND_TURN_KEY, useHandoffPairs } from "./intake";
 import { ToolCallChip } from "./ToolCallChip";
 import { turnSteps } from "./turnSteps";
 
@@ -166,6 +166,10 @@ export function KioskPane() {
   // A reset on the corpus takes seconds and wipes every check-in when it lands: nothing is sent
   // meanwhile, and ResetButton starts the new check-in once it has finished.
   const resetting = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
+  const demo = useDemoReset();
+  // The message in flight, read from the cache like `resetting`: the suggestion bar and Start
+  // over are locked while it is being read, so nothing else lands in the same check-in.
+  const sending = useIsMutating({ mutationKey: SEND_TURN_KEY }) > 0;
   const session = useQuery({
     queryKey: INTAKE_KEY,
     queryFn: startIntake,
@@ -184,6 +188,7 @@ export function KioskPane() {
       : null;
 
   const send = useMutation({
+    mutationKey: SEND_TURN_KEY,
     mutationFn: async (message: { text: string; key: string }) => {
       try {
         return await source.sendTurn(session.data!.id, message.text, message.key);
@@ -330,12 +335,20 @@ export function KioskPane() {
             {turns.length > 0 && (
               <button
                 type="button"
-                disabled={send.isPending}
+                disabled={sending || resetting}
                 onClick={() => {
                   setFailed(null);
                   setText("");
                   key.current = null;
                   send.reset();
+                  if (source.mode === "LOCAL") {
+                    // Every check-in leaves an intake record on the server, and the next check-in's
+                    // gate would match it: the patient's own earlier entry scores AUTO_LINK and takes
+                    // the card from the hero chart. Only the demo reset removes it (the kiosk then
+                    // starts a new check-in and takes focus); the fixture keeps no such record.
+                    demo.reset.mutate();
+                    return;
+                  }
                   void queryClient.resetQueries({ queryKey: INTAKE_KEY });
                   void queryClient.resetQueries({ queryKey: HANDOFF_KEY });
                   composer.current?.focus();
@@ -460,7 +473,7 @@ export function KioskPane() {
             <ConstructedChip label={t.constructed} explanation={t.constructedKiosk} />
             <button
               type="button"
-              disabled={resetting}
+              disabled={resetting || sending}
               onClick={() => {
                 setText(suggestion);
                 composer.current?.focus();

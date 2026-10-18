@@ -3,16 +3,16 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { IntakeSession, IntakeTurn } from "@/api/types";
+import { SESSION_CHANGE_KEY } from "@/components/ui/ResetButton";
 import { DataSourceProvider } from "@/data/DataSourceProvider";
 import { FixtureSource } from "@/data/fixtureSource";
 import { scenario } from "@/data/scenario";
 import { COPY } from "./copy";
-import { INTAKE_KEY } from "./intake";
+import { INTAKE_KEY, SEND_TURN_KEY } from "./intake";
 import { KioskPane } from "./KioskPane";
 
 /** The kiosk with one check-in already in the cache, rendered for real. */
-function renderKiosk(session: IntakeSession): string {
-  const queryClient = new QueryClient();
+function renderKiosk(session: IntakeSession, queryClient = new QueryClient()): string {
   queryClient.setQueryData(INTAKE_KEY, session);
   return renderToStaticMarkup(
     createElement(
@@ -104,5 +104,37 @@ describe("KioskPane transcript", () => {
     );
     expect(html.match(/data-testid="tool-call-chip"/g)).toHaveLength(2);
     expect(html).toContain('data-testid="gate-card"');
+  });
+});
+
+/** A client whose cache holds a mutation under `mutationKey` that never settles: the kiosk sees
+ * it the way it sees a turn or a reset in flight, through useIsMutating. */
+function inFlight(mutationKey: readonly unknown[]): QueryClient {
+  const queryClient = new QueryClient();
+  const mutation = queryClient
+    .getMutationCache()
+    .build(queryClient, { mutationKey: [...mutationKey], mutationFn: () => new Promise<never>(() => {}) });
+  void mutation.execute(undefined);
+  return queryClient;
+}
+
+/** Whether the button that reads `label` is rendered disabled (the attribute, not a class). */
+function isDisabled(html: string, label: string): boolean {
+  const end = html.indexOf(`>${label}</button>`);
+  expect(end, `a "${label}" button`).toBeGreaterThan(-1);
+  return html.slice(html.lastIndexOf("<button", end), end + 1).includes(' disabled=""');
+}
+
+describe("KioskPane while work is in flight", () => {
+  it("locks Use this while the first turn is being read, so the line cannot go twice into one check-in", async () => {
+    const fresh = await new FixtureSource(scenario).startIntake("EN");
+    expect(isDisabled(renderKiosk(fresh), COPY.en.suggestUse)).toBe(false);
+    expect(isDisabled(renderKiosk(fresh, inFlight(SEND_TURN_KEY)), COPY.en.suggestUse)).toBe(true);
+  });
+
+  it("locks Start over while the demo resets", async () => {
+    const { session } = await checkIn(scenario.frontdeskIntake.utteranceEn);
+    expect(isDisabled(renderKiosk(session), COPY.en.startOver)).toBe(false);
+    expect(isDisabled(renderKiosk(session, inFlight(SESSION_CHANGE_KEY)), COPY.en.startOver)).toBe(true);
   });
 });
