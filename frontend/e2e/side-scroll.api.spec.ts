@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 // Run by `npm run e2e:api` against the API-mode build and an API in REPLAY with the corpus hero.
 // It presses Reset demo on that API; the config refuses to run unless CHECKMATE_API_ORIGIN names it.
-// The hero shows constructed-scenario chips on the kiosk's suggested check-in, the registrar's
-// source cards and the flag summary. No tooltip, open or closed, may add sideways scroll.
+// The hero shows constructed-scenario chips on the kiosk's suggested check-in, the Desk's
+// records and the flag notice. No tooltip, open or closed, may add sideways scroll.
 const RESET_MS = 90_000;
 test.setTimeout(240_000);
 
@@ -36,7 +36,7 @@ for (const viewport of VIEWPORTS) {
     page,
   }) => {
     await page.setViewportSize(viewport);
-    await page.goto("/frontdesk");
+    await page.goto("/");
     const reset = page.waitForResponse(
       (r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/api/v1/sessions",
       { timeout: RESET_MS },
@@ -50,19 +50,17 @@ for (const viewport of VIEWPORTS) {
     await page.getByRole("button", { name: "Use this" }).click();
     await page.getByTestId("kiosk-send").click();
     await expect(page.getByTestId("gate-card")).toBeVisible({ timeout: 30_000 });
-    const held = page.getByTestId("registrar-held");
-    await expect(held).toContainText("Held check-ins (2)");
+    await expect(page.locator('[data-pane="held"]')).toBeVisible({ timeout: 30_000 });
     expect(await sideScroll(page), "after a turn").toBeLessThanOrEqual(0);
     await expectEveryOpenTooltipInside(page, viewport.width);
 
-    // The staff pane is a landscape surface: approve both held pairs there, then look again.
+    // The Desk is a landscape surface: Resolve, then one Confirm links the records and attaches
+    // the held check-in (L4), then look again at this size.
     await page.setViewportSize(STAFF_VIEWPORT);
-    for (let i = 0; i < 2; i++) {
-      await held.getByTestId("approve-button").first().click();
-      await held.getByTestId("review-submit-button").click();
-      await expect(held.getByText(/Approved by /)).toHaveCount(i + 1, { timeout: 30_000 });
-    }
-    await expect(page.getByTestId("registrar-flag-summary")).toBeVisible();
+    await page.getByTestId("resolve-button").click();
+    await page.getByTestId("approve-button").click({ timeout: 30_000 });
+    await page.getByTestId("review-submit-button").click();
+    await expect(page.getByTestId("flag-card")).toBeVisible({ timeout: 30_000 });
     await page.setViewportSize(viewport);
     expect(await sideScroll(page), "after Approve").toBeLessThanOrEqual(0);
     await expectEveryOpenTooltipInside(page, viewport.width);

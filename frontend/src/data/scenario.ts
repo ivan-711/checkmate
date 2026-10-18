@@ -4,6 +4,7 @@ import type {
   Entity,
   SafetyAlert,
   SessionResponse,
+  ThresholdSet,
   TilesResponse,
   TimelineEvent,
 } from "@/api/types";
@@ -18,6 +19,8 @@ export interface ScenarioFixture {
   timelineIfApproved: TimelineEvent[];
   alertIfApproved: SafetyAlert;
   tiles: TilesResponse;
+  /** The provisional threshold set the fixture pair was banded with. */
+  thresholds: ThresholdSet;
   /** The kiosk's suggested check-in: the utterance the recorded agent turn answers. */
   frontdeskIntake: { scenarioContextId: string; utteranceEn: string; utteranceEs: string };
 }

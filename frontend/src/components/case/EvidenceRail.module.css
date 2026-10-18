@@ -1,0 +1,26 @@
+/* The Desk's compact layer (globals.css: 1300 px wide or 760 px tall and under, so 1280x720):
+   the rail shows its top four rows with "Show all", so Approve stays in view without a scroll. */
+.compactOnly {
+  display: none;
+}
+@media (max-width: 1300px), (max-height: 760px) {
+  .compactHidden {
+    display: none;
+  }
+  .compactOnly {
+    display: inline;
+  }
+}
+
+/* One dot per 0.5 log-odds; --f is the fill of this dot, 0% to 100%. */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.2px var(--ink);
+  background: linear-gradient(to right, var(--ink) var(--f, 0%), transparent var(--f, 0%));
+}
+.dotAgainst {
+  box-shadow: inset 0 0 0 1.2px var(--ink-3);
+  background: linear-gradient(to right, var(--ink-3) var(--f, 0%), transparent var(--f, 0%));
+}

@@ -111,12 +111,17 @@ Scope: **runtime** packages are reached from `[project].dependencies` in `pyproj
 
 These are the direct dependencies and devDependencies only; transitive packages are not listed. Versions come from each app's `package-lock.json`. Licenses come from `node_modules/<package>/package.json`, installed from those lock files, and every installed version equals its lock version.
 
-### `frontend/` (7 dependencies, 13 devDependencies)
+### `frontend/` (12 dependencies, 13 devDependencies)
 
 | Package | Version | License | Scope |
 |---|---|---|---|
+| @fontsource-variable/bricolage-grotesque | 5.3.0 | OFL-1.1 | runtime |
+| @fontsource-variable/instrument-sans | 5.3.0 | OFL-1.1 | runtime |
+| @fontsource/dm-mono | 5.3.0 | OFL-1.1 | runtime |
 | @tanstack/react-query | 5.104.4 | MIT | runtime |
+| cmdk | 1.1.1 | MIT | runtime |
 | lucide-react | 1.59.0 | ISC | runtime |
+| motion | 14.3.0 | MIT | runtime |
 | next | 15.5.28 | MIT | runtime |
 | openapi-fetch | 0.17.0 | MIT | runtime |
 | react | 19.1.10 | MIT | runtime |
@@ -143,6 +148,7 @@ These are the direct dependencies and devDependencies only; transitive packages 
 | @playwright/test | 1.64.1 | Apache-2.0 | dev |
 | @types/node | 26.6.5 | MIT | dev |
 | typescript | 5.9.3 | Apache-2.0 | dev |
+
 
 ## Container images and build tools
 

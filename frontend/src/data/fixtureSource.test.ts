@@ -225,3 +225,12 @@ describe("FixtureSource work queue", () => {
     });
   });
 });
+
+describe("FixtureSource thresholds", () => {
+  it("returns the fixture's threshold set, auto-link off and not calibrated", async () => {
+    const thresholds = await source().getThresholds();
+    expect(thresholds).toEqual(scenario.thresholds);
+    expect(thresholds.autoLinkEnabled).toBe(false);
+    expect(thresholds.isCalibrated).toBe(false);
+  });
+});

@@ -14,8 +14,8 @@ test("Send is held during Reset; Español before the first turn plays the record
   page.on("request", (r) => {
     if (isStart(r.url(), r.method())) starts.push(r.postDataJSON()?.language);
   });
-  await page.goto("/frontdesk");
-  await expect(page.getByTestId("agent-mode-badge")).toBeVisible();
+  await page.goto("/");
+  await expect(page.getByTestId("kiosk-composer")).toBeVisible();
 
   // Reset on the corpus takes seconds: nothing can be sent until it has finished.
   let resetDone = false;
@@ -49,7 +49,38 @@ test("Send is held during Reset; Español before the first turn plays the record
   expect(turn.degraded ?? null).toBeNull();
   expect(turn.assistantTextSource).toBe("MODEL");
   await expect(page.getByTestId("gate-card")).toBeVisible();
-  await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (2)");
+  // The hero holds two pairs for the registrar (the ER and the Clinic record); the Desk knows.
+  expect(turn.registration.handoffPairIds).toHaveLength(2);
+  await expect(page.locator('[data-kiosk="held"]')).toHaveCount(1);
+});
+
+// BUILD-SPEC decision 5: on the API a second check-in without a reset would find the first one's
+// own intake record, so Start over performs the same Reset as the top bar's Reset demo.
+test("Start over after a held check-in resets the demo, then starts a new check-in", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("kiosk-composer")).toBeVisible();
+  await page.getByRole("button", { name: "Use this" }).click();
+  await expect(page.getByTestId("kiosk-send")).toBeEnabled({ timeout: 30_000 });
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("gate-card")).toBeVisible({ timeout: 30_000 });
+  // The demo line runs once per check-in.
+  await expect(page.getByRole("button", { name: "Use this" })).toHaveCount(0);
+
+  const starts: string[] = [];
+  page.on("request", (r) => {
+    if (isStart(r.url(), r.method())) starts.push(r.url());
+  });
+  const [reset] = await Promise.all([
+    page.waitForResponse(
+      (r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/api/v1/sessions",
+      { timeout: 60_000 },
+    ),
+    page.getByRole("button", { name: "Start over" }).click(),
+  ]);
+  expect(reset.status()).toBe(201);
+  await expect(page.getByTestId("kiosk")).toHaveAttribute("data-k", "idle", { timeout: 30_000 });
+  await expect.poll(() => starts.length, { timeout: 30_000 }).toBeGreaterThan(0);
+  await expect(page.getByRole("button", { name: "Use this" })).toBeEnabled({ timeout: 30_000 });
 });
 
 for (const lang of [
@@ -68,11 +99,11 @@ for (const lang of [
     failed: "FrontDesk no pudo conectar con el servicio del agente. Su mensaje no se envió.",
   },
 ]) {
-  test(`waiting, then a failed first turn: kiosk text at 16 px or more at 1280x720 (${lang.toggle})`, async ({
+  test(`waiting, then a failed first turn: kiosk text at 18 px or more at 1280x720 (${lang.toggle})`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.goto("/frontdesk");
+    await page.goto("/");
     await page.getByRole("button", { name: lang.toggle }).click();
     await page.getByRole("button", { name: lang.use }).click();
     await expect(page.getByTestId("kiosk-send")).toBeEnabled({ timeout: 30_000 });
