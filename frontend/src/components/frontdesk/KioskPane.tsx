@@ -1,11 +1,12 @@
 "use client";
 
 import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ShieldCheck } from "lucide-react";
+import { Check, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { IntakeSession, IntakeTurn, ToolCallRecord } from "@/api/types";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
 import { SESSION_CHANGE_KEY } from "@/components/ui/ResetButton";
+import { VerifiedTag } from "@/components/ui/VerifiedTag";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { scenario } from "@/data/scenario";
@@ -16,7 +17,6 @@ import { GateCard } from "./GateCard";
 import { HANDOFF_KEY, INTAKE_KEY, useHandoffPairs } from "./intake";
 import { ToolCallChip } from "./ToolCallChip";
 import { turnSteps } from "./turnSteps";
-import { VerifiedTag } from "@/components/ui/VerifiedTag";
 
 const MAX_CHARS = 280; // UX 3.11 composer limit; the contract allows 500
 const COUNTER_FROM = 240;
@@ -57,8 +57,9 @@ function Steps({ turn, t }: { turn: IntakeTurn; t: KioskCopy }) {
   return (
     <li data-testid="turn-steps">
       <ol aria-label={t.stepsLabel} className="space-y-1 text-[18px]">
-        {steps.done.map((step) => (
-          <li key={step} className="flex items-center gap-2 text-ink-2">
+        {/* The same tool can run twice in a turn, so rows are keyed by position. */}
+        {steps.done.map((step, i) => (
+          <li key={i} className="flex items-center gap-2 text-ink-2">
             <Check aria-hidden size={18} className="shrink-0" />
             {step}
           </li>
@@ -71,7 +72,11 @@ function Steps({ turn, t }: { turn: IntakeTurn; t: KioskCopy }) {
             fact.outcome === "HELD" ? "border-denied-border border-l-gate-bar" : "border-allowed-border"
           }`}
         >
-          <ShieldCheck aria-hidden size={18} className="shrink-0" />
+          {fact.outcome === "HELD" ? (
+            <ShieldAlert aria-hidden size={18} className="shrink-0 text-denied-ink" />
+          ) : (
+            <ShieldCheck aria-hidden size={18} className="shrink-0 text-allowed-ink" />
+          )}
           <span>{t.gateName}:</span>
           <span className="font-semibold">{fact.label}</span>
           {fact.reason && <span className="font-mono text-[16px]">{fact.reason}</span>}
