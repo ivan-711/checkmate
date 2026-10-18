@@ -7,6 +7,7 @@ import { ReviewPanel } from "@/components/case/ReviewPanel";
 import { SourceCardView } from "@/components/case/SourceCardView";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { differingFields } from "@/lib/display";
+import { COPY } from "./copy";
 import { HANDOFF_KEY, handoffPairKey, useIntakeSession } from "./intake";
 
 /** One pair the gate held, decided by a person through the existing review endpoint. */
@@ -47,7 +48,7 @@ function HeldPair({ pairId, index, total }: { pairId: string; index: number; tot
       </h3>
       <p>
         FrontDesk asked to create a new chart. The identity gate denied it because an existing chart scored{" "}
-        {decision.p.toFixed(2)} ({decision.band}).
+        {decision.p.toFixed(2)} ({COPY.en.band[decision.band]}).
       </p>
       <div className="grid min-w-0 grid-cols-2 gap-3 max-[640px]:grid-cols-1">
         <SourceCardView card={detail.recordA} differs={differs} />
