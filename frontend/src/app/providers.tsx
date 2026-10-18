@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { Toaster } from "sonner";
+import { DeskProvider } from "@/components/desk/DeskContext";
 import { LiveRegionProvider } from "@/components/ui/LiveRegion";
 import { LATEST_MATCH_RUN_KEY } from "@/components/ui/ResetButton";
 import { DataSourceProvider } from "@/data/DataSourceProvider";
@@ -24,8 +25,10 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <DataSourceProvider>
         <LiveRegionProvider>
-          {children}
-          <Toaster position="bottom-right" duration={UNDO_WINDOW_MS} />
+          <DeskProvider>
+            {children}
+            <Toaster position="bottom-right" duration={UNDO_WINDOW_MS} />
+          </DeskProvider>
         </LiveRegionProvider>
       </DataSourceProvider>
     </QueryClientProvider>
