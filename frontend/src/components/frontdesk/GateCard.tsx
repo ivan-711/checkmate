@@ -79,7 +79,7 @@ export const GateCard = forwardRef<
             </li>
           ))}
         </ul>
-        <p className="mt-2 text-[14px] text-ink-3">{t.gateHidden}</p>
+        <p className="mt-2 text-ink-3">{t.gateHidden}</p>
       </div>
       <p className="mt-3 flex items-center gap-2 font-semibold">
         <ArrowRight aria-hidden size={20} />

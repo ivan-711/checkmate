@@ -15,6 +15,7 @@ export const COPY = {
     disclosure:
       "FrontDesk uses Gemini to read your check-in. A registrar confirms any match to an existing chart.",
     transcript: "TRANSCRIPT",
+    agentMode: (mode: string) => `Agent: ${mode}`,
     region: "Check-in conversation",
     empty: "Your conversation will appear here.",
     language: "Language",
@@ -71,6 +72,7 @@ export const COPY = {
     disclosure:
       "FrontDesk usa Gemini para leer su registro. El personal de admisión confirma cualquier coincidencia con un expediente existente.",
     transcript: "CONVERSACIÓN",
+    agentMode: (mode: string) => `Agente: ${mode}`,
     region: "Conversación de registro",
     empty: "Su conversación aparecerá aquí.",
     language: "Idioma",
