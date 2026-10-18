@@ -141,27 +141,46 @@ CI runs ruff, the OpenAPI snapshot check, pytest, a schemathesis contract test a
 
 ## Evaluation
 
-The harness measures the code the app runs: the synthetic corpus built from the Synthea sample with its hidden truth table, and the engine with the shipped `handset-1` weights, banded at the app's current threshold row (`eval/harness/product.py`, `eval/harness/current_thresholds.py`). On every merge to `main`, CI runs the fast configuration (P0 corruption families, one seed, development components only, out of fold) and posts the table as a commit comment (`.github/workflows/ci.yml`, `eval/expectations/config.json`). Intervals are percentile bootstrap over dependency components (`eval/harness/summary.py`). These are descriptive numbers on synthetic data, not guarantees.
+The harness measures the code the app runs: the synthetic corpus built from the Synthea sample with its hidden truth table, and the engine with the shipped `handset-1` weights, banded at the app's current threshold row (`eval/harness/product.py`, `eval/harness/current_thresholds.py`). These are descriptive numbers on synthetic data, not guarantees.
+
+### Held-out test partition
+
+Source: harness run 1c3f8f96 (local `eval/runs/`, gitignored; reproduce with the eval command below).
+
+- The run scored the development partition out of fold, then scored the test partition once. The test partition holds 144 of the 500 dependency components. They are kept out of the development scoring and the cutoff selection (manifest `regime`: "development + single test pass"; split rules in `eval/expectations/splits.json`).
+- Settings: seed 20261017, scorer `handset-1`, threshold row `provisional-1` (`c_low` 0.0, `c_high` 4.0). Every band number is computed at that row; auto-link is off in the app, so the `AUTO_LINK` rows describe the band only.
+- The run was made at commit `95be994`, an ancestor of `main`. `backend/core`, `backend/ingest` and `eval/harness` are unchanged since then, and the engine hash recorded in the run equals the hash of `backend/core` on `main`.
+- Intervals are 95% percentile bootstrap intervals over dependency components, with 1000 resamples.
+- A number is not reported when the harness flags it "do not read": under 30 components or under 100 pairs (`eval/harness/metrics.py`).
+- The five held-out corruption families (C3, D5, L4, N5, S4) have no numbers in this run.
+
+| Number | Value | 95% interval | n pairs | n components |
+|---|---|---|---|---|
+| AUTO_LINK precision | not reported (n = 15, below the reporting floor) | n/a | 15 | 11 |
+| AUTO_LINK recall (STRICT, end to end) | 0.069444 | 0.031094 to 0.118489 | 216 | 125 |
+| REVIEW precision | 0.903226 | 0.839791 to 0.962991 | 186 | 111 |
+| REVIEW share of true pairs | 0.865979 | 0.795803 to 0.924267 | 194 | 120 |
+| LENIENT recall (end to end) | 0.847222 | 0.783542 to 0.905025 | 216 | 125 |
+| KEEP_SEPARATE precision | not reported (n = 72, below the reporting floor) | n/a | 72 | 33 |
+| False-merge rate (auto-links) | not reported (n = 15, below the reporting floor) | n/a | 15 | 11 |
+| Review burden | 0.681319 | 0.567974 to 0.794252 | 273 | 122 |
+| Blocking recall | 0.898148 | 0.845794 to 0.946433 | 216 | 125 |
+
+What the rows mean (`eval/harness/metrics.py`):
+- Strict recall counts true pairs that land in `AUTO_LINK`. Lenient recall counts true pairs that land in `AUTO_LINK` or `REVIEW`. Both are taken over all true pairs, including pairs that blocking missed.
+- Review burden is the share of scored pairs that go to `REVIEW`.
+- Blocking recall is the share of true pairs that blocking puts forward as candidate pairs: 194 of 216. The run itself notes that the keys were built after reading the corruption taxonomy, so this number is partly true by construction.
+
+### Running the harness
+
+The harness has no Makefile target; run it with `uv`. It needs the Synthea sample from `data/download.py`.
 
 ```sh
 uv run python data/download.py
-uv run python -m eval.harness.run --fast --seed 20261017 --out eval/runs
-uv run python -m eval.harness.summary eval/runs/<run_id>
+uv run python -m eval.harness.run --test-pass --seed 20261017 --out eval/runs
 ```
 
-Harness run <!-- lead: number -->, seed 20261017, scorer `handset-1`, thresholds `provisional-1`:
-
-| Number | Value | 95% interval | n pairs |
-|---|---|---|---|
-| AUTO_LINK precision | <!-- lead: number --> | <!-- lead: number --> | <!-- lead: number --> |
-| AUTO_LINK recall (STRICT, end to end) | <!-- lead: number --> | <!-- lead: number --> | <!-- lead: number --> |
-| REVIEW precision | <!-- lead: number --> | <!-- lead: number --> | <!-- lead: number --> |
-| REVIEW share of true pairs | <!-- lead: number --> | <!-- lead: number --> | <!-- lead: number --> |
-| LENIENT recall (end to end) | <!-- lead: number --> | <!-- lead: number --> | <!-- lead: number --> |
-| KEEP_SEPARATE precision | <!-- lead: number --> | <!-- lead: number --> | <!-- lead: number --> |
-| False-merge rate (auto-links) | <!-- lead: number --> | <!-- lead: number --> | <!-- lead: number --> |
-| Review burden | <!-- lead: number --> | <!-- lead: number --> | <!-- lead: number --> |
-| Blocking recall | <!-- lead: number --> | <!-- lead: number --> | <!-- lead: number --> |
+`--test-pass` adds the single test-partition pass; the held-out numbers are the `test.*` keys in `eval/runs/<run_id>/metrics.json` (`eval/harness/run.py`). On every merge to `main`, CI runs the per-merge configuration instead: `--fast`, with P0 corruption families, one seed, development components only and no test pass. CI posts that table as a commit comment (`.github/workflows/ci.yml`, `eval/expectations/config.json`). `uv run python -m eval.harness.summary eval/runs/<run_id>` renders the development numbers only.
 
 Not measured yet: the gate suite, the injection suite and the BL-AMOX-01 case list in `eval/expectations/` are placeholders with no cases (`eval/expectations/gate_suite.json`, `injection_strings.json`, `rule_tests.json`). The rule's unit tests are in `backend/tests/rule/`.
 
