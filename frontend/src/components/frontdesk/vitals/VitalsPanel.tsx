@@ -2,7 +2,7 @@
 
 // Optional pulse estimate while the kiosk looks up the patient's record. Everything happens in
 // this component: the reading is never sent to the API, stored or shown to staff, and the camera
-// is released when the 20 seconds end, on Stop and on unmount.
+// is released when the 20 seconds end, on timeout, on Stop and on unmount.
 import { useEffect, useRef, useState } from "react";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import type { KioskLanguage } from "../copy";
@@ -11,6 +11,8 @@ import { createPulseEngine, isSteady, type PulseEngine, type PulseReading } from
 
 /** Length of one reading; the POS window needs a few seconds before its first estimate. */
 export const MEASURE_SECONDS = 20;
+/** Bounds camera ownership across both library start-up and measurement. */
+export const VITALS_TIMEOUT_MS = 45_000;
 const TICK_MS = 1000;
 const CAMERA: MediaStreamConstraints = {
   video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
@@ -18,20 +20,33 @@ const CAMERA: MediaStreamConstraints = {
 };
 
 type Phase =
-  "consent" | "declined" | "pick-file" | "starting" | "measuring" | "result" | "unsteady" | "unavailable";
+  | "consent"
+  | "declined"
+  | "pick-file"
+  | "starting"
+  | "measuring"
+  | "result"
+  | "stopped"
+  | "timed-out"
+  | "unsteady"
+  | "unavailable";
 
 /** One camera or clip run: what has to be released when it ends. */
 interface Run {
   stream: MediaStream | null;
   engine: PulseEngine | null;
   timer: ReturnType<typeof setInterval> | null;
+  watchdog: ReturnType<typeof setTimeout> | null;
   clipUrl: string | null;
   reading: PulseReading | null;
 }
 
-/** `?vitalsSource=file` swaps the webcam for a local recorded clip, for machines without one. */
+/** A local clip is a development-only camera substitute and cannot ship in production builds. */
 function fromFileRequested() {
-  return new URLSearchParams(window.location.search).get("vitalsSource") === "file";
+  return (
+    process.env.NODE_ENV !== "production" &&
+    new URLSearchParams(window.location.search).get("vitalsSource") === "file"
+  );
 }
 
 export default function VitalsPanel({ language }: { language: KioskLanguage }) {
@@ -49,6 +64,8 @@ export default function VitalsPanel({ language }: { language: KioskLanguage }) {
     if (run.current === r) run.current = null;
     if (r.timer) clearInterval(r.timer);
     r.timer = null;
+    if (r.watchdog) clearTimeout(r.watchdog);
+    r.watchdog = null;
     void r.engine?.stop().catch(() => undefined);
     r.engine = null;
     r.stream?.getTracks().forEach((track) => track.stop());
@@ -82,8 +99,20 @@ export default function VitalsPanel({ language }: { language: KioskLanguage }) {
   }
 
   async function measure(openStream: (r: Run) => Promise<MediaStream>) {
-    const r: Run = { stream: null, engine: null, timer: null, clipUrl: null, reading: null };
+    const r: Run = {
+      stream: null,
+      engine: null,
+      timer: null,
+      watchdog: null,
+      clipUrl: null,
+      reading: null,
+    };
     run.current = r;
+    r.watchdog = setTimeout(() => {
+      if (run.current !== r) return;
+      release(r);
+      setPhase("timed-out");
+    }, VITALS_TIMEOUT_MS);
     setPhase("starting");
     try {
       r.stream = await openStream(r);
@@ -104,7 +133,8 @@ export default function VitalsPanel({ language }: { language: KioskLanguage }) {
         if (left <= 0) finish(r);
         else setRemaining(left);
       }, TICK_MS);
-    } catch {
+    } catch (error) {
+      console.warn("vitals: on-device pulse estimate unavailable", error);
       const current = run.current === r;
       release(r);
       if (current) setPhase("unavailable");
@@ -123,20 +153,24 @@ export default function VitalsPanel({ language }: { language: KioskLanguage }) {
 
   function stop() {
     if (run.current) release(run.current);
-    setPhase("declined");
+    setPhase("stopped");
   }
 
   const live = phase === "starting" || phase === "measuring";
   const status =
     phase === "declined"
       ? t.declined
-      : phase === "starting"
-        ? t.starting
-        : phase === "unsteady"
-          ? t.unsteady
-          : phase === "unavailable"
-            ? t.unavailable
-            : null;
+      : phase === "stopped"
+        ? t.stopped
+        : phase === "timed-out"
+          ? t.timedOut
+          : phase === "starting"
+            ? t.starting
+            : phase === "unsteady"
+              ? t.unsteady
+              : phase === "unavailable"
+                ? t.unavailable
+                : null;
   // Spoken through the page's one polite live region, as every other kiosk message is.
   const spoken = phase === "measuring" ? t.hold : phase === "result" && bpm !== null ? t.result(bpm) : status;
   useEffect(() => {
@@ -152,6 +186,9 @@ export default function VitalsPanel({ language }: { language: KioskLanguage }) {
       <h3 id="vitals-heading" className="text-[16px] font-semibold uppercase tracking-wider text-ink-3">
         {t.heading}
       </h3>
+      <p data-testid="vitals-label" className="text-[16px] font-semibold text-ink-2">
+        {t.label}
+      </p>
 
       {phase === "consent" && (
         <>
@@ -202,21 +239,24 @@ export default function VitalsPanel({ language }: { language: KioskLanguage }) {
           playsInline
           className={`h-30 w-40 rounded-md bg-sunken object-cover ${fromFile ? "" : "-scale-x-100"}`}
         />
-        {phase === "measuring" && (
-          <div className="flex flex-col gap-1">
-            <p className="font-semibold">{t.hold}</p>
-            <p data-testid="vitals-countdown" className="text-[16px] text-ink-3 tabular-nums">
-              {t.remaining(remaining)}
-            </p>
-            <button
-              type="button"
-              onClick={stop}
-              className="self-start font-semibold text-accent underline underline-offset-2"
-            >
-              {t.stop}
-            </button>
-          </div>
-        )}
+        <div className="flex flex-col gap-1">
+          {phase === "measuring" && (
+            <>
+              <p className="font-semibold">{t.hold}</p>
+              <p data-testid="vitals-countdown" className="text-[16px] text-ink-3 tabular-nums">
+                {t.remaining(remaining)}
+              </p>
+            </>
+          )}
+          <button
+            type="button"
+            data-testid="vitals-stop"
+            onClick={stop}
+            className="self-start text-[16px] font-semibold text-accent underline underline-offset-2"
+          >
+            {t.stop}
+          </button>
+        </div>
       </div>
       {fromFile && <video ref={clip} hidden muted playsInline loop />}
 
@@ -231,7 +271,7 @@ export default function VitalsPanel({ language }: { language: KioskLanguage }) {
         </p>
       )}
 
-      <p data-testid="vitals-footer" className="text-[14px] font-medium text-ink-3">
+      <p data-testid="vitals-footer" className="text-[16px] font-medium text-ink-3">
         {t.footer}
       </p>
     </section>

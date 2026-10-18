@@ -11,6 +11,8 @@ export const VITALS_COPY = {
     accept: "Estimate my pulse",
     decline: "No thanks",
     declined: "OK. The camera stays off.",
+    stopped: "Stopped. No reading was taken.",
+    timedOut: "The estimate timed out. That's fine, your check-in continues.",
     pickFile: "Test clip (dev only)",
     starting: "Starting the camera...",
     hold: "Hold still, face the light.",
@@ -20,7 +22,8 @@ export const VITALS_COPY = {
     unsteady: "Couldn't get a steady reading, that's fine.",
     unavailable: "The camera isn't available. That's fine, your check-in continues.",
     preview: "Camera preview",
-    footer: "Wellness estimate only. Not saved, not sent to staff, not used for check-in.",
+    footer:
+      "Wellness estimate only, not a medical measurement. Not saved, not sent to staff, not used for check-in.",
   },
   es: {
     heading: "Pulso (opcional)",
@@ -30,6 +33,8 @@ export const VITALS_COPY = {
     accept: "Calcular mi pulso",
     decline: "No, gracias",
     declined: "De acuerdo. La cámara sigue apagada.",
+    stopped: "Se detuvo. No se tomó ninguna lectura.",
+    timedOut: "Se agotó el tiempo de la estimación. No pasa nada, su registro continúa.",
     pickFile: "Video de prueba (solo desarrollo)",
     starting: "Encendiendo la cámara...",
     hold: "No se mueva y mire hacia la luz.",
