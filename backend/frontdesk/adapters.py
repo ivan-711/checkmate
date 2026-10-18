@@ -11,6 +11,7 @@ import os
 from typing import Protocol
 
 from backend.app.config import Settings
+from backend.frontdesk import replay
 from backend.frontdesk.model import AgentModel, ErrorStep, ModelRequest, ModelStep
 from contracts.models.intake import AgentMode
 
@@ -43,9 +44,11 @@ def make_model(mode: AgentMode, settings: Settings) -> AgentModel:
         from backend.frontdesk.gemini import GeminiAgentModel  # the only module importing the SDK
 
         # The key is read here and handed to the client; it is never logged, stored or returned.
-        return GeminiAgentModel(api_key=os.environ["GEMINI_API_KEY"], model_id=settings.gemini_model_id)
-    # Q1.4 replaces this with ReplayAgentModel(transcript) in backend/frontdesk/replay.py.
-    return UnavailableAgentModel(AgentMode.REPLAY)
+        live = GeminiAgentModel(api_key=os.environ["GEMINI_API_KEY"], model_id=settings.gemini_model_id)
+        return replay.maybe_record(live, settings.gemini_model_id)  # FRONTDESK_RECORD_TO, Q1.4
+    # Q1.4: the committed transcript plays through the real engine; a transcript that does not load
+    # fails closed into UNAVAILABLE, so the turn degrades to the template instead of raising.
+    return replay.build_replay_model() or UnavailableAgentModel(AgentMode.REPLAY)
 
 
 def pin_mode(settings: Settings) -> AgentMode:

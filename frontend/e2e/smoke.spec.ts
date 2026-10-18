@@ -69,7 +69,10 @@ test("case path: reject keeps the rule silent, then approve links and flags", as
   const flag = page.getByRole("article", { name: "Flagged for clinician review" });
   await expect(flag).toBeVisible();
   await expect(flag.getByText("constructed scenario")).toBeVisible();
-  await expect(flag.getByText(scenario.alertIfApproved.cardFooter)).toBeVisible();
+  // The footer's limits stay; its "Rule <id> <version>." prefix moved to the header, so the id shows once.
+  const { cardFooter, ruleId, ruleVersion } = scenario.alertIfApproved;
+  await expect(flag.getByText(cardFooter.replace(`Rule ${ruleId} ${ruleVersion}.`, "").trim())).toBeVisible();
+  expect(((await flag.textContent()) ?? "").split(ruleId).length - 1).toBe(1);
   await expect(page.getByTestId("flag-card-rule-id")).toHaveText("BL-AMOX-01");
   await expect(flag.getByTestId("constructed-scenario-chip")).toBeVisible();
   expect(await page.getByTestId("crosswalk-chip").count()).toBeGreaterThan(0);

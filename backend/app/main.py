@@ -8,30 +8,36 @@ with the contract's error envelope; each lane's router replaces its stubs by add
 from __future__ import annotations
 
 import logging
+import os
 import uuid
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.exc import DBAPIError, OperationalError
+from sqlalchemy.exc import DBAPIError, OperationalError, SQLAlchemyError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
 from starlette.responses import Response
 
 from backend.api import events, intake, match_runs, pairs, reviews, sessions, thresholds, tiles
+from backend.api.common import current_threshold_row
 from backend.app import request_context
 from backend.app.config import load_settings
 from backend.app.db import db_is_up, make_engine
 from backend.app.deps import EngineDep
 from backend.app.errors import ApiError
 from backend.app.openapi_meta import common_error_responses, error_responses
+from backend.frontdesk import replay
 from backend.golden.service import alert_page, entity_exists, read_alerts, read_entity, read_timeline
 from backend.golden.timeline import BadCursor
 from backend.link.service import CannotLinkConflict
+from backend.match.seam import resolve_core
+from backend.scenarios.loader import HERO_OVERLAY_DIR
 from contracts.api_spec import build_app, error_envelope
 from contracts.models.alerts import AlertStatus, SafetyAlert
 from contracts.models.common import ErrorCode, Page
 from contracts.models.entities import Entity, TimelineEvent
-from contracts.models.health import AgentStatus, DependencyStatus, Health, HealthVersions
+from contracts.models.health import DependencyStatus, Health, HealthVersions
 from contracts.version import (
     API_PREFIX,
     CONTRACT_VERSION,
@@ -160,7 +166,14 @@ async def request_id_and_log(request: Request, call_next) -> Response:
 )
 def health() -> Health:  # sync: db_is_up blocks, so it runs in the threadpool, never on the event loop
     db = DependencyStatus.UP if db_is_up(engine) else DependencyStatus.DOWN
-    agent = AgentStatus.REPLAY if settings.frontdesk_agent_mode != "LIVE" else AgentStatus.DOWN
+    # Q1.4: REPLAY only when the committed transcript loads, validates and its pins match the running
+    # engine; LIVE needs a key and a model id; DOWN otherwise. The agent field never guesses.
+    running = _running_pins(db == DependencyStatus.UP)
+    agent = replay.agent_status(
+        settings.frontdesk_agent_mode,
+        settings.gemini_api_key_present and bool(settings.gemini_model_id),
+        running_pins=running,
+    )
     return Health(
         db=db,
         gemini=DependencyStatus.DOWN,
@@ -171,9 +184,30 @@ def health() -> Health:  # sync: db_is_up blocks, so it runs in the threadpool, 
             contract_version=CONTRACT_VERSION,
             policy_version=POLICY_VERSION,
             tool_schema_version=TOOL_SCHEMA_VERSION,
+            scorer_version=running["scorer_version"],
+            threshold_set_id=running["threshold_set_id"],
             git_sha=settings.git_sha,
         ),
     )
+
+
+def _running_pins(db_up: bool) -> dict[str, str | None]:
+    """What the engine runs now: the scorer, the active threshold set, and the hero file a corpus reset
+    loads (``CHECKMATE_HERO_OVERLAY_DIR``). None where it cannot be read; never a guess."""
+    threshold_set_id = None
+    if db_up:
+        try:
+            with engine.connect() as conn:
+                row = current_threshold_row(conn)
+            threshold_set_id = row.thresholds_id if row is not None else None
+        except SQLAlchemyError:
+            threshold_set_id = None
+    hero_dir = Path(os.environ.get("CHECKMATE_HERO_OVERLAY_DIR", str(HERO_OVERLAY_DIR)))
+    return {
+        "scorer_version": resolve_core().scorer_version,
+        "threshold_set_id": threshold_set_id,
+        "hero_scenario_sha256": replay.hero_scenario_sha256(hero_dir),
+    }
 
 
 # W3b: read-time golden record, timeline and alerts (architecture section 5, section 8; ADR-014).
