@@ -5,7 +5,7 @@ import { forwardRef } from "react";
 import type { ToolCallCandidate, ToolCallRecord } from "@/api/types";
 import { BandChip } from "@/components/ui/BandChip";
 import { rankContributions } from "@/lib/display";
-import { VerifiedTag } from "./VerifiedTag";
+import { VerifiedTag } from "@/components/ui/VerifiedTag";
 import { sourceSystemLabel, type KioskCopy } from "./copy";
 
 const EVIDENCE_ROWS = 5; // UX 3.11: up to 5 rows, by absolute weight

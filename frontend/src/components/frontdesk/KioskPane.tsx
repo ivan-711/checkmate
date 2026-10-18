@@ -16,7 +16,7 @@ import { GateCard } from "./GateCard";
 import { HANDOFF_KEY, INTAKE_KEY, useHandoffPairs } from "./intake";
 import { ToolCallChip } from "./ToolCallChip";
 import { turnSteps } from "./turnSteps";
-import { VerifiedTag } from "./VerifiedTag";
+import { VerifiedTag } from "@/components/ui/VerifiedTag";
 
 const MAX_CHARS = 280; // UX 3.11 composer limit; the contract allows 500
 const COUNTER_FROM = 240;
