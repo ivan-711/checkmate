@@ -13,6 +13,8 @@ export default defineConfig({
   testDir: "e2e",
   testMatch: "**/*.api.spec.ts",
   fullyParallel: false,
+  // Every spec presses Reset demo on the one API; a Reset in a parallel worker 503s another's requests.
+  workers: 1,
   retries: 0,
   reporter: [["list"]],
   use: {

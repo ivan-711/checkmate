@@ -19,6 +19,7 @@ export function BandChip({ band, label: override }: { band: Band; label?: string
   const { label, Icon, className } = BANDS[band];
   return (
     <span
+      data-testid="band-chip"
       className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[14px] font-semibold ${className}`}
     >
       <Icon aria-hidden size={16} />

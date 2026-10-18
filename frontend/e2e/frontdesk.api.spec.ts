@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
+import { BODY_TEXT_PX, fontSizePx, kioskTextBelow } from "./kioskText";
 
 // Run by `npm run e2e:api` against the API-mode build and an API in REPLAY with the corpus hero.
 // It presses Reset demo on that API; the config refuses to run unless CHECKMATE_API_ORIGIN names it.
@@ -50,3 +51,41 @@ test("Send is held during Reset; Español before the first turn plays the record
   await expect(page.getByTestId("gate-card")).toBeVisible();
   await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (2)");
 });
+
+for (const lang of [
+  {
+    toggle: "English",
+    use: "Use this",
+    reading: "Reading your message",
+    wait: "Wait for FrontDesk to finish",
+  },
+  {
+    toggle: "Español",
+    use: "Usar este",
+    reading: "Leyendo su mensaje",
+    wait: "Espere a que FrontDesk termine",
+  },
+]) {
+  test(`the waiting state reads at body size at 1280x720 (${lang.toggle})`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto("/frontdesk");
+    await page.getByRole("button", { name: lang.toggle }).click();
+    await page.getByRole("button", { name: lang.use }).click();
+    await expect(page.getByTestId("kiosk-send")).toBeEnabled({ timeout: 30_000 });
+
+    let held: Route | null = null;
+    await page.route("**/api/v1/intake-sessions/*/turns", (route) => {
+      held = route;
+    });
+    await page.getByTestId("kiosk-send").click();
+    await expect.poll(() => held !== null).toBe(true);
+    await expect(page.getByText(lang.reading)).toBeVisible();
+    await expect(page.getByText(lang.wait)).toBeVisible();
+    expect(await kioskTextBelow(page)).toEqual([]);
+    expect(await fontSizePx(page.getByText(lang.reading))).toBeGreaterThanOrEqual(BODY_TEXT_PX);
+
+    // The turn never reaches the API, so this check writes no check-in record.
+    await held!.abort();
+    await page.unroute("**/api/v1/intake-sessions/*/turns");
+  });
+}

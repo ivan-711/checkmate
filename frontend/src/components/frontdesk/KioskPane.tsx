@@ -33,7 +33,7 @@ function gateDenial(call: ToolCallRecord) {
 function Agent({ text, automatic, t }: { text: string; automatic: boolean; t: KioskCopy }) {
   return (
     <li className="max-w-[80%] text-[20px]">
-      <p className="text-[14px] font-semibold text-ink-2">
+      <p className="text-[18px] font-semibold text-ink-2">
         {t.speaker}
         {automatic && <span className="ml-2 font-normal text-ink-3">{t.automatic}</span>}
       </p>
@@ -220,9 +220,9 @@ export function KioskPane() {
             {agentMode && (
               <span
                 data-testid="agent-mode-badge"
-                className="inline-flex items-center gap-1 rounded border border-dashed border-ink-2 px-2 text-[14px] font-semibold text-ink-2"
+                className="inline-flex items-center gap-1 rounded border border-dashed border-ink-2 px-2 text-[16px] font-semibold text-ink-2"
               >
-                Agent: {agentMode}
+                {t.agentMode(agentMode)}
               </span>
             )}
             {turns.length > 0 && (
@@ -256,7 +256,8 @@ export function KioskPane() {
               </button>
             </div>
           ) : turns.length === 0 && !pending ? (
-            <p className="m-auto text-ink-3">{t.empty}</p>
+            // pt-4 matches the 16 px gap to the composer below, so the line sits centred between them.
+            <p className="m-auto pt-4 text-center text-ink-3">{t.empty}</p>
           ) : (
             <ol aria-live="off" className="mt-3 flex flex-col gap-3">
               {turns.map((turn) => (
@@ -269,7 +270,7 @@ export function KioskPane() {
                   <li className="ml-auto max-w-[80%] rounded-lg border border-border-subtle bg-surface px-4 py-3 text-[20px]">
                     {pending}
                   </li>
-                  <li aria-busy="true" className="text-[14px] text-ink-3">
+                  <li aria-busy="true" className="text-[18px] text-ink-3">
                     {t.reading}
                     <span className="indeterminate mt-1 block h-0.5 w-40" />
                   </li>
@@ -277,7 +278,7 @@ export function KioskPane() {
               )}
               {failedText && !send.isPending && (
                 <li className="max-w-[80%] text-[20px]">
-                  <p className="text-[14px] font-semibold text-ink-2">
+                  <p className="text-[18px] font-semibold text-ink-2">
                     {t.speaker} <span className="ml-2 font-normal text-ink-3">{t.automatic}</span>
                   </p>
                   <p>{t.agentDown}</p>
@@ -327,7 +328,7 @@ export function KioskPane() {
               {t.send}
             </button>
           </div>
-          <p className="text-[14px] text-ink-3">
+          <p className="text-[16px] text-ink-3">
             {send.isPending ? t.wait : t.helper}
             {text.length >= COUNTER_FROM && (
               <span className="ml-2 tabular-nums">{t.counter(text.length)}</span>
