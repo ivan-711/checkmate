@@ -17,6 +17,7 @@ import { KioskMark, Tick } from "./KioskMark";
 import { gateDenial, kioskState, patientGivenName, type KioskState } from "./kioskState";
 import { turnSteps } from "./turnSteps";
 import { WorkChecklist } from "./WorkChecklist";
+import { VitalsSlot } from "./vitals/VitalsSlot";
 import "./kiosk.css";
 
 const MAX_CHARS = 280; // UX 3.11 composer limit; the contract allows 500
@@ -436,6 +437,7 @@ export function KioskPane({
             </ol>
           </section>
         )}
+        <VitalsSlot key={session.data?.id ?? "no-session"} language={language} />
       </div>
 
       {!finished && (

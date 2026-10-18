@@ -11,5 +11,5 @@ export default defineConfig({
   },
   // tsconfig keeps JSX for Next (jsx: preserve); Vite compiles it here so a test can render a component.
   oxc: { jsx: { runtime: "automatic" } },
-  test: { include: ["src/**/*.test.ts"] },
+  test: { include: ["src/**/*.test.{ts,tsx}"] },
 });
