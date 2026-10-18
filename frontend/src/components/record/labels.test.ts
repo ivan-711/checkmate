@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { scenario } from "@/data/scenario";
-import { holdsLine, phoneLabel, sexLabel, sourceFormat, sourceName } from "./labels";
+import { holdsLine, phoneLabel, recordIdLabel, sexLabel, sourceFormat, sourceName } from "./labels";
 
 const [er, cl] = scenario.session.sources;
 
@@ -17,6 +17,17 @@ describe("sourceName", () => {
 
   it("falls back to the API's own label for any other source", () => {
     expect(sourceName("KIOSK", "Kiosk check-in")).toBe("Kiosk check-in");
+  });
+});
+
+describe("recordIdLabel", () => {
+  it("shortens a kiosk intake id to its first 8 characters, without the intake: prefix", () => {
+    expect(recordIdLabel("FRONTDESK_INTAKE", "intake:0226ab4e-766e-49ea-9cb0-1d8ffbcc3758")).toBe("0226ab4e");
+    expect(recordIdLabel("FRONTDESK_INTAKE", "0226ab4e-766e-49ea-9cb0-1d8ffbcc3758")).toBe("0226ab4e");
+  });
+
+  it("leaves every other source's record id whole", () => {
+    expect(recordIdLabel("ER_FHIR", "ER-5F3685342A")).toBe("ER-5F3685342A");
   });
 });
 

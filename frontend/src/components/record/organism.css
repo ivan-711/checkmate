@@ -319,12 +319,16 @@
 }
 
 /* ── crosswalk tabs, hanging under the record's bottom edge ── */
+/* Inside the record's width: a third tab (the attached check-in) wraps to a second row rather
+   than running under the decision column. */
 .org-tabs {
   position: absolute;
   top: 520px;
   left: 24px;
+  right: 24px;
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
 }
 .org-tab {
   display: flex;
@@ -336,6 +340,7 @@
   border-radius: 0 0 12px 12px;
   font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
 }
 .org-tab svg {
   width: 16px;
