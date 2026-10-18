@@ -57,6 +57,9 @@ describe("flagHeadline", () => {
     expect(headline(cardText({ order: "amoxicillin 250 MG / clavulanate 125 MG Oral Tablet" }))).toBe(
       "Penicillin V allergy (anaphylaxis) · active amoxicillin/clavulanate order",
     );
+    expect(headline(cardText({ order: "Amoxicillin 250 MG / Clavulanate 125 MG Oral Tablet" }))).toBe(
+      "Penicillin V allergy (anaphylaxis) · active amoxicillin/clavulanate order",
+    );
   });
 
   it("skips a leading quantity on an injectable order", () => {
@@ -65,9 +68,15 @@ describe("flagHeadline", () => {
     ).toBe("Penicillin V allergy (anaphylaxis) · active penicillin G benzathine order");
   });
 
-  it("shows a severity when the record names no reaction", () => {
+  it("calls a bare severity a reaction's severity, never a reaction name", () => {
     expect(headline(cardText({ reaction: "severe" }))).toBe(
-      "Penicillin V allergy (severe) · active amoxicillin order",
+      "Penicillin V allergy (severe reaction) · active amoxicillin order",
+    );
+  });
+
+  it("keeps an order the rule could only name by its RxNorm code", () => {
+    expect(headline(cardText({ order: "RxNorm 723" }))).toBe(
+      "Penicillin V allergy (anaphylaxis) · active RxNorm 723 order",
     );
   });
 

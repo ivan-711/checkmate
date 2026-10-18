@@ -3,7 +3,7 @@
 import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Flag, IdCard, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReviewResponse, SafetyAlert } from "@/api/types";
 import { EvidenceRail } from "@/components/case/EvidenceRail";
 import { ReviewPanel } from "@/components/case/ReviewPanel";
@@ -79,11 +79,12 @@ function HeldPair({ pairId, index, total }: { pairId: string; index: number; tot
   });
   // Written only by this pane's own approval (below); never fetched.
   const raised = useQuery<SafetyAlert[]>({
-    queryKey: raisedAlertsKey(pairId),
+    queryKey: raisedAlertsKey(pair.data?.pair.decision.id ?? ""),
     queryFn: skipToken,
     gcTime: Infinity,
   }).data;
   const [focusOpenCase, setFocusOpenCase] = useState(false);
+  const focused = useCallback(() => setFocusOpenCase(false), []);
   const headingId = `held-heading-${index}`;
 
   if (pair.isError) {
@@ -108,7 +109,8 @@ function HeldPair({ pairId, index, total }: { pairId: string; index: number; tot
   function onDecided(response: ReviewResponse) {
     void queryClient.invalidateQueries({ queryKey: HANDOFF_KEY });
     const surfaced = response.decision.status === "LINKED" ? (response.alerts ?? []) : [];
-    if (response.decision.status === "LINKED") queryClient.setQueryData(raisedAlertsKey(pairId), surfaced);
+    if (response.decision.status === "LINKED")
+      queryClient.setQueryData(raisedAlertsKey(response.decision.id), surfaced);
     if (surfaced.length > 0) {
       // The flag is what this approval changed: say it once and land on the way to the case.
       const lines = surfaced.map(flagHeadline).join("; ");
@@ -144,12 +146,7 @@ function HeldPair({ pairId, index, total }: { pairId: string; index: number; tot
       </p>
       <ReviewPanel detail={detail} onDecided={onDecided}>
         {alerts.length > 0 && (
-          <RaisedFlag
-            alerts={alerts}
-            pairId={pairId}
-            focusOnMount={focusOpenCase}
-            onFocused={() => setFocusOpenCase(false)}
-          />
+          <RaisedFlag alerts={alerts} pairId={pairId} focusOnMount={focusOpenCase} onFocused={focused} />
         )}
       </ReviewPanel>
     </article>

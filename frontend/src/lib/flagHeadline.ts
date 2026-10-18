@@ -8,6 +8,7 @@ const REACTION = /; reaction: (.+?)\)\./;
 const ORDER = /has an active order for (.+?), RxNorm \d+\./;
 const NOT_RECORDED = /not recorded$/;
 const NUMBER = /^\d/;
+const RXNORM_ONLY = /^RxNorm \d+$/;
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -20,20 +21,21 @@ function midSentence(text: string): string {
 /** The rule writes "<name>, <severity>", a severity alone, or "not recorded". */
 function reactionName(reaction: string): string | null {
   const comma = reaction.lastIndexOf(", ");
-  const name = comma === -1 ? reaction : reaction.slice(0, comma);
-  return NOT_RECORDED.test(name) ? null : midSentence(name);
+  if (comma !== -1) return midSentence(reaction.slice(0, comma));
+  return NOT_RECORDED.test(reaction) ? null : `${reaction} reaction`;
 }
 
 /** "amoxicillin 250 MG / clavulanate 125 MG Oral Tablet" names "amoxicillin/clavulanate": each
  * ingredient is the words before its strength, after any leading quantity ("1 ML ..."). */
 function drugName(display: string): string {
+  if (RXNORM_ONLY.test(display)) return display; // the rule's fallback when the order has no display
   const names = display.split(" / ").map((part) => {
     const words = part.split(" ");
     const start = NUMBER.test(words[0]) ? 2 : 0;
     const end = words.findIndex((word, i) => i >= start && NUMBER.test(word));
     return words.slice(start, end === -1 ? undefined : end).join(" ");
   });
-  return midSentence(names.every(Boolean) ? names.join("/") : display);
+  return names.every(Boolean) ? names.map(midSentence).join("/") : midSentence(display);
 }
 
 /** The flag's two facts, e.g. "Penicillin V allergy (anaphylaxis)" and "active amoxicillin order". */

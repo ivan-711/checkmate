@@ -21,7 +21,7 @@ function renderHeld(detail: CandidatePairDetail, raised?: SafetyAlert[]): string
   held.pairIds = [detail.pair.id];
   const queryClient = new QueryClient();
   queryClient.setQueryData(handoffPairKey(detail.pair.id), detail);
-  if (raised) queryClient.setQueryData(raisedAlertsKey(detail.pair.id), raised);
+  if (raised) queryClient.setQueryData(raisedAlertsKey(detail.pair.decision.id), raised);
   return renderToStaticMarkup(
     createElement(
       QueryClientProvider,
@@ -59,6 +59,26 @@ describe("RegistrarPane", () => {
     expect(summary).toMatch(new RegExp(`<a[^>]*href="/queue/${linked.pair.id}"[^>]*>Open case</a>`));
     expect(html).not.toContain('role="alert"');
     expect(summary).not.toContain("aria-live");
+  });
+
+  it("never shows a flag kept for an earlier decision on the same pair (after Reset)", () => {
+    const relinked = {
+      ...linked,
+      pair: { ...linked.pair, decision: { ...linked.pair.decision, id: "later" } },
+    };
+    held.pairIds = [relinked.pair.id];
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(handoffPairKey(relinked.pair.id), relinked);
+    queryClient.setQueryData(raisedAlertsKey(linked.pair.decision.id), [scenario.alertIfApproved]);
+    const html = renderToStaticMarkup(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(DataSourceProvider, null, createElement(RegistrarPane)),
+      ),
+    );
+    expect(html).toMatch(/Approved by /);
+    expect(html).not.toContain('data-testid="registrar-flag-summary"');
   });
 
   it("counts every alert the approval raised", () => {

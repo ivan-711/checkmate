@@ -12,10 +12,10 @@ export const INTAKE_KEY = ["intake-session"] as const;
 export const HANDOFF_KEY = ["handoff-pair"] as const;
 export const handoffPairKey = (pairId: string) => [...HANDOFF_KEY, pairId] as const;
 
-/** The alerts a pair's approval raised, as its review response returned them. Kept in the cache
- * (not under HANDOFF_KEY, which is refetched) so the registrar pane still shows them after a
- * visit to the Case screen and back. */
-export const raisedAlertsKey = (pairId: string) => ["raised-alerts", pairId] as const;
+/** The alerts an approval raised, as its review response returned them, keyed by that decision
+ * (a Reset makes a new one, so an old flag never shows again). Kept in the cache, not under
+ * HANDOFF_KEY, which is refetched, so the pane still shows them after a visit to Case and back. */
+export const raisedAlertsKey = (decisionId: string) => ["raised-alerts", decisionId] as const;
 
 /** Reads the kiosk's check-in from the cache without observing the query. A second observer
  * would replace the kiosk's queryFn, so Start over and Reset could not start a new check-in. */
