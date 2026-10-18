@@ -168,3 +168,36 @@ for (const size of [LANDSCAPE[0], LANDSCAPE[2]]) {
     });
   });
 }
+
+for (const size of [{ width: 1440, height: 900 }, { width: 1512, height: 982 }, LANDSCAPE[0]]) {
+  test.describe(`${size.width}x${size.height}`, () => {
+    test.use({ viewport: size });
+
+    test("Desk: the crosswalk tabs stay inside the record, the check-in's id short with the full id in its tooltip", async ({
+      page,
+    }) => {
+      await reset(page);
+      await checkIn(page);
+      await page.getByTestId("resolve-button").click();
+      await page.getByTestId("approve-button").click({ timeout: 30_000 });
+      await expect(page.getByTestId("attach-checkin")).toBeChecked();
+      await page.getByTestId("review-submit-button").click();
+      const golden = page.getByTestId("golden-record");
+      await expect(golden).toBeVisible({ timeout: 30_000 });
+      const intake = page.locator('[data-testid="crosswalk-chip"][data-source-system="FRONTDESK_INTAKE"]');
+      await expect(intake).toHaveCount(1, { timeout: 30_000 });
+      await expect(intake.locator("code")).toHaveText(/^[0-9a-f]{8}$/);
+      await expect(intake).toHaveAttribute("title", /^Source record \S{20,}$/);
+
+      const record = (await golden.boundingBox())!;
+      const history = (await page.getByTestId("timeline").boundingBox())!;
+      for (const chip of await page.getByTestId("crosswalk-chip").all()) {
+        const box = (await chip.boundingBox())!;
+        expect(box.height, "a tab is one line").toBeLessThan(48);
+        expect(box.x + box.width, "tab inside the record").toBeLessThanOrEqual(record.x + record.width + 1);
+        expect(box.x + box.width, "tab clear of History").toBeLessThanOrEqual(history.x);
+      }
+      expect(await sideways(page), "after Approve").toBe(0);
+    });
+  });
+}

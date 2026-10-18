@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import type { Entity, SourceCard } from "@/api/types";
 import { TABS } from "./geometry";
 import { SourceGlyph } from "./Glyph";
-import { sourceNameFrom } from "./labels";
+import { recordIdLabel, sourceNameFrom } from "./labels";
 import { CROSSFADE_S, EASE_OUT, TABS_IN, type MorphMode } from "./motion";
 
 type EntityMember = Entity["members"][number];
@@ -53,8 +53,8 @@ export function Tabs({ members, cards, mode }: TabsProps) {
           >
             <SourceGlyph sourceSystem={member.sourceSystem} />
             {sourceNameFrom(member.sourceSystem, cards)}
-            <code>{id}</code>
-            <span className="sr-only">, source record {id}</span>
+            <code>{recordIdLabel(member.sourceSystem, id)}</code>
+            <span className="sr-only">, source record {recordIdLabel(member.sourceSystem, id)}</span>
           </span>
         );
       })}
