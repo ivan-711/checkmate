@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState, type Ref } from "react";
 import type {
   CandidatePairDetail,
@@ -9,6 +9,7 @@ import type {
   ReviewRequest,
   ReviewResponse,
 } from "@/api/types";
+import { RESOLVE_KEY, SESSION_CHANGE_KEY } from "@/components/ui/ResetButton";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { scenario } from "@/data/scenario";
 import { actorName, formatCt } from "@/lib/display";
@@ -72,6 +73,10 @@ export function ReviewPanel({ detail, onDecided }: Props) {
   const approveRef = useRef<HTMLButtonElement>(null);
   const rejectRef = useRef<HTMLButtonElement>(null);
   const decisionRef = useRef<HTMLParagraphElement>(null);
+  // While a match run or a session change is in flight the pair on screen may be about to change,
+  // so no decision can be recorded against it.
+  const pairChanging =
+    useIsMutating({ mutationKey: RESOLVE_KEY }) + useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
 
   const decide = useMutation({
     mutationFn: ({ body, key }: { body: ReviewRequest; key: string }) =>
@@ -88,6 +93,8 @@ export function ReviewPanel({ detail, onDecided }: Props) {
       onDecided(response);
     },
   });
+
+  const blocked = decide.isPending || pairChanging;
 
   // The refreshed decision can arrive a render after the request, so the request waits until
   // its target is on screen.
@@ -175,7 +182,7 @@ export function ReviewPanel({ detail, onDecided }: Props) {
                 ref={approveRef}
                 onClick={() => open("APPROVE")}
                 aria-expanded={false}
-                disabled={decide.isPending}
+                disabled={blocked}
                 className="h-12 rounded-md bg-accent px-6 font-semibold text-on-accent hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-3"
               >
                 Approve link
@@ -186,7 +193,7 @@ export function ReviewPanel({ detail, onDecided }: Props) {
                 ref={rejectRef}
                 onClick={() => open("REJECT")}
                 aria-expanded={false}
-                disabled={decide.isPending}
+                disabled={blocked}
                 className="h-12 rounded-md border border-border-strong bg-surface px-6 font-semibold text-ink-1 hover:bg-sunken disabled:text-ink-3"
               >
                 Reject link
@@ -248,7 +255,7 @@ export function ReviewPanel({ detail, onDecided }: Props) {
                 <button
                   type="submit"
                   data-testid="review-submit-button"
-                  disabled={decide.isPending}
+                  disabled={blocked}
                   className="h-11 rounded-md bg-accent px-5 font-semibold text-on-accent hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-3"
                 >
                   {decide.isPending

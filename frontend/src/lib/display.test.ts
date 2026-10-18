@@ -4,6 +4,7 @@ import {
   actorName,
   differingFields,
   formatCt,
+  compactLane,
   goldenValueText,
   rankContributions,
   sourceLabel,
@@ -79,5 +80,29 @@ describe("goldenValueText", () => {
       "line: 100 Placeholder St, city: Madison",
     );
     expect(goldenValueText(["a", { display: "B" }])).toBe("a, B");
+  });
+});
+
+describe("compactLane", () => {
+  const ev = (day: number, isConstructed = false) => ({
+    occurredAt: `2020-01-${String(day).padStart(2, "0")}`,
+    isConstructed,
+  });
+
+  it("keeps the latest rows in date order and reports how many it hid", () => {
+    const lane = [ev(3), ev(1), ev(5), ev(2), ev(4)];
+    const { shown, hidden } = compactLane(lane, 2);
+    expect(shown.map((e) => e.occurredAt)).toEqual(["2020-01-04", "2020-01-05"]);
+    expect(hidden).toBe(3);
+  });
+
+  it("always keeps constructed-scenario rows, however old", () => {
+    const { shown, hidden } = compactLane([ev(1, true), ev(2), ev(3), ev(4)], 2);
+    expect(shown.map((e) => e.occurredAt)).toEqual(["2020-01-01", "2020-01-03", "2020-01-04"]);
+    expect(hidden).toBe(1);
+  });
+
+  it("shows everything when the lane fits", () => {
+    expect(compactLane([ev(2), ev(1)], 5)).toEqual({ shown: [ev(1), ev(2)], hidden: 0 });
   });
 });

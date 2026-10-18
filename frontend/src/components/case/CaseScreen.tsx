@@ -31,9 +31,13 @@ export function CaseScreen() {
   const announce = useAnnounce();
   const queryClient = useQueryClient();
   const [justApproved, setJustApproved] = useState(false);
+  // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
+  const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
   const caseQuery = useQuery({
     queryKey: ["case"],
     queryFn: () => source.getCase(),
+    // Paused while Reset or Undo runs: reads against the half-reset session only race the reset.
+    enabled: !sessionChanging,
     // "No session" is an answer, not a failure: show the reset prompt at once instead of retrying.
     retry: (failures, error) => !(error instanceof DataError && error.code === "NO_SESSION") && failures < 1,
   });
@@ -42,10 +46,8 @@ export function CaseScreen() {
   const timeline = useQuery({
     queryKey: ["timeline", entity?.id],
     queryFn: () => source.getTimeline(entity!.id),
-    enabled: linked,
+    enabled: linked && !sessionChanging,
   });
-  // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
-  const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
   const resolve = useMutation({
     mutationKey: RESOLVE_KEY,
     mutationFn: () => source.resolve(),
@@ -141,6 +143,7 @@ export function CaseScreen() {
           {detail && (resolved || linked) ? (
             <div
               data-testid="candidate-pair"
+              aria-busy={resolve.isPending || sessionChanging}
               className="space-y-3 rounded-lg border border-border-subtle bg-surface p-3"
             >
               <EvidenceRail detail={detail} />

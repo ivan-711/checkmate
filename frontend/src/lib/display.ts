@@ -84,3 +84,15 @@ export function goldenValueText(value: unknown): string | null {
     .map(([k, v]) => `${k}: ${goldenValueText(v)}`)
     .join(", ");
 }
+
+/** One timeline lane, oldest first, cut to its latest `rows` events so the flag card below stays
+ * on screen. Constructed-scenario events are the demo's story, so they are never cut. */
+export function compactLane<T extends { occurredAt: string; isConstructed?: boolean | null }>(
+  lane: T[],
+  rows: number,
+): { shown: T[]; hidden: number } {
+  const sorted = [...lane].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+  const cutoff = sorted.length - rows;
+  const shown = sorted.filter((e, i) => i >= cutoff || e.isConstructed);
+  return { shown, hidden: sorted.length - shown.length };
+}
