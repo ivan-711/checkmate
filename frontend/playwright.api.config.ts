@@ -13,6 +13,9 @@ export default defineConfig({
   testDir: "e2e",
   testMatch: "**/*.api.spec.ts",
   fullyParallel: false,
+  // The specs share one API and three of them press Reset demo: a Reset in a parallel worker 503s
+  // the other workers' requests (check-in starts, turns), so they run one at a time.
+  workers: 1,
   retries: 0,
   reporter: [["list"]],
   use: {

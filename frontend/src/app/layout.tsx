@@ -23,7 +23,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
+    // The venue runs light (DESIGN.md): the demo never follows a laptop set to dark mode.
+    <html lang="en" data-theme="light" className={`${plexSans.variable} ${plexMono.variable}`}>
       <body className="min-h-screen font-sans text-[18px]">
         <Providers>
           <a
