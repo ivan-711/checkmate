@@ -297,13 +297,13 @@ test("FrontDesk registrar: the approval that raises the flag shows it there, eas
   await expect(summary.getByTestId("registrar-flag-headline")).toHaveText(
     "Penicillin V allergy (anaphylaxis) from Clinic CSV · active amoxicillin order from ER FHIR",
   );
-  await expect(summary.getByTestId("registrar-flag-count")).toHaveText("1 allergy surfaced");
+  await expect(summary.getByTestId("registrar-flag-count")).toHaveText("1 safety flag on the linked chart");
   const openCase = summary.getByRole("link", { name: "Open case" });
   await expect(openCase).toBeFocused();
   await expect(summary).toBeInViewport();
   // Said once, politely: the summary itself is not a live region and nothing is an alert.
   await expect(page.getByRole("status")).toHaveText(
-    "Link approved. Flagged for clinician review: Penicillin V allergy (anaphylaxis) · active amoxicillin order. 1 allergy surfaced.",
+    "Link approved. Flagged for clinician review: Penicillin V allergy (anaphylaxis) · active amoxicillin order. 1 safety flag on the linked chart.",
   );
   await expect(summary.locator("[aria-live], [role=alert], [role=status]")).toHaveCount(0);
   await expect(page.locator('main [role="alert"]')).toHaveCount(0);
@@ -320,6 +320,51 @@ test("FrontDesk registrar: the approval that raises the flag shows it there, eas
     "Penicillin V allergy (anaphylaxis) from Clinic CSV · active amoxicillin order from ER FHIR",
   );
 });
+
+// Landscape demo sizes and portrait kiosk sizes: no tooltip, open or closed, may add sideways scroll.
+const SIDE_SCROLL_VIEWPORTS = [
+  { width: 1280, height: 720 },
+  { width: 1440, height: 900 },
+  { width: 768, height: 1024 },
+  { width: 390, height: 844 },
+];
+const sideScroll = (page: Page) =>
+  page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+
+for (const viewport of SIDE_SCROLL_VIEWPORTS) {
+  test(`FrontDesk at ${viewport.width}x${viewport.height}: no sideways scroll before a turn, after a turn, after Approve, with each chip open`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.goto("/frontdesk");
+    await expect(page.getByRole("button", { name: "Use this" })).toBeVisible();
+    expect(await sideScroll(page), "before a turn").toBeLessThanOrEqual(0);
+
+    await page.getByRole("button", { name: "Use this" }).click();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("gate-card")).toBeVisible();
+    await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (1)");
+    expect(await sideScroll(page), "after a turn").toBeLessThanOrEqual(0);
+
+    // The staff pane is a landscape surface: approve there, then look again at this size.
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await review(page, "approve");
+    await expect(page.getByTestId("registrar-flag-summary")).toBeVisible();
+    await page.setViewportSize(viewport);
+    expect(await sideScroll(page), "after Approve").toBeLessThanOrEqual(0);
+
+    for (const chip of await page.getByTestId("constructed-scenario-chip").all()) {
+      if (!(await chip.isVisible())) continue; // a pane this size does not show
+      await chip.hover();
+      const tip = chip.locator('[role="tooltip"]');
+      await expect(tip).toBeVisible();
+      const box = (await tip.boundingBox())!;
+      expect(box.x, "tooltip starts inside the window").toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width, "tooltip ends inside the window").toBeLessThanOrEqual(viewport.width);
+      expect(await sideScroll(page), "with a tooltip open").toBeLessThanOrEqual(0);
+    }
+  });
+}
 
 test("FrontDesk registrar: with reduced motion the flag summary appears without a transition", async ({
   page,
