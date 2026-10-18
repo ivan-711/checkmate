@@ -393,7 +393,13 @@ def maybe_record(inner: AgentModel, model_id: str, env: dict[str, str] | None = 
     out = source.get(RECORD_TO_ENV)
     if not out:
         return inner
-    return RecordingAgentModel(inner, Path(out), pins_from_hero_dir(HERO_DIR, model_id))
+    try:
+        pins = pins_from_hero_dir(HERO_DIR, model_id)
+    except (OSError, KeyError, ValueError, ValidationError) as exc:
+        # Recording is optional; a broken hero file must not cost the live turn.
+        log.warning("recording disabled: hero pins unavailable (%s)", type(exc).__name__)
+        return inner
+    return RecordingAgentModel(inner, Path(out), pins)
 
 
 def agent_status(mode: str, live_configured: bool, env: dict[str, str] | None = None) -> AgentStatus:

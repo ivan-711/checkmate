@@ -110,3 +110,11 @@ def test_maybe_record_wraps_only_when_the_output_path_is_set(tmp_path: Path):
     assert wrapped.mode == AgentMode.LIVE
     assert wrapped.pins.model_id == "model-x"
     assert wrapped.pins.scenario_context_id == "hero-er-arrival"
+
+
+def test_maybe_record_degrades_to_the_bare_adapter_when_the_hero_pins_are_unavailable(tmp_path: Path, monkeypatch):
+    from backend.frontdesk import replay
+
+    monkeypatch.setattr(replay, "HERO_DIR", tmp_path / "no-hero-dir")
+    inner = _Inner()
+    assert maybe_record(inner, "model-x", {RECORD_TO_ENV: str(tmp_path / "rec.json")}) is inner
