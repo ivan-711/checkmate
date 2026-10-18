@@ -1,6 +1,7 @@
 import createClient from "openapi-fetch";
 import type { paths } from "@/api/schema";
 import type {
+  CandidatePairQuery,
   CandidatePairDetail,
   ErrorEnvelope,
   EventLogRow,
@@ -64,7 +65,18 @@ export class ApiSource implements DataSource {
     return res.data;
   }
 
-  async getCase(): Promise<CaseData> {
+  async getCase(pairId?: string): Promise<CaseData> {
+    if (pairId) {
+      const detail = await this.getCandidatePair(pairId);
+      const { outcome, alertsKnown } = await this.outcomeFor(detail);
+      return {
+        sources: [detail.recordA, detail.recordB],
+        detail,
+        outcome,
+        resolved: true,
+        alertsKnown,
+      };
+    }
     const session = await this.getSession();
     if (!session) throw new DataError("NO_SESSION", NO_SESSION_MESSAGE);
     const { sources } = session;
@@ -80,8 +92,29 @@ export class ApiSource implements DataSource {
   }
 
   async resolve(): Promise<void> {
+    await this.runMatch();
+  }
+
+  async runMatch() {
     const res = await this.client.POST("/api/v1/match-runs");
     if (!res.data) fail(res.error);
+    return res.data;
+  }
+
+  async getCandidatePairs(filters: CandidatePairQuery) {
+    const res = await this.client.GET("/api/v1/candidate-pairs", {
+      params: { query: filters },
+    });
+    if (!res.data) fail(res.error);
+    return res.data;
+  }
+
+  async getCandidatePair(pairId: string): Promise<CandidatePairDetail> {
+    const res = await this.client.GET("/api/v1/candidate-pairs/{pair_id}", {
+      params: { path: { pair_id: pairId } },
+    });
+    if (!res.data) fail(res.error);
+    return res.data;
   }
 
   async review(pairId: string, body: ReviewRequest, idempotencyKey: string): Promise<ReviewResponse> {

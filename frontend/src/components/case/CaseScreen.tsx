@@ -26,7 +26,7 @@ function announcement(response: ReviewResponse): string {
     : "Link approved. Records linked into one golden record with a crosswalk on every value. The rule did not flag this record.";
 }
 
-export function CaseScreen() {
+export function CaseScreen({ pairId }: { pairId?: string }) {
   const source = useDataSource();
   const announce = useAnnounce();
   const queryClient = useQueryClient();
@@ -34,8 +34,8 @@ export function CaseScreen() {
   // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
   const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
   const caseQuery = useQuery({
-    queryKey: ["case"],
-    queryFn: () => source.getCase(),
+    queryKey: ["case", pairId],
+    queryFn: () => source.getCase(pairId),
     // Paused while Reset or Undo runs: reads against the half-reset session only race the reset.
     enabled: !sessionChanging,
     // "No session" is an answer, not a failure: show the reset prompt at once instead of retrying.
