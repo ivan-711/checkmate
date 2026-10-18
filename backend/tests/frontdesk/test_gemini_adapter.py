@@ -117,13 +117,29 @@ def test_contents_rebuilt_with_user_role_for_function_responses(monkeypatch):
         (errors.APIError(504, {"error": {"message": "deadline"}}), "UNAVAILABLE", True),
         (errors.APIError(400, {"error": {"message": "bad"}}), "UNAVAILABLE", False),
         (errors.APIError(404, {"error": {"message": "no model"}}), "UNAVAILABLE", False),
-        (httpx.ConnectError("down"), "UNAVAILABLE", True),
+        (httpx.ConnectError("down"), "UNAVAILABLE", False),
     ],
 )
 def test_errors_become_error_steps(monkeypatch, exc, kind, retryable):
+    """ADR-016 §8: the one retry only for a timeout, a 429 that fits, or a 5xx; never another 4xx or a
+    transport failure."""
     adapter, _ = _adapter(monkeypatch, exc)
     step = adapter.next_step(_request())
     assert step == ErrorStep(kind=kind, retryable=retryable, mode=AgentMode.LIVE)
+
+
+def _rate_limited(retry_after: str | None) -> errors.APIError:
+    headers = {} if retry_after is None else {"Retry-After": retry_after}
+    response = httpx.Response(429, headers=headers, request=httpx.Request("POST", "https://example.invalid"))
+    return errors.APIError(429, {"error": {"message": "quota"}}, response)
+
+
+@pytest.mark.parametrize(
+    "retry_after, retryable", [(None, True), ("1", True), ("0.5", True), ("20", False), ("Wed, 21 Oct", False)]
+)
+def test_429_is_retried_only_when_retry_after_fits_the_retry_delay(monkeypatch, retry_after, retryable):
+    adapter, _ = _adapter(monkeypatch, _rate_limited(retry_after))
+    assert adapter.next_step(_request()).retryable is retryable
 
 
 def test_blocked_and_malformed_finish_reasons(monkeypatch):

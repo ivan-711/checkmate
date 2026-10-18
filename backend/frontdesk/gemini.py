@@ -10,11 +10,13 @@ never the key.
 from __future__ import annotations
 
 import logging
+import math
 import time
 
 import httpx
 from google.genai import Client, errors, types
 
+from backend.frontdesk.budget import RETRY_AFTER_MAX_S
 from backend.frontdesk.model import ErrorStep, Message, ModelRequest, ModelStep, TextStep, ToolCallStep
 from contracts.models.intake import AgentMode
 from contracts.version import AUTO_MODE_PROBE_S, MODEL_TIMEOUT_MS
@@ -68,13 +70,38 @@ class GeminiAgentModel:
             log.warning("gemini timeout exception_class=%s", type(exc).__name__)
             return ErrorStep(kind="TIMEOUT", retryable=True, mode=self.mode)
         except errors.APIError as exc:
-            retryable = exc.code == _RATE_LIMITED or (exc.code or 0) >= _RETRYABLE_HTTP_MIN
             log.warning("gemini api error exception_class=%s code=%s", type(exc).__name__, exc.code)
-            return ErrorStep(kind="UNAVAILABLE", retryable=retryable, mode=self.mode)
+            return ErrorStep(kind="UNAVAILABLE", retryable=api_error_retryable(exc), mode=self.mode)
         except httpx.HTTPError as exc:
+            # ADR-016 §8: the one retry is for a timeout, a 429 that fits, or a 5xx; a transport
+            # failure (connection refused, DNS) is none of those.
             log.warning("gemini transport error exception_class=%s", type(exc).__name__)
-            return ErrorStep(kind="UNAVAILABLE", retryable=True, mode=self.mode)
+            return ErrorStep(kind="UNAVAILABLE", retryable=False, mode=self.mode)
         return step_from_response(response, _elapsed_ms(started), self.mode)
+
+
+def retry_after_seconds(exc: errors.APIError) -> float | None:
+    """``Retry-After`` from the 429 response: None when absent, ``inf`` when present but not a number
+    of seconds (an HTTP-date cannot be shown to fit the retry delay)."""
+    headers = getattr(getattr(exc, "response", None), "headers", None)
+    raw = headers.get("retry-after") if headers is not None else None
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return math.inf
+
+
+def api_error_retryable(exc: errors.APIError) -> bool:
+    """5xx: yes. 429: only when Retry-After is absent or fits the loop's retry delay. Other 4xx: no."""
+    code = exc.code or 0
+    if code >= _RETRYABLE_HTTP_MIN:
+        return True
+    if code == _RATE_LIMITED:
+        wait = retry_after_seconds(exc)
+        return wait is None or wait <= RETRY_AFTER_MAX_S
+    return False
 
 
 def probe_live(*, api_key: str, model_id: str) -> bool:

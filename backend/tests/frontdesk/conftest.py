@@ -29,7 +29,7 @@ os.environ.setdefault("FRONTDESK_AGENT_MODE", "REPLAY")
 
 from backend.api import intake as intake_api
 from backend.app.main import app, engine
-from backend.frontdesk import loop
+from backend.frontdesk import budget
 
 API = "/api/v1"
 DEFAULT_TEXT_REPLY = "Gracias. Una persona de registro va a confirmar su expediente en un momento."
@@ -80,7 +80,7 @@ def client() -> Iterator[TestClient]:
 @pytest.fixture
 def fake(monkeypatch) -> FakeAgentModel:
     HOLDER.model = FakeAgentModel()
-    monkeypatch.setattr(loop, "RETRY_DELAY_S", 0.0)  # the retry is still taken; the wait is not
+    monkeypatch.setattr(budget, "RETRY_DELAY_S", 0.0)  # the retry is still taken; the wait is not
     return HOLDER.model
 
 
