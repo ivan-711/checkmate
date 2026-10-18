@@ -18,8 +18,9 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from backend.core.api import CORE
-from backend.core.normalize import normalize_record
 from backend.events.writer import write_event
+from backend.ingest.normalize import Identity
+from backend.ingest.normalize import normalized_row as ingest_normalized_row
 from backend.policy.args import fold
 from backend.policy.tokens import PolicyAllow, PolicyHandoff, require_token
 from contracts.models.common import ActorType, Band, DecisionStatus, EventType, PairOrigin, SourceKind
@@ -99,18 +100,22 @@ def intake_payload(args: ProposeArgs) -> dict:
 
 
 def normalized_row(args: ProposeArgs) -> dict:
-    """The intake demographics through the same normalizer ingest uses (one folding rule set)."""
-    return normalize_record(
-        {
-            "given_name": args.given_name,
-            "family_name": args.family_name,
-            "birth_date": args.birth_date,
-            "sex": args.sex.value if args.sex else None,
-            "phone": args.phone,
-            "address_line": args.address_line,
-            "zip": args.postal_code,
-        }
-    ).to_row_dict()
+    """The intake demographics as ingest stores a source record: one row builder, one folding rule set.
+
+    Display columns keep the patient's typed spelling (fork issue #13), because the golden record
+    renders them and the intake record, being the newest member, wins its recency tie-breaks.
+    """
+    return ingest_normalized_row(
+        Identity(
+            given=args.given_name,
+            family=args.family_name,
+            birth_date=args.birth_date,
+            sex=args.sex.value if args.sex else None,
+            phone=args.phone,
+            address_line=args.address_line,
+            postal_code=args.postal_code,
+        )
+    )
 
 
 def create_intake_record(
