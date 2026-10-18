@@ -108,24 +108,24 @@ Max content 1440 px, `p-4` gutter. Case: `grid-cols-[1fr_28rem]`, one column at 
 
 Placement decided by the UX lead (Christian Flores, design squad, UX lead). The queue is the registrar's backlog, not a stop on the judge's path: Case stays at `/` with every data-testid unchanged, FrontDesk stays first, and the queue goes third. It never decides anything; Approve and Reject stay on Case (the FrontDesk registrar handoff gets its own, later).
 
-1. Route `/queue`, new file `app/queue/page.tsx`. Add `{ href: "/queue", label: "Work queue" }` to `TABS` in `components/ui/Header.tsx` after Case. Final order: FrontDesk, Case, Work queue. Do not touch `/` or `/frontdesk`.
+1. Route `/queue`, new file `app/queue/page.tsx`. Add `{ href: "/queue", label: "Work queue" }` to `TABS` in `components/ui/Header.tsx` after Case. Final order: FrontDesk, Case, Work queue. Do not touch `/` or `/frontdesk`. The third tab widens a header that does not wrap yet (audit #11); keep the label "Work queue" and check 1366 px still fits on one row.
 2. Data path. Add two reads to `DataSource` (`src/data/source.ts`) and implement both in each adapter:
-   - `getReviewQueue(cursor?: string): Promise<{ items: CandidatePair[]; nextCursor: string | null }>`. `ApiSource`: `GET /api/v1/candidate-pairs?band=REVIEW&status=PROPOSED&limit=50&cursor=…` through the generated client. `FixtureSource`: one item, the fixture pair, while its decision is `PROPOSED`; none after.
+   - `getReviewQueue(cursor?: string): Promise<{ items: CandidatePair[]; nextCursor: string | null }>`. `ApiSource`: `GET /api/v1/candidate-pairs?band=REVIEW&status=PROPOSED&limit=50&cursor=…` through the generated client; send `band` and `status` again with every cursor, because the cursor does not carry them. `FixtureSource`: one item, the fixture pair, once Resolve has run and while its decision is `PROPOSED`; none before Resolve or after a decision, matching Case. Add `export type CandidatePair = Schemas["CandidatePair"]` to `src/api/types.ts` (an alias of the generated type, never hand-written).
    - `getCandidatePair(id: string): Promise<CandidatePairDetail>`. `ApiSource`: `GET /api/v1/candidate-pairs/{pair_id}`. `FixtureSource`: the fixture's pair detail for its pair id, `DataError("NOT_FOUND")` otherwise.
    - Both endpoints are in the frozen contract, so no contract change. Existing methods, their calls and the Case screen's reads stay exactly as they are.
-3. Order: keep the server's order ("most uncertain first", `|p − 0.5|`) and say so in the header line. Don't re-sort on the client: "Load more" appends the next page.
+3. Order: keep the server's order ("most uncertain first", `|p − 0.5|`) and say so in the header line. Don't re-sort on the client: "Load more" appends the next page: use `useInfiniteQuery` with `nextCursor` as the page param.
 4. Collapsed row, 56 px minimum, built only from the list item:
    - the band chip (`BandChip`, text and icon);
-   - `p` as a two-decimal number (tabular), labelled "Probability", display only;
+   - `p` as a two-decimal number (tabular), labelled "Probability estimate" with the Case caption "fitted on our synthetic development distribution" (never a bare "Probability"), display only;
    - the origin as "Match run" or "FrontDesk hand-off";
-   - the age from `decision.decidedAt` ("waiting 3 m");
+   - the age from `decision.decidedAt` ("waiting 3 m"); in REPLAY the fixture time is fixed, so show the CT time ("scored 13:00 CT") instead of an age;
    - a short pair id (mono, first 8 characters).
-5. Expanded row: call `getCandidatePair(id)` for that row only, on expand. Show the two source names (`recordA` and `recordB` `displayLabel` and names), then the top 3 rows from `rankContributions(detail.contributions)`. That helper already returns plain labels.
-6. The Case pair: a row whose `recordAId` and `recordBId` are the session's two `sources[].record.id` (from `getSession()`, in either order) gets a secondary **Open in Case** link to `/`. Other rows have no decision buttons. Case doesn't read a `?pair=` parameter. Adding one changes Case data flow and is a fork for the lead.
+5. Expanded row: call `getCandidatePair(id)` for that row only, on expand. Show the two source names (`recordA` and `recordB` `displayLabel` and names), then the top 3 rows from `rankContributions(detail.contributions)`. It returns plain labels once PR #23 (evidence-rail labels for every scorer id) merges; until then live ids such as `given_jw_folded` show raw, as on Case.
+6. The Case pair: a row with `origin === "MATCH_RUN"` whose `recordAId` and `recordBId` are the session's two `sources[].record.id` (from `getSession()`, in either order) gets a secondary **Open in Case** link to `/`. Other rows have no decision buttons. Case doesn't read a `?pair=` parameter. Adding one changes Case data flow and is a fork for the lead.
 7. States:
-   - empty: "No pairs need a registrar." (`ink-3`);
+   - empty: "No pairs need a registrar. Resolve identity on Case scores the loaded records." (`ink-3`);
    - loading: row skeletons with `aria-busy`;
-   - error: "Work queue unavailable: {reason}. Nothing was changed."
+   - error: "Work queue unavailable: {reason}. Nothing was changed." with a **Try again** button that refetches.
 
    No red, no `role="alert"`. Testids are new only, prefixed `work-queue-`.
 
