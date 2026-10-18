@@ -166,7 +166,7 @@ def parse_action(tool_name: str, raw_args: object, *, user_texts: Sequence[str],
     """
     try:
         return _parse_action(tool_name, raw_args, user_texts=user_texts, session=session)
-    except Exception as exc:  # anything unexpected in the model's input is an invalid argument
+    except Exception as exc:  # noqa: BLE001 - the model wrote the input; every failure is an invalid argument
         return _invalid(tool_name, raw_args, [f"{type(exc).__name__}: {exc}"], session)
 
 

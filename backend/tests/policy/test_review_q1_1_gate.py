@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
-
 import pytest
 from sqlalchemy import text
 
 from backend.chart_store import writes
-from backend.policy.decide import allow_token, handoff_token
+from backend.policy.decide import allow_token
 from backend.policy.gate import GateUnavailable, evaluate
 from backend.tests.link.seed import insert_decision, insert_pair
 from backend.tests.policy.seed import ER_DEMOGRAPHICS, insert_record, insert_session, near_duplicates
@@ -67,7 +65,7 @@ def test_feb_31_is_deny_not_exception(conn):
 def test_linked_on_a_match_run_pair_is_already_linked(conn):
     """ADR-016 §2 rule 1 does not restrict the pair's origin: a LINKED decision between the intake
     record and a candidate on any pair means the patient has a chart."""
-    er, clinic = near_duplicates(conn)
+    er, _clinic = near_duplicates(conn)
     sid = insert_session(conn)
     intake = insert_record(
         conn,
