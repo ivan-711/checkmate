@@ -34,12 +34,25 @@ router = APIRouter(prefix=API_PREFIX, tags=["frontdesk"])
 
 DEFAULT_LANGUAGE = Language.EN
 
+# JSON lets a string carry U+0000 and the frozen schema allows it, but Postgres text and jsonb cannot hold
+# it: the insert raised DataError, a 500 (CI schemathesis). Only NUL is refused; every other schema-valid
+# string is kept. (An unpaired surrogate never gets this far: Pydantic rejects it as a 422.)
+_NUL = "\x00"
+
 
 def get_model_factory() -> adapters.ModelFactory:
     return adapters.make_model
 
 
 ModelFactoryDep = Annotated[adapters.ModelFactory, Depends(get_model_factory)]
+
+
+def reject_unstorable_text(field: str, value: str | None) -> None:
+    """Checklist 13: validate at the boundary, before any row, event or model call; 422, never a 500."""
+    if value is not None and _NUL in value:
+        raise ApiError(
+            ErrorCode.VALIDATION_ERROR, f"{field} contains a character that cannot be stored", {"field": field}
+        )
 
 
 def _session_view(conn, session_id: UUID) -> IntakeSession:
@@ -72,6 +85,7 @@ def _session_view(conn, session_id: UUID) -> IntakeSession:
     description="Lane Q1.2. Start an intake; the server pins the agent mode from FRONTDESK_AGENT_MODE.",
 )
 def create_intake_session(body: CreateIntakeSessionRequest, engine: EngineDep, settings: SettingsDep):
+    reject_unstorable_text("scenarioContextId", body.scenario_context_id)
     session_id = uuid.uuid4()
     language = body.language or DEFAULT_LANGUAGE
     mode = adapters.pin_mode(settings)
@@ -119,6 +133,7 @@ def create_intake_turn(
     settings: SettingsDep,
     model_factory: ModelFactoryDep,
 ):
+    reject_unstorable_text("text", body.text)
     with engine.connect() as conn:
         session = store.read_session(conn, session_id)
     if session is None:
