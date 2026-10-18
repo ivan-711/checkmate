@@ -24,6 +24,7 @@ from backend.app.db import db_is_up, make_engine
 from backend.app.deps import EngineDep
 from backend.app.errors import ApiError
 from backend.app.openapi_meta import common_error_responses, error_responses
+from backend.frontdesk import replay
 from backend.golden.service import alert_page, entity_exists, read_alerts, read_entity, read_timeline
 from backend.golden.timeline import BadCursor
 from backend.link.service import CannotLinkConflict
@@ -31,7 +32,7 @@ from contracts.api_spec import build_app, error_envelope
 from contracts.models.alerts import AlertStatus, SafetyAlert
 from contracts.models.common import ErrorCode, Page
 from contracts.models.entities import Entity, TimelineEvent
-from contracts.models.health import AgentStatus, DependencyStatus, Health, HealthVersions
+from contracts.models.health import DependencyStatus, Health, HealthVersions
 from contracts.version import (
     API_PREFIX,
     CONTRACT_VERSION,
@@ -160,7 +161,11 @@ async def request_id_and_log(request: Request, call_next) -> Response:
 )
 def health() -> Health:  # sync: db_is_up blocks, so it runs in the threadpool, never on the event loop
     db = DependencyStatus.UP if db_is_up(engine) else DependencyStatus.DOWN
-    agent = AgentStatus.REPLAY if settings.frontdesk_agent_mode != "LIVE" else AgentStatus.DOWN
+    # Q1.4: REPLAY only when the committed transcript loads and validates; LIVE needs a key and a
+    # model id; DOWN otherwise. The agent field never guesses.
+    agent = replay.agent_status(
+        settings.frontdesk_agent_mode, settings.gemini_api_key_present and bool(settings.gemini_model_id)
+    )
     return Health(
         db=db,
         gemini=DependencyStatus.DOWN,

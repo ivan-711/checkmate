@@ -25,6 +25,7 @@ from pathlib import Path
 
 from backend.frontdesk.replay import (
     DEFAULT_TRANSCRIPT_PATH,
+    HERO_DIR,
     TRANSCRIPT_VERSION,
     StepExpect,
     TextModelStep,
@@ -37,7 +38,6 @@ from backend.frontdesk.replay import (
 from contracts.models.policy import PolicyOutcome, PolicyReason
 from contracts.version import TOOL_SCHEMA_VERSION
 
-HERO_DIR = Path("data/scenarios/hero")
 AUTHORED_MODEL_ID = "authored (not a recorded model run)"
 DEFAULT_PROMPT_VERSION = "fd-prompt/1"
 # Latencies measured at the venue (docs/spikes/gemini.md): tool step 3.9–7.8 s, plain text 2.6–2.9 s.

@@ -304,5 +304,7 @@ def test_transcript_sha256_is_stable_over_bytes(tmp_path: Path):
     assert transcript_sha256(path) != before
 
 
-def test_default_transcript_path_is_the_hero_file():
-    assert DEFAULT_TRANSCRIPT_PATH == Path("data/scenarios/hero/frontdesk_transcript.json")
+def test_default_transcript_path_is_the_committed_hero_file():
+    assert DEFAULT_TRANSCRIPT_PATH.is_absolute()
+    assert DEFAULT_TRANSCRIPT_PATH.parts[-4:] == ("data", "scenarios", "hero", "frontdesk_transcript.json")
+    assert DEFAULT_TRANSCRIPT_PATH.exists()

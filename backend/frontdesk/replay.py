@@ -15,10 +15,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
-import re
 import time
-import unicodedata
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,28 +26,28 @@ from typing import Annotated, Literal
 from pydantic import Field, ValidationError, model_validator
 
 from backend.frontdesk.model import AgentModel, ErrorStep, ModelRequest, ModelStep, TextStep, ToolCallStep
+from backend.policy.args import fold  # the grounding check's fold: replay matching must agree with it
 from contracts.models.common import ContractModel
+from contracts.models.health import AgentStatus
 from contracts.models.intake import AgentMode
 from contracts.models.policy import PolicyOutcome, PolicyReason
 from contracts.version import REPLAY_PACING_CAP_MS
 
+log = logging.getLogger("checkmate.frontdesk.replay")
+
 TRANSCRIPT_VERSION = 1
-DEFAULT_TRANSCRIPT_PATH = Path("data/scenarios/hero/frontdesk_transcript.json")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+HERO_DIR = REPO_ROOT / "data" / "scenarios" / "hero"
+DEFAULT_TRANSCRIPT_PATH = HERO_DIR / "frontdesk_transcript.json"
 TRANSCRIPT_PATH_ENV = "FRONTDESK_TRANSCRIPT"  # override for tests and rehearsals
+PACING_ENV = "FRONTDESK_REPLAY_PACING"  # "0" turns the latency pacing off (tests); default on
 RECORD_TO_ENV = "FRONTDESK_RECORD_TO"  # when set in LIVE mode, the live adapter is wrapped and recorded here
+_OFF_VALUES = frozenset({"0", "false", "no", "off"})
 
 _SHA256_RE = r"^[0-9a-f]{64}$"
 Sha256 = Annotated[str, Field(pattern=_SHA256_RE)]
 
-try:  # the gate's fold is the one the grounding check uses; share it when Q1.1's branch is present
-    from backend.policy.args import fold  # type: ignore[no-redef]
-except ImportError:  # pragma: no cover - exercised only before lane/q1-1 merges
-
-    def fold(text: str) -> str:
-        """NFKD, strip combining marks, casefold, collapse whitespace (ADR-016 §4)."""
-        decomposed = unicodedata.normalize("NFKD", text)
-        stripped = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-        return re.sub(r"\s+", " ", stripped.casefold()).strip()
+__all__ = ["fold"]  # re-exported so the authoring script and tests fold exactly as the gate does
 
 
 class TranscriptError(ValueError):
@@ -230,7 +229,8 @@ class RecordingAgentModel:
     The previous step's ToolResult hash arrives on the *next* request (``last_tool_result_sha256``),
     so it is written back into ``expect`` of step j-1 when step j is requested. ``ErrorStep`` answers
     are not recorded: they are not model output and the loop degrades the turn anyway. The file is
-    rewritten after every step so a crash mid-session leaves a valid prefix on disk.
+    rewritten after every step so a crash mid-session leaves a valid prefix on disk, and an existing
+    RECORDED file at ``out_path`` is resumed, because the routes build a fresh adapter per turn.
     """
 
     def __init__(self, inner: AgentModel, out_path: Path | str, pins: TranscriptPins) -> None:
@@ -238,10 +238,26 @@ class RecordingAgentModel:
         self.mode = inner.mode
         self.out_path = Path(out_path)
         self.pins = pins
-        self._turns: dict[int, TranscriptTurn] = {}
+        self._turns: dict[tuple[int, str], TranscriptTurn] = {}  # keyed like Transcript.turn()
         self._started_at = datetime.now(UTC)
         self._prompt_version: str | None = None  # pinned from the first request; the loop never changes them
         self._tool_schema_version: str | None = None
+        self._resume()
+
+    def _resume(self) -> None:
+        if not self.out_path.exists():
+            return
+        try:
+            previous = load_transcript(self.out_path)
+        except TranscriptError:
+            log.warning("recording at %s is not a valid transcript; starting over", self.out_path)
+            return
+        if previous.kind != "RECORDED":
+            return  # never append a live run onto an authored file
+        self._turns = {(t.turn_index, fold(t.user_text_folded)): t for t in previous.turns}
+        self._started_at = previous.recorded_at
+        self._prompt_version = previous.prompt_version
+        self._tool_schema_version = previous.tool_schema_version
 
     def next_step(self, req: ModelRequest) -> ModelStep:
         step = self.inner.next_step(req)
@@ -250,21 +266,22 @@ class RecordingAgentModel:
         try:
             self._record(req, step)
         except Exception:  # noqa: BLE001  recording must never cost the live turn
-            return step
+            log.warning("recording step failed turn=%s step=%s", req.turn_index, req.step_index)
         return step
 
     def _record(self, req: ModelRequest, step: ToolCallStep | TextStep) -> None:
         self._prompt_version = self._prompt_version or req.prompt_version
         self._tool_schema_version = self._tool_schema_version or req.tool_schema_version
-        turn = self._turns.get(req.turn_index)
-        if turn is None:
+        key = (req.turn_index, fold(req.user_text_folded))
+        turn = self._turns.get(key)
+        if turn is None or req.step_index == 0:  # a new session re-records the script from its first step
             turn = TranscriptTurn(
                 turn_index=req.turn_index,
                 user_text=_last_user_text(req) or req.user_text_folded,
                 user_text_folded=fold(req.user_text_folded),
                 steps=[_from_model_step(req, step)],
             )
-            self._turns[req.turn_index] = turn
+            self._turns[key] = turn
         else:
             if req.step_index > 0 and req.step_index - 1 < len(turn.steps):
                 previous = turn.steps[req.step_index - 1]
@@ -326,3 +343,59 @@ def _from_model_step(req: ModelRequest, step: ToolCallStep | TextStep) -> Transc
     else:
         model = TextModelStep(type="TEXT", text=step.text)
     return TranscriptStep(step_index=req.step_index, latency_ms=step.latency_ms, model=model, expect=None)
+
+
+# Wiring used by adapters.make_model and the /health route. Only the transcript path, the pacing
+# switch and the recording path come from the environment; everything else is in Settings.
+
+
+def pacing_enabled(env: dict[str, str] | None = None) -> bool:
+    source = os.environ if env is None else env
+    return (source.get(PACING_ENV) or "1").strip().lower() not in _OFF_VALUES
+
+
+def build_replay_model(env: dict[str, str] | None = None) -> ReplayAgentModel | None:
+    """The REPLAY adapter for the configured transcript, or None (logged) when it does not load.
+    The caller degrades to an unavailable adapter: a broken transcript fails closed, never raises."""
+    path = transcript_path(env)
+    try:
+        return ReplayAgentModel(
+            load_transcript(path), pacing=pacing_enabled(env), transcript_sha256=transcript_sha256(path)
+        )
+    except TranscriptError as exc:
+        log.warning("REPLAY transcript unavailable: %s", exc)
+        return None
+
+
+def pins_from_hero_dir(hero_dir: Path, model_id: str) -> TranscriptPins:
+    """Recording pins from the committed hero files, so a recording is pinned exactly as the authored one."""
+    hero = json.loads((hero_dir / "hero.json").read_text(encoding="utf-8"))
+    intake = json.loads((hero_dir / "frontdesk_intake.json").read_text(encoding="utf-8"))
+    return TranscriptPins(
+        model_id=model_id,
+        scorer_version=hero["scorerVersion"],
+        threshold_set_id=hero["thresholdsId"],
+        hero_scenario_sha256=hashlib.sha256((hero_dir / "scenario.json").read_bytes()).hexdigest(),
+        scenario_context_id=intake["scenarioContextId"],
+    )
+
+
+def maybe_record(inner: AgentModel, model_id: str, env: dict[str, str] | None = None) -> AgentModel:
+    """Wrap a LIVE adapter in a recorder when FRONTDESK_RECORD_TO names an output file."""
+    source = os.environ if env is None else env
+    out = source.get(RECORD_TO_ENV)
+    if not out:
+        return inner
+    return RecordingAgentModel(inner, Path(out), pins_from_hero_dir(HERO_DIR, model_id))
+
+
+def agent_status(mode: str, live_configured: bool, env: dict[str, str] | None = None) -> AgentStatus:
+    """/health ``agent``: LIVE when LIVE mode has a key and a model id; REPLAY when the transcript
+    loads and validates (REPLAY and AUTO both play it when live is not available); DOWN otherwise."""
+    if (mode or "").upper() == AgentMode.LIVE.value:
+        return AgentStatus.LIVE if live_configured else AgentStatus.DOWN
+    try:
+        load_transcript(transcript_path(env))
+    except TranscriptError:
+        return AgentStatus.DOWN
+    return AgentStatus.REPLAY

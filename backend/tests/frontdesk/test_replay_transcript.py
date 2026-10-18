@@ -19,7 +19,7 @@ from contracts.version import TOOL_SCHEMA_VERSION
 
 REPO = Path(__file__).resolve().parents[3]
 HERO_DIR = REPO / "data" / "scenarios" / "hero"
-TRANSCRIPT = REPO / DEFAULT_TRANSCRIPT_PATH
+TRANSCRIPT = DEFAULT_TRANSCRIPT_PATH
 
 # Words the kiosk must never say to a patient (clinical or alarming); the brief's never-say list.
 NEVER_SAY = (
