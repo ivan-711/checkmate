@@ -44,6 +44,7 @@
 
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 150ms;
   --dur-base: 200ms;
   --dur-enter: 250ms;
@@ -196,6 +197,23 @@ body {
     @starting-style {
       transform: none;
     }
+  }
+}
+
+/* The registrar's flag summary after Approve: one easing, one duration. Reduced motion: it simply
+   appears (no transition at all, so the starting style never shows). */
+.reveal {
+  transition:
+    opacity var(--dur-move) var(--ease-out-expo),
+    transform var(--dur-move) var(--ease-out-expo);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    transition: none;
   }
 }
 
