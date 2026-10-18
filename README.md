@@ -256,7 +256,7 @@ Contract routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the co
 | DailyMed label excerpts | The citation on a flag | Not yet recorded | `backend/rule/cache/labels/` |
 | b.well public synthetic patient-matching benchmark, derived from ONC challenge data | Evaluation only, never committed or displayed | Described by the test-set authors as synthetic; terms not located | Never committed (`.gitignore`: `data/onc/`, `data/benchmark/`) |
 
-Third-party code licenses are listed in `docs/LICENSES.md`. That inventory has not caught up yet: it has no table for `frontend/package-lock.json`, and packages added to `uv.lock` since it was written, such as `google-genai`, `jellyfish` and `metaphone`, are missing from its Python table.
+Third-party licenses are listed in `docs/LICENSES.md`: every package in `uv.lock`, the direct dependencies of `frontend/` and `eval/acceptance/`, the container images, and the data sources.
 
 ## Not for clinical use
 
