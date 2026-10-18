@@ -1,0 +1,1782 @@
+{
+  "_withheld": "Withheld: every cell the harness marks do_not_read has its value and ci95 set to null. The harness marks a cell do_not_read when it rests on fewer than 30 dependency components or fewer than 100 pairs (eval/harness/metrics.py). That covers AUTO_LINK precision, KEEP_SEPARATE precision and the false-merge rate on the held-out test partition (test.band.auto_link.precision, test.band.keep_separate.precision, test.false_merge_rate), AUTO_LINK precision and the false-merge rate on the development partition, and the per-category, per-button and hard-negative cells on both partitions. Pair, entity and component counts are kept.",
+  "fixtureHashes": {
+    "records": "420d5d50cb5ca9bd3aac62582b9525a24ccbc7df2de7ea633450fe2bf503b340",
+    "truth": "3f188c7aa680717c46e0e34ff0389b2ff4d886dd381d8d519b018922fd2d4e6f"
+  },
+  "invariants": {
+    "band_agreement_p_vs_raw": true,
+    "fit_partition_assertions": true,
+    "idempotent_ingest": true,
+    "leakage_assertions": true,
+    "monotone_display_map": true
+  },
+  "numbers": {
+    "band.auto_link.count": {
+      "n_components": 44,
+      "n_entities": 45,
+      "n_pairs": 57,
+      "value": 57
+    },
+    "band.auto_link.precision": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 44,
+      "n_entities": 45,
+      "n_pairs": 57,
+      "value": null,
+      "zero_events": false
+    },
+    "band.auto_link.true_pair_share": {
+      "ci95": [
+        0.088743,
+        0.16305
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 281,
+      "n_entities": 303,
+      "n_pairs": 461,
+      "value": 0.123644,
+      "zero_events": false
+    },
+    "band.keep_separate.count": {
+      "n_components": 48,
+      "n_entities": 68,
+      "n_pairs": 104,
+      "value": 104
+    },
+    "band.keep_separate.precision": {
+      "ci95": [
+        0.106665,
+        0.413896
+      ],
+      "do_not_read": false,
+      "low_support": true,
+      "n_components": 48,
+      "n_entities": 68,
+      "n_pairs": 104,
+      "value": 0.221154,
+      "zero_events": false
+    },
+    "band.keep_separate.true_pair_share": {
+      "ci95": [
+        0.029849,
+        0.073476
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 281,
+      "n_entities": 303,
+      "n_pairs": 461,
+      "value": 0.049892,
+      "zero_events": false
+    },
+    "band.review.count": {
+      "n_components": 257,
+      "n_entities": 284,
+      "n_pairs": 431,
+      "value": 431
+    },
+    "band.review.precision": {
+      "ci95": [
+        0.834395,
+        0.929327
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 257,
+      "n_entities": 284,
+      "n_pairs": 431,
+      "value": 0.883991,
+      "zero_events": false
+    },
+    "band.review.true_pair_share": {
+      "ci95": [
+        0.785371,
+        0.864882
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 281,
+      "n_entities": 303,
+      "n_pairs": 461,
+      "value": 0.826464,
+      "zero_events": false
+    },
+    "blocking.recall": {
+      "ci95": [
+        0.902292,
+        0.955828
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 293,
+      "n_entities": 318,
+      "n_hit": 461,
+      "n_pairs": 496,
+      "n_true_pairs": 496,
+      "note": "keys were built after reading the taxonomy; partly by construction",
+      "value": 0.929435,
+      "zero_events": false
+    },
+    "blocking.reduction_ratio": {
+      "N": 62031,
+      "n_blocked": 592,
+      "value": 0.990456
+    },
+    "button.ACCENT_HYPHEN_SURNAME.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 6,
+      "n_entities": 6,
+      "n_pairs": 8,
+      "value": null,
+      "zero_events": false
+    },
+    "button.ACCENT_HYPHEN_SURNAME.kind": {
+      "category_ids": [
+        "S1",
+        "S5"
+      ],
+      "value": "robustness"
+    },
+    "button.ACCENT_HYPHEN_SURNAME.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 6,
+      "n_entities": 6,
+      "n_pairs": 8,
+      "value": null,
+      "zero_events": false
+    },
+    "button.ACCENT_HYPHEN_SURNAME.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 6,
+      "n_entities": 6,
+      "n_pairs": 8,
+      "value": null,
+      "zero_events": false
+    },
+    "button.CHANGE_BIRTH_YEAR.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 66,
+      "n_entities": 66,
+      "n_pairs": 86,
+      "value": null,
+      "zero_events": false
+    },
+    "button.CHANGE_BIRTH_YEAR.kind": {
+      "category_ids": [
+        "D3"
+      ],
+      "value": "band_changer"
+    },
+    "button.CHANGE_BIRTH_YEAR.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 66,
+      "n_entities": 66,
+      "n_pairs": 86,
+      "value": null,
+      "zero_events": false
+    },
+    "button.CHANGE_BIRTH_YEAR.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 66,
+      "n_entities": 66,
+      "n_pairs": 86,
+      "value": null,
+      "zero_events": false
+    },
+    "button.REMOVE_ADDRESS.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 50,
+      "n_entities": 51,
+      "n_pairs": 69,
+      "value": null,
+      "zero_events": false
+    },
+    "button.REMOVE_ADDRESS.kind": {
+      "category_ids": [
+        "L7"
+      ],
+      "value": "band_changer"
+    },
+    "button.REMOVE_ADDRESS.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 50,
+      "n_entities": 51,
+      "n_pairs": 69,
+      "value": null,
+      "zero_events": false
+    },
+    "button.REMOVE_ADDRESS.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 50,
+      "n_entities": 51,
+      "n_pairs": 69,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "button.SWAP_DOB_DAY_MONTH.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 20,
+      "n_entities": 20,
+      "n_pairs": 30,
+      "value": null,
+      "zero_events": false
+    },
+    "button.SWAP_DOB_DAY_MONTH.kind": {
+      "category_ids": [
+        "D1"
+      ],
+      "value": "robustness"
+    },
+    "button.SWAP_DOB_DAY_MONTH.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 20,
+      "n_entities": 20,
+      "n_pairs": 30,
+      "value": null,
+      "zero_events": false
+    },
+    "button.SWAP_DOB_DAY_MONTH.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 20,
+      "n_entities": 20,
+      "n_pairs": 30,
+      "value": null,
+      "zero_events": false
+    },
+    "category.C1.blocking_recall": {
+      "ci95": [
+        0.714253,
+        0.888889
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 74,
+      "n_entities": 76,
+      "n_pairs": 107,
+      "value": 0.803738,
+      "zero_events": false
+    },
+    "category.C1.recall.lenient": {
+      "ci95": [
+        0.545455,
+        0.744908
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 74,
+      "n_entities": 76,
+      "n_pairs": 107,
+      "value": 0.635514,
+      "zero_events": false
+    },
+    "category.C1.recall.strict": {
+      "ci95": [
+        0.0,
+        0.03125
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 74,
+      "n_entities": 76,
+      "n_pairs": 107,
+      "value": 0.009346,
+      "zero_events": false
+    },
+    "category.D1.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 20,
+      "n_entities": 20,
+      "n_pairs": 30,
+      "value": null,
+      "zero_events": false
+    },
+    "category.D1.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 20,
+      "n_entities": 20,
+      "n_pairs": 30,
+      "value": null,
+      "zero_events": false
+    },
+    "category.D1.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 20,
+      "n_entities": 20,
+      "n_pairs": 30,
+      "value": null,
+      "zero_events": false
+    },
+    "category.D3.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 66,
+      "n_entities": 66,
+      "n_pairs": 86,
+      "value": null,
+      "zero_events": false
+    },
+    "category.D3.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 66,
+      "n_entities": 66,
+      "n_pairs": 86,
+      "value": null,
+      "zero_events": false
+    },
+    "category.D3.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 66,
+      "n_entities": 66,
+      "n_pairs": 86,
+      "value": null,
+      "zero_events": false
+    },
+    "category.L1.blocking_recall": {
+      "ci95": [
+        0.897623,
+        0.975217
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 85,
+      "n_entities": 90,
+      "n_pairs": 132,
+      "value": 0.939394,
+      "zero_events": false
+    },
+    "category.L1.recall.lenient": {
+      "ci95": [
+        0.846715,
+        0.941176
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 85,
+      "n_entities": 90,
+      "n_pairs": 132,
+      "value": 0.893939,
+      "zero_events": false
+    },
+    "category.L1.recall.strict": {
+      "ci95": [
+        0.045096,
+        0.142886
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 85,
+      "n_entities": 90,
+      "n_pairs": 132,
+      "value": 0.090909,
+      "zero_events": false
+    },
+    "category.L3.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 50,
+      "n_entities": 50,
+      "n_pairs": 72,
+      "value": null,
+      "zero_events": false
+    },
+    "category.L3.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 50,
+      "n_entities": 50,
+      "n_pairs": 72,
+      "value": null,
+      "zero_events": false
+    },
+    "category.L3.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 50,
+      "n_entities": 50,
+      "n_pairs": 72,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "category.L7.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 50,
+      "n_entities": 51,
+      "n_pairs": 69,
+      "value": null,
+      "zero_events": false
+    },
+    "category.L7.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 50,
+      "n_entities": 51,
+      "n_pairs": 69,
+      "value": null,
+      "zero_events": false
+    },
+    "category.L7.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 50,
+      "n_entities": 51,
+      "n_pairs": 69,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "category.S1.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 2,
+      "n_entities": 2,
+      "n_pairs": 4,
+      "value": null,
+      "zero_events": false
+    },
+    "category.S1.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 2,
+      "n_entities": 2,
+      "n_pairs": 4,
+      "value": null,
+      "zero_events": false
+    },
+    "category.S1.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 2,
+      "n_entities": 2,
+      "n_pairs": 4,
+      "value": null,
+      "zero_events": false
+    },
+    "category.S3.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 4,
+      "n_entities": 4,
+      "n_pairs": 7,
+      "value": null,
+      "zero_events": false
+    },
+    "category.S3.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 4,
+      "n_entities": 4,
+      "n_pairs": 7,
+      "value": null,
+      "zero_events": false
+    },
+    "category.S3.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 4,
+      "n_entities": 4,
+      "n_pairs": 7,
+      "value": null,
+      "zero_events": false
+    },
+    "category.S5.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 4,
+      "n_entities": 4,
+      "n_pairs": 4,
+      "value": null,
+      "zero_events": false
+    },
+    "category.S5.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 4,
+      "n_entities": 4,
+      "n_pairs": 4,
+      "value": null,
+      "zero_events": false
+    },
+    "category.S5.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 4,
+      "n_entities": 4,
+      "n_pairs": 4,
+      "value": null,
+      "zero_events": false
+    },
+    "category.S6.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 0,
+      "n_entities": 0,
+      "n_pairs": 0,
+      "value": null,
+      "zero_events": false
+    },
+    "category.S6.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 0,
+      "n_entities": 0,
+      "n_pairs": 0,
+      "value": null,
+      "zero_events": false
+    },
+    "category.S6.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 0,
+      "n_entities": 0,
+      "n_pairs": 0,
+      "value": null,
+      "zero_events": false
+    },
+    "category.T1.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 61,
+      "n_entities": 61,
+      "n_pairs": 97,
+      "value": null,
+      "zero_events": false
+    },
+    "category.T1.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 61,
+      "n_entities": 61,
+      "n_pairs": 97,
+      "value": null,
+      "zero_events": false
+    },
+    "category.T1.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": false,
+      "n_components": 61,
+      "n_entities": 61,
+      "n_pairs": 97,
+      "value": null,
+      "zero_events": false
+    },
+    "category.T3.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 4,
+      "n_entities": 4,
+      "n_pairs": 7,
+      "value": null,
+      "zero_events": false
+    },
+    "category.T3.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 4,
+      "n_entities": 4,
+      "n_pairs": 7,
+      "value": null,
+      "zero_events": false
+    },
+    "category.T3.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 4,
+      "n_entities": 4,
+      "n_pairs": 7,
+      "value": null,
+      "zero_events": false
+    },
+    "corpus.components": {
+      "value": 500
+    },
+    "corpus.records.development": {
+      "value": 781
+    },
+    "false_merge_rate": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 44,
+      "n_entities": 45,
+      "n_pairs": 57,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "hard_negative.N1.auto_linked_wrongly": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 15,
+      "n_entities": 30,
+      "n_pairs": 36,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "hard_negative.N1.sent_to_review": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 15,
+      "n_entities": 30,
+      "n_pairs": 36,
+      "value": null,
+      "zero_events": false
+    },
+    "hard_negative.N3.auto_linked_wrongly": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 15,
+      "n_entities": 30,
+      "n_pairs": 50,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "hard_negative.N3.sent_to_review": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 15,
+      "n_entities": 30,
+      "n_pairs": 50,
+      "value": null,
+      "zero_events": false
+    },
+    "missed_match_rate.scorer": {
+      "ci95": [
+        0.029849,
+        0.073476
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 281,
+      "n_entities": 303,
+      "n_pairs": 461,
+      "value": 0.049892,
+      "zero_events": false
+    },
+    "recall.lenient.end_to_end": {
+      "ci95": [
+        0.853042,
+        0.91529
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 293,
+      "n_entities": 318,
+      "n_pairs": 496,
+      "value": 0.883065,
+      "zero_events": false
+    },
+    "recall.lenient.scorer": {
+      "ci95": [
+        0.926524,
+        0.970151
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 281,
+      "n_entities": 303,
+      "n_pairs": 461,
+      "value": 0.950108,
+      "zero_events": false
+    },
+    "recall.strict.end_to_end": {
+      "ci95": [
+        0.08262,
+        0.151098
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 293,
+      "n_entities": 318,
+      "n_pairs": 496,
+      "value": 0.114919,
+      "zero_events": false
+    },
+    "recall.strict.scorer": {
+      "ci95": [
+        0.088743,
+        0.16305
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 281,
+      "n_entities": 303,
+      "n_pairs": 461,
+      "value": 0.123644,
+      "zero_events": false
+    },
+    "regression.relatives-cousins-similar-name-and-date": {
+      "expected": {
+        "band_not": [
+          "AUTO_LINK"
+        ]
+      },
+      "kind": "different_people",
+      "nickname": false,
+      "pass": true,
+      "raw_score": 1.1,
+      "value": "REVIEW"
+    },
+    "regression.relatives-parent-child-junior": {
+      "expected": {
+        "band_not": [
+          "AUTO_LINK"
+        ]
+      },
+      "kind": "different_people",
+      "nickname": false,
+      "pass": true,
+      "raw_score": 1.1,
+      "value": "REVIEW"
+    },
+    "regression.relatives-siblings-one-address": {
+      "expected": {
+        "band_not": [
+          "AUTO_LINK"
+        ]
+      },
+      "kind": "different_people",
+      "nickname": false,
+      "pass": true,
+      "raw_score": -0.308333,
+      "value": "KEEP_SEPARATE"
+    },
+    "regression.relatives-twins-one-address": {
+      "expected": {
+        "band_not": [
+          "AUTO_LINK"
+        ]
+      },
+      "kind": "different_people",
+      "nickname": false,
+      "pass": true,
+      "raw_score": -0.5,
+      "value": "KEEP_SEPARATE"
+    },
+    "regression.same-person-dob-swap-address-missing": {
+      "expected": {
+        "band_in": [
+          "AUTO_LINK",
+          "REVIEW"
+        ]
+      },
+      "kind": "same_person",
+      "nickname": false,
+      "pass": true,
+      "raw_score": 0.6,
+      "value": "REVIEW"
+    },
+    "regression.same-person-english-nickname-only": {
+      "expected": {
+        "band_in": [
+          "AUTO_LINK",
+          "REVIEW"
+        ]
+      },
+      "kind": "same_person",
+      "nickname": true,
+      "pass": true,
+      "raw_score": 2.316667,
+      "value": "REVIEW"
+    },
+    "regression.same-person-nickname-typo-missing-phone": {
+      "expected": {
+        "band_in": [
+          "AUTO_LINK",
+          "REVIEW"
+        ]
+      },
+      "kind": "same_person",
+      "nickname": true,
+      "pass": true,
+      "raw_score": 1.266667,
+      "value": "REVIEW"
+    },
+    "regression.same-person-spanish-nickname-only": {
+      "expected": {
+        "band_in": [
+          "AUTO_LINK",
+          "REVIEW"
+        ]
+      },
+      "kind": "same_person",
+      "nickname": true,
+      "pass": true,
+      "raw_score": 2.501852,
+      "value": "REVIEW"
+    },
+    "regression.same-person-spanish-surname-moved": {
+      "expected": {
+        "band_in": [
+          "AUTO_LINK",
+          "REVIEW"
+        ]
+      },
+      "kind": "same_person",
+      "nickname": false,
+      "pass": true,
+      "raw_score": 1.785873,
+      "value": "REVIEW"
+    },
+    "regression.thin-record-stays-in-review": {
+      "expected": {
+        "band_in": [
+          "REVIEW"
+        ]
+      },
+      "kind": "thin_record",
+      "nickname": false,
+      "pass": true,
+      "raw_score": 0.7,
+      "value": "REVIEW"
+    },
+    "review.items_per_1000_pairs": {
+      "n_components": 257,
+      "n_entities": 284,
+      "n_pairs": 431,
+      "value": 728.040541
+    },
+    "review.true_match_share": {
+      "ci95": [
+        0.834395,
+        0.929327
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 257,
+      "n_entities": 284,
+      "n_pairs": 431,
+      "value": 0.883991,
+      "zero_events": false
+    },
+    "review_burden": {
+      "ci95": [
+        0.634559,
+        0.800362
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 282,
+      "n_entities": 316,
+      "n_pairs": 592,
+      "value": 0.728041,
+      "zero_events": false
+    },
+    "test.band.auto_link.count": {
+      "n_components": 11,
+      "n_entities": 11,
+      "n_pairs": 15,
+      "value": 15
+    },
+    "test.band.auto_link.precision": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 11,
+      "n_entities": 11,
+      "n_pairs": 15,
+      "value": null,
+      "zero_events": false
+    },
+    "test.band.auto_link.true_pair_share": {
+      "ci95": [
+        0.034134,
+        0.131839
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 120,
+      "n_entities": 128,
+      "n_pairs": 194,
+      "value": 0.07732,
+      "zero_events": false
+    },
+    "test.band.keep_separate.count": {
+      "n_components": 33,
+      "n_entities": 44,
+      "n_pairs": 72,
+      "value": 72
+    },
+    "test.band.keep_separate.precision": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 33,
+      "n_entities": 44,
+      "n_pairs": 72,
+      "value": null,
+      "zero_events": false
+    },
+    "test.band.keep_separate.true_pair_share": {
+      "ci95": [
+        0.0198,
+        0.103971
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 120,
+      "n_entities": 128,
+      "n_pairs": 194,
+      "value": 0.056701,
+      "zero_events": false
+    },
+    "test.band.review.count": {
+      "n_components": 111,
+      "n_entities": 122,
+      "n_pairs": 186,
+      "value": 186
+    },
+    "test.band.review.precision": {
+      "ci95": [
+        0.839791,
+        0.962991
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 111,
+      "n_entities": 122,
+      "n_pairs": 186,
+      "value": 0.903226,
+      "zero_events": false
+    },
+    "test.band.review.true_pair_share": {
+      "ci95": [
+        0.795803,
+        0.924267
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 120,
+      "n_entities": 128,
+      "n_pairs": 194,
+      "value": 0.865979,
+      "zero_events": false
+    },
+    "test.blocking.recall": {
+      "ci95": [
+        0.845794,
+        0.946433
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 125,
+      "n_entities": 136,
+      "n_hit": 194,
+      "n_pairs": 216,
+      "n_true_pairs": 216,
+      "note": "keys were built after reading the taxonomy; partly by construction",
+      "value": 0.898148,
+      "zero_events": false
+    },
+    "test.blocking.reduction_ratio": {
+      "N": 56280,
+      "n_blocked": 273,
+      "value": 0.995149
+    },
+    "test.button.ACCENT_HYPHEN_SURNAME.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 3,
+      "n_entities": 3,
+      "n_pairs": 7,
+      "value": null,
+      "zero_events": false
+    },
+    "test.button.ACCENT_HYPHEN_SURNAME.kind": {
+      "category_ids": [
+        "S1",
+        "S5"
+      ],
+      "value": "robustness"
+    },
+    "test.button.ACCENT_HYPHEN_SURNAME.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 3,
+      "n_entities": 3,
+      "n_pairs": 7,
+      "value": null,
+      "zero_events": false
+    },
+    "test.button.ACCENT_HYPHEN_SURNAME.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 3,
+      "n_entities": 3,
+      "n_pairs": 7,
+      "value": null,
+      "zero_events": false
+    },
+    "test.button.CHANGE_BIRTH_YEAR.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 24,
+      "n_entities": 24,
+      "n_pairs": 34,
+      "value": null,
+      "zero_events": false
+    },
+    "test.button.CHANGE_BIRTH_YEAR.kind": {
+      "category_ids": [
+        "D3"
+      ],
+      "value": "band_changer"
+    },
+    "test.button.CHANGE_BIRTH_YEAR.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 24,
+      "n_entities": 24,
+      "n_pairs": 34,
+      "value": null,
+      "zero_events": false
+    },
+    "test.button.CHANGE_BIRTH_YEAR.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 24,
+      "n_entities": 24,
+      "n_pairs": 34,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "test.button.REMOVE_ADDRESS.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 23,
+      "n_entities": 23,
+      "n_pairs": 34,
+      "value": null,
+      "zero_events": false
+    },
+    "test.button.REMOVE_ADDRESS.kind": {
+      "category_ids": [
+        "L7"
+      ],
+      "value": "band_changer"
+    },
+    "test.button.REMOVE_ADDRESS.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 23,
+      "n_entities": 23,
+      "n_pairs": 34,
+      "value": null,
+      "zero_events": false
+    },
+    "test.button.REMOVE_ADDRESS.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 23,
+      "n_entities": 23,
+      "n_pairs": 34,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "test.button.SWAP_DOB_DAY_MONTH.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 8,
+      "n_entities": 8,
+      "n_pairs": 11,
+      "value": null,
+      "zero_events": false
+    },
+    "test.button.SWAP_DOB_DAY_MONTH.kind": {
+      "category_ids": [
+        "D1"
+      ],
+      "value": "robustness"
+    },
+    "test.button.SWAP_DOB_DAY_MONTH.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 8,
+      "n_entities": 8,
+      "n_pairs": 11,
+      "value": null,
+      "zero_events": false
+    },
+    "test.button.SWAP_DOB_DAY_MONTH.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 8,
+      "n_entities": 8,
+      "n_pairs": 11,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.C1.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 30,
+      "n_entities": 32,
+      "n_pairs": 44,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.C1.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 30,
+      "n_entities": 32,
+      "n_pairs": 44,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.C1.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 30,
+      "n_entities": 32,
+      "n_pairs": 44,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "test.category.D1.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 8,
+      "n_entities": 8,
+      "n_pairs": 11,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.D1.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 8,
+      "n_entities": 8,
+      "n_pairs": 11,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.D1.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 8,
+      "n_entities": 8,
+      "n_pairs": 11,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.D3.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 24,
+      "n_entities": 24,
+      "n_pairs": 34,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.D3.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 24,
+      "n_entities": 24,
+      "n_pairs": 34,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.D3.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 24,
+      "n_entities": 24,
+      "n_pairs": 34,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "test.category.L1.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 32,
+      "n_entities": 32,
+      "n_pairs": 46,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.L1.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 32,
+      "n_entities": 32,
+      "n_pairs": 46,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.L1.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 32,
+      "n_entities": 32,
+      "n_pairs": 46,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.L3.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 27,
+      "n_entities": 27,
+      "n_pairs": 39,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.L3.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 27,
+      "n_entities": 27,
+      "n_pairs": 39,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.L3.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 27,
+      "n_entities": 27,
+      "n_pairs": 39,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "test.category.L7.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 23,
+      "n_entities": 23,
+      "n_pairs": 34,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.L7.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 23,
+      "n_entities": 23,
+      "n_pairs": 34,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.L7.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 23,
+      "n_entities": 23,
+      "n_pairs": 34,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "test.category.S1.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 3,
+      "n_entities": 3,
+      "n_pairs": 6,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.S1.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 3,
+      "n_entities": 3,
+      "n_pairs": 6,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.S1.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 3,
+      "n_entities": 3,
+      "n_pairs": 6,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.S3.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 0,
+      "n_entities": 0,
+      "n_pairs": 0,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.S3.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 0,
+      "n_entities": 0,
+      "n_pairs": 0,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.S3.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 0,
+      "n_entities": 0,
+      "n_pairs": 0,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.S5.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 1,
+      "n_entities": 1,
+      "n_pairs": 3,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.S5.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 1,
+      "n_entities": 1,
+      "n_pairs": 3,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.S5.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 1,
+      "n_entities": 1,
+      "n_pairs": 3,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.S6.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 0,
+      "n_entities": 0,
+      "n_pairs": 0,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.S6.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 0,
+      "n_entities": 0,
+      "n_pairs": 0,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.S6.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 0,
+      "n_entities": 0,
+      "n_pairs": 0,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.T1.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 41,
+      "n_entities": 44,
+      "n_pairs": 65,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.T1.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 41,
+      "n_entities": 44,
+      "n_pairs": 65,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.T1.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 41,
+      "n_entities": 44,
+      "n_pairs": 65,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.T3.blocking_recall": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 2,
+      "n_entities": 2,
+      "n_pairs": 2,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.T3.recall.lenient": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 2,
+      "n_entities": 2,
+      "n_pairs": 2,
+      "value": null,
+      "zero_events": false
+    },
+    "test.category.T3.recall.strict": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 2,
+      "n_entities": 2,
+      "n_pairs": 2,
+      "value": null,
+      "zero_events": false
+    },
+    "test.false_merge_rate": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 11,
+      "n_entities": 11,
+      "n_pairs": 15,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "test.hard_negative.N1.auto_linked_wrongly": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 6,
+      "n_entities": 12,
+      "n_pairs": 16,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "test.hard_negative.N1.sent_to_review": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 6,
+      "n_entities": 12,
+      "n_pairs": 16,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "test.hard_negative.N3.auto_linked_wrongly": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 10,
+      "n_entities": 19,
+      "n_pairs": 30,
+      "note": "zero observed; insufficient independent evidence for a tight pair-error bound",
+      "value": null,
+      "zero_events": true
+    },
+    "test.hard_negative.N3.sent_to_review": {
+      "ci95": null,
+      "do_not_read": true,
+      "low_support": true,
+      "n_components": 10,
+      "n_entities": 19,
+      "n_pairs": 30,
+      "value": null,
+      "zero_events": false
+    },
+    "test.missed_match_rate.scorer": {
+      "ci95": [
+        0.0198,
+        0.103971
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 120,
+      "n_entities": 128,
+      "n_pairs": 194,
+      "value": 0.056701,
+      "zero_events": false
+    },
+    "test.recall.lenient.end_to_end": {
+      "ci95": [
+        0.783542,
+        0.905025
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 125,
+      "n_entities": 136,
+      "n_pairs": 216,
+      "value": 0.847222,
+      "zero_events": false
+    },
+    "test.recall.lenient.scorer": {
+      "ci95": [
+        0.896029,
+        0.9802
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 120,
+      "n_entities": 128,
+      "n_pairs": 194,
+      "value": 0.943299,
+      "zero_events": false
+    },
+    "test.recall.strict.end_to_end": {
+      "ci95": [
+        0.031094,
+        0.118489
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 125,
+      "n_entities": 136,
+      "n_pairs": 216,
+      "value": 0.069444,
+      "zero_events": false
+    },
+    "test.recall.strict.scorer": {
+      "ci95": [
+        0.034134,
+        0.131839
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 120,
+      "n_entities": 128,
+      "n_pairs": 194,
+      "value": 0.07732,
+      "zero_events": false
+    },
+    "test.review.items_per_1000_pairs": {
+      "n_components": 111,
+      "n_entities": 122,
+      "n_pairs": 186,
+      "value": 681.318681
+    },
+    "test.review.true_match_share": {
+      "ci95": [
+        0.839791,
+        0.962991
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 111,
+      "n_entities": 122,
+      "n_pairs": 186,
+      "value": 0.903226,
+      "zero_events": false
+    },
+    "test.review_burden": {
+      "ci95": [
+        0.567974,
+        0.794252
+      ],
+      "do_not_read": false,
+      "low_support": false,
+      "n_components": 122,
+      "n_entities": 138,
+      "n_pairs": 273,
+      "value": 0.681319,
+      "zero_events": false
+    },
+    "thresholds.alpha_target_reachable": {
+      "fallback_used": false,
+      "value": true
+    },
+    "thresholds.c_high": {
+      "thresholds_id": "provisional-1",
+      "value": 4.0
+    },
+    "thresholds.c_low": {
+      "thresholds_id": "provisional-1",
+      "value": 0.0
+    },
+    "thresholds.envelope_at_c_high": {
+      "n_components": 275,
+      "n_pairs": 437,
+      "note": "development, descriptive",
+      "value": 0.009217
+    },
+    "thresholds.operating_point": {
+      "note": "every band number above is computed at this row",
+      "source": "migrations (migrations)",
+      "value": "provisional-1"
+    },
+    "thresholds.proposed.c_high": {
+      "note": "out-of-fold selection, development, descriptive",
+      "thresholds_id": "oof-4dc28f256de9",
+      "value": 0.44375
+    },
+    "thresholds.proposed.c_low": {
+      "note": "out-of-fold selection, development, descriptive",
+      "thresholds_id": "oof-4dc28f256de9",
+      "value": -0.35
+    }
+  },
+  "scorerVersion": "handset-1",
+  "seed": 20261017,
+  "split": {
+    "componentCount": 500,
+    "componentsPerPartition": {
+      "development": 336,
+      "showcase": 20,
+      "test": 144
+    },
+    "foldSizes": {
+      "0": 70,
+      "1": 79,
+      "2": 59,
+      "3": 54,
+      "4": 74
+    },
+    "largestComponent": {
+      "id": "d868e198-8ebe-2338-5691-4c1de3421c65",
+      "persons": 2,
+      "records": 3
+    }
+  },
+  "thresholds": {
+    "alpha": 0.01,
+    "auto_links_at_c_high": 437,
+    "beta": 0.02,
+    "c_high": 0.44375,
+    "c_high_fallback_used": false,
+    "c_high_reachable": true,
+    "c_low": -0.35,
+    "c_low_constraint_failed": null,
+    "components_at_c_high": 275,
+    "envelope_at_c_high": 0.009217,
+    "min_components": 50,
+    "missed_true_rate_at_c_low": 0.019523,
+    "note": "c_high: smallest c with envelope <= alpha at the support floor; development, descriptive; configuration, not clinical thresholds",
+    "review_burden_at_c_low": 0.126689,
+    "review_burden_max": 0.2
+  }
+}

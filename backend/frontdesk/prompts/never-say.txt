@@ -31,3 +31,33 @@ verifique su identidad
 verificamos su identidad
 triaje
 signos vitales
+# First-person link claims (feature plan of 2026-10-18, item D4). The agent has no tool that links
+# records, so "I linked you" is never true. "already linked" on its own stays allowed: it is true once
+# a registrar has linked. Contractions use the ASCII apostrophe; banned_phrase() maps the curly ones.
+i linked
+i have linked
+i've linked
+i already linked
+i have already linked
+i've already linked
+we linked
+we have linked
+we've linked
+we already linked
+we have already linked
+we've already linked
+linked you to
+now linked
+just linked
+successfully linked
+lo vincule
+la vincule
+los vincule
+las vincule
+he vinculado
+hemos vinculado
+vincule su
+acabo de vincular
+acabamos de vincular
+ahora esta vinculad
+ahora estan vinculad
