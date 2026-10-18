@@ -58,6 +58,10 @@ _TOOL_CALLS = text(
     "reason_code, evidence_ids, evidence_snapshot, effect_key, effect_status, effect_ref, policy_version, latency_ms, "
     "created_at FROM agent_tool_call WHERE session_id = :session_id ORDER BY turn_index, step_index"
 )
+_NEXT_STEP_INDEX = text(
+    "SELECT coalesce(max(step_index) + 1, 0) FROM agent_tool_call WHERE session_id = :session_id "
+    "AND turn_index = :turn_index"
+)
 _IDENTICAL_CALLS = text(
     "SELECT count(*) FROM agent_tool_call WHERE session_id = :session_id AND tool_name = :tool_name "
     "AND args_sha256 = :args_sha256"
@@ -186,6 +190,11 @@ def complete_turn(
 
 def read_tool_calls(conn: Connection, session_id: UUID) -> list[Row]:
     return list(conn.execute(_TOOL_CALLS, {"session_id": session_id}))
+
+
+def next_step_index(conn: Connection, session_id: UUID, turn_index: int) -> int:
+    """A re-claimed turn continues its step numbering: audit rows from the failed run stay."""
+    return int(conn.execute(_NEXT_STEP_INDEX, {"session_id": session_id, "turn_index": turn_index}).scalar_one())
 
 
 def identical_call_count(conn: Connection, session_id: UUID, tool_name: str, args_sha256: str) -> int:

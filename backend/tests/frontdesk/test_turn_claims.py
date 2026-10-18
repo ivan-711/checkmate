@@ -163,3 +163,56 @@ def test_replay_and_live_turn_responses_share_one_shape(client, fake, db_conn, c
         purge_session(db_conn, session["id"])
     assert bodies[AgentMode.REPLAY]["agentMode"] == "REPLAY" and bodies[AgentMode.LIVE]["agentMode"] == "LIVE"
     assert _strip(bodies[AgentMode.REPLAY]) == _strip(bodies[AgentMode.LIVE])
+
+
+class ExplodingModel(FakeAgentModel):
+    def next_step(self, req):
+        raise RuntimeError("adapter bug")
+
+
+def test_exception_mid_turn_marks_the_turn_failed_and_the_key_reclaims(client, fake, db_conn, cleanup):
+    """Adapters never raise by contract; if one does, the kiosk must not sit on 409 for 40 s."""
+    from backend.tests.frontdesk import conftest
+
+    session = create_session(client)
+    cleanup[0].append(session["id"])
+    sid = uuid.UUID(session["id"])
+    key = new_key()
+    conftest.HOLDER.model = ExplodingModel()
+    boom = turn(client, session["id"], "Hola", key)
+    assert boom.status_code == 500 and boom.json()["error"]["code"] == "INTERNAL"
+    status = db_conn.execute(text("SELECT status FROM intake_turn WHERE session_id = :s"), {"s": sid}).scalar_one()
+    assert status == "FAILED"
+    conftest.HOLDER.model = FakeAgentModel(final_text="Hola de nuevo.")
+    again = turn(client, session["id"], "Hola", key)
+    assert again.status_code == 201 and again.json()["assistantText"] == "Hola de nuevo."
+
+
+def test_reclaimed_turn_continues_step_numbering_and_replays_the_chart_effect(client, fake, db_conn, cleanup):
+    """A run that applied the chart effect and then died: the re-run's audit rows get fresh step indices
+    and the chart effect comes back REPLAYED, never a second chart."""
+    from backend.tests.frontdesk import conftest
+
+    session = create_session(client, "EN")
+    cleanup[0].append(session["id"])
+    sid = uuid.UUID(session["id"])
+
+    class DiesAfterPropose(FakeAgentModel):
+        def next_step(self, req):
+            if self.requests:
+                raise RuntimeError("died after the tool call")
+            return super().next_step(req)
+
+    conftest.HOLDER.model = DiesAfterPropose(steps=[tool_call("propose_new_chart", UNRELATED_ARGS)])
+    key = new_key()
+    assert turn(client, session["id"], UNRELATED_TEXT, key).status_code == 500
+    conftest.HOLDER.model = FakeAgentModel(steps=[tool_call("propose_new_chart", UNRELATED_ARGS)])
+    body = turn(client, session["id"], UNRELATED_TEXT, key).json()
+    assert body["turnIndex"] == 0
+    assert body["toolCalls"][0]["stepIndex"] == 1 and body["toolCalls"][0]["effect"]["status"] == "REPLAYED"
+    assert body["registration"]["state"] == "NEW_CHART"
+    rows = db_conn.execute(
+        text("SELECT step_index, effect_status FROM agent_tool_call WHERE session_id = :s ORDER BY step_index"),
+        {"s": sid},
+    ).all()
+    assert [tuple(r) for r in rows] == [(0, "APPLIED"), (1, "REPLAYED")]

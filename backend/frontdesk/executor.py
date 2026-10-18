@@ -219,7 +219,8 @@ def _execute(
         with conn.begin_nested():
             store.insert_tool_call(conn, row)
     except IntegrityError:
-        # A concurrent re-run claimed the same effect key first: the effect already happened.
+        # The effect key was claimed by an earlier run (the row's (session, turn, step) is fresh: a
+        # re-claimed turn continues its step numbering): the effect already happened.
         effect = Effect(status=EffectStatus.REPLAYED, ref=effect.ref)
         row.update({"effect_key": None, "effect_status": effect.status.value})
         store.insert_tool_call(conn, row)
