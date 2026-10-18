@@ -9,10 +9,11 @@ import { CiteProvider } from "./CiteProvider";
 const card = scenario.pair.recordA;
 const render = (cite: "family" | "addr" | null) =>
   renderToStaticMarkup(
-    createElement(CiteProvider, {
-      initial: cite,
-      children: createElement(SourceCardView, { card, differs: new Set<CardField>() }),
-    }),
+    createElement(
+      CiteProvider,
+      { initial: cite },
+      createElement(SourceCardView, { card, differs: new Set<CardField>() }),
+    ),
   );
 
 describe("hover-to-cite on a source card", () => {

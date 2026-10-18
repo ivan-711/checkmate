@@ -17,7 +17,7 @@ export function CiteProvider({
 }: {
   initial?: CiteField | null;
   value?: CiteContext;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   const [cite, setCite] = useState<CiteField | null>(initial);
   const own = useMemo<CiteContext>(() => ({ cite, setCite }), [cite]);
