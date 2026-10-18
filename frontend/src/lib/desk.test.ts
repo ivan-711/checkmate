@@ -10,7 +10,20 @@ import {
   stageHead,
   stepStatus,
   type DeskState,
+  newChartStepStatus,
 } from "./desk";
+
+describe("newChartStepStatus", () => {
+  it("marks Check-in and Rules gate done and leaves the rest upcoming", () => {
+    expect(STORY_STEPS.map((step) => newChartStepStatus(step.id))).toEqual([
+      "done",
+      "done",
+      "upcoming",
+      "upcoming",
+      "upcoming",
+    ]);
+  });
+});
 
 describe("deriveDeskState", () => {
   const base = { decision: null, linked: false, sheet: null, kiosk: "idle" } as const;
