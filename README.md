@@ -178,7 +178,7 @@ What the rows mean (`eval/harness/metrics.py`):
 
 ### Parallel evaluation sweep
 
-`eval/sweep/` runs the harness over several seeds in parallel and reports each metric's mean and 95% interval across seeds; the interval is a two-sided Student t interval on the per-seed values (`eval/sweep/results.py`). `--executor` chooses where the runs happen: `local` is a process pool on this machine, `modal` is Modal and needs a token from `uvx modal token new`, and `auto`, the default, uses Modal when a token is configured and the local pool otherwise (`eval/sweep/executors.py`).
+`eval/sweep/` runs the harness over several seeds in parallel and reports each metric's mean and 95% interval across seeds, except a metric the harness marks do-not-read on any seed, which prints as not reported with no mean or interval; the interval is a two-sided Student t interval on the per-seed values, clipped to 0 to 1 for rates (`eval/sweep/results.py`). `--executor` chooses where the runs happen: `local` is a process pool on this machine, `modal` is Modal and needs a token from `uvx modal token new`, and `auto`, the default, uses Modal when a token is configured and the local pool otherwise (`eval/sweep/executors.py`).
 
 ```sh
 uvx modal token new
