@@ -203,10 +203,10 @@ test("FrontDesk shell: empty chat pane, ES/EN switch and the agent gate tile", a
   await page.getByRole("button", { name: "English" }).click();
   await expect(page.getByText("Welcome. Let's get you checked in.")).toBeVisible();
 
-  const tile = page.getByRole("region", { name: "Agent actions per 5 minutes" });
-  await expect(tile.getByText("No agent actions yet.")).toBeVisible();
-  // The caption names the aggregate only; it never changes with the data source's mode.
-  await expect(tile.getByText("agent_gate_5m · continuous aggregate", { exact: true })).toBeVisible();
+  // The gate tile lives in the Activity strip: counts in words, the window in the caption.
+  const tile = page.getByTestId("tile-agent-gate");
+  await expect(tile).toContainText("0 denied · 0 allowed");
+  await expect(tile).toContainText(/Gate, last \d+ min/);
 });
 
 test("FrontDesk check-in: the gate denies a new chart at REVIEW and hands it to a registrar", async ({
@@ -455,10 +455,22 @@ for (const scheme of ["light", "dark"] as const) {
           .map((el) => el.outerHTML.slice(0, 80));
       });
       expect(reds, route).toEqual([]);
-      // The evidence tokens themselves, not just the bars the fixture happens to draw.
+      // The colour tokens themselves, not just what the fixture happens to draw: the record's
+      // mulberry family, the working glow, the gate's amber and the ink the evidence is drawn in.
       const tokens = await page.evaluate(() => {
         const cs = getComputedStyle(document.documentElement);
-        return ["--evidence-against", "--evidence-for"].map((name) => cs.getPropertyValue(name).trim());
+        return [
+          "--mulberry",
+          "--mulberry-deep",
+          "--mulberry-tint",
+          "--mulberry-cite",
+          "--glow",
+          "--amber-surface",
+          "--amber-line",
+          "--amber-ink",
+          "--ink",
+          "--ink-3",
+        ].map((name) => cs.getPropertyValue(name).trim());
       });
       for (const token of tokens) {
         const m = token.match(/^#([0-9a-f]{6})$/i);
