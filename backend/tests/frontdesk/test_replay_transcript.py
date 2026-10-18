@@ -14,6 +14,7 @@ import pytest
 
 from backend.frontdesk import author_transcript
 from backend.frontdesk.replay import DEFAULT_TRANSCRIPT_PATH, ToolCallModelStep, fold, load_transcript
+from backend.frontdesk.templates import banned_phrase
 from contracts.models.policy import PolicyOutcome, PolicyReason, ProposeArgs
 from contracts.version import TOOL_SCHEMA_VERSION
 
@@ -118,6 +119,24 @@ def test_assistant_text_is_plain_and_never_claims_a_chart(transcript):
                 for word in NEVER_SAY:
                     assert word not in low, f"{word!r} in {step.model.text!r}"
                 assert "registr" in low  # a registrar is always named as the next step
+
+
+def test_assistant_text_passes_the_production_banned_phrase_check(transcript):
+    """loop.py runs banned_phrase on every TextStep in REPLAY too, so a never-say.txt entry that
+    matched a recorded reply would turn a demo turn into the template line; this pins the demo
+    to the production lists with the chart effect the scripted gate outcome produces."""
+    for turn in transcript.turns:
+        created = False
+        for step in turn.steps:
+            if isinstance(step.model, ToolCallModelStep):
+                created = created or (
+                    step.model.tool_name == "propose_new_chart"
+                    and step.expect is not None
+                    and step.expect.gate_outcome == PolicyOutcome.ALLOW
+                )
+            else:
+                hit = banned_phrase(step.model.text, new_chart_created=created)
+                assert hit is None, f"{hit!r} in {step.model.text!r}"
 
 
 def test_authoring_script_reproduces_the_committed_file(tmp_path: Path):
