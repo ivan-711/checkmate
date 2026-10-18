@@ -1,5 +1,5 @@
 // UX spec 10.9, the FrontDesk copy deck. Strings with braces are functions filled from the API.
-import type { Band } from "@/api/types";
+import type { Band, PolicyReason } from "@/api/types";
 import { FAMILY_FEATURES, FEATURE_LABELS, GIVEN_FEATURES, type NameFeature } from "@/lib/display";
 
 export type KioskLanguage = "en" | "es";
@@ -70,7 +70,21 @@ export const COPY = {
     helper: "This demo uses synthetic patients. Please don't type your own details.",
     promise: "Nothing is linked to your chart until a staff member approves.",
     heldFinish: "Held for review. No records were linked.",
-    verified: "Verified",
+    ruleResult: "Rule result",
+    // The gate's reason codes in words a patient can read; the code itself is for staff screens.
+    reason: {
+      CANDIDATE_IN_REVIEW_OR_HIGHER: "An existing chart may be yours",
+      INCOMPLETE_DEMOGRAPHICS: "More details are needed first",
+      UNGROUNDED_FIELD: "A detail was not in what you typed",
+      INVALID_ARGUMENTS: "The request was incomplete",
+      UNKNOWN_TOOL: "That action is not available here",
+      LOOP_GUARD: "Too many repeated steps",
+      SESSION_CLOSED: "This check-in is already closed",
+      INTAKE_ALREADY_RECORDED: "Your check-in is already recorded",
+      ALREADY_LINKED: "Your chart is already linked",
+      NO_INTAKE_RECORD: "There is no check-in record yet",
+    } satisfies Record<PolicyReason, string> as Record<string, string>,
+    reasonFallback: "A staff member will review this",
     stepsLabel: "What FrontDesk did",
     stepRead: "Read your check-in",
     step: {
@@ -140,7 +154,20 @@ export const COPY = {
     helper: "Esta demostración usa pacientes sintéticos. Por favor, no escriba sus datos personales.",
     promise: "No se vincula nada a su expediente hasta que un miembro del personal lo apruebe.",
     heldFinish: "En espera de revisión. No se vinculó ningún expediente.",
-    verified: "Verificado",
+    ruleResult: "Resultado de regla",
+    reason: {
+      CANDIDATE_IN_REVIEW_OR_HIGHER: "Un expediente existente podría ser suyo",
+      INCOMPLETE_DEMOGRAPHICS: "Primero se necesitan más datos",
+      UNGROUNDED_FIELD: "Un dato no estaba en lo que escribió",
+      INVALID_ARGUMENTS: "La solicitud estaba incompleta",
+      UNKNOWN_TOOL: "Esa acción no está disponible aquí",
+      LOOP_GUARD: "Demasiados pasos repetidos",
+      SESSION_CLOSED: "Este registro ya está cerrado",
+      INTAKE_ALREADY_RECORDED: "Su registro ya quedó guardado",
+      ALREADY_LINKED: "Su expediente ya está vinculado",
+      NO_INTAKE_RECORD: "Todavía no hay un registro de llegada",
+    } satisfies Record<PolicyReason, string> as Record<string, string>,
+    reasonFallback: "Un miembro del personal lo revisará",
     stepsLabel: "Lo que hizo FrontDesk",
     stepRead: "Se leyó su registro",
     step: {

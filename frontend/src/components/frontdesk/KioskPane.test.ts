@@ -83,13 +83,16 @@ describe("KioskPane transcript", () => {
     expect(renderKiosk(session)).toMatch(new RegExp(`data-voice="system"[^>]*>${turn.assistantText}<`));
   });
 
-  it("tags the gate's fact and the gate card as verified, in near-black", async () => {
+  it("tags the gate's fact and the gate card as a rule result, in plain words, in near-black", async () => {
     const held = renderKiosk((await checkIn(scenario.frontdeskIntake.utteranceEn)).session);
     expect(held).toMatch(/data-testid="gate-fact"[^>]*data-voice="verified"/);
     const card = held.slice(held.indexOf('data-testid="gate-card"'));
-    expect(card.slice(0, card.indexOf("</h4>"))).toContain(`>${COPY.en.verified}<`);
+    expect(card.slice(0, card.indexOf("</h4>"))).toContain(`>${COPY.en.ruleResult}<`);
     const fact = held.slice(held.indexOf('data-testid="gate-fact"'));
-    expect(fact.slice(0, fact.indexOf("</li>"))).toContain(`>${COPY.en.verified}<`);
+    const factHtml = fact.slice(0, fact.indexOf("</li>"));
+    expect(factHtml).toContain(`>${COPY.en.ruleResult}<`);
+    expect(factHtml).toContain(COPY.en.reason.CANDIDATE_IN_REVIEW_OR_HIGHER);
+    expect(factHtml).not.toContain(">CANDIDATE_IN_REVIEW_OR_HIGHER<");
   });
 
   it("lists the turn's steps and ends them on the gate fact, keeping the chips and the gate card", async () => {

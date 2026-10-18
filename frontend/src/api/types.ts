@@ -39,3 +39,4 @@ export type IntakeSession = Schemas["IntakeSession"];
 export type IntakeTurn = Schemas["IntakeTurn"];
 export type ToolCallRecord = Schemas["ToolCallRecord"];
 export type ToolCallCandidate = Schemas["ToolCallCandidate"];
+export type PolicyReason = Schemas["PolicyReason"];

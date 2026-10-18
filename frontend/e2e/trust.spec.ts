@@ -9,7 +9,8 @@ const COPY = {
     held: "Held for review. No records were linked.",
     steps: ["Read your check-in", "Searched for an existing chart", "Asked to create a new chart"],
     fact: "HELD",
-    verified: "Verified",
+    ruleResult: "Rule result",
+    reason: "An existing chart may be yours",
   },
   es: {
     toggle: "Español",
@@ -18,7 +19,8 @@ const COPY = {
     held: "En espera de revisión. No se vinculó ningún expediente.",
     steps: ["Se leyó su registro", "Se buscó un expediente existente", "Se pidió crear un expediente nuevo"],
     fact: "EN ESPERA",
-    verified: "Verificado",
+    ruleResult: "Resultado de regla",
+    reason: "Un expediente existente podría ser suyo",
   },
 } as const;
 
@@ -52,12 +54,13 @@ for (const viewport of [
       const fact = steps.getByTestId("gate-fact");
       await expect(fact).toHaveAttribute("data-outcome", "HELD");
       await expect(fact).toContainText(c.fact);
-      await expect(fact).toContainText("CANDIDATE_IN_REVIEW_OR_HIGHER");
-      await expect(fact).toContainText(c.verified);
+      await expect(fact).toContainText(c.reason);
+      await expect(fact).not.toContainText("CANDIDATE_IN_REVIEW_OR_HIGHER");
+      await expect(fact).toContainText(c.ruleResult);
       // The fact is the checklist's last line.
       await expect(steps.locator("li").last()).toHaveAttribute("data-testid", "gate-fact");
       await expect(fact).toHaveCSS("color", NEAR_BLACK);
-      await expect(page.getByTestId("gate-card")).toContainText(c.verified);
+      await expect(page.getByTestId("gate-card")).toContainText(c.ruleResult);
       await expect(page.getByTestId("tool-call-chip")).toHaveCount(2);
 
       await expect(page.getByTestId("kiosk-finish-held")).toHaveText(c.held);
@@ -122,13 +125,14 @@ for (const reduced of [false, true]) {
   });
 }
 
-test("the flag card on Case is a verified rule outcome, neutral and never an alert", async ({ page }) => {
+test("the flag card on Case is a rule result, neutral and never an alert", async ({ page }) => {
   await page.goto("/");
   await page.getByTestId("resolve-button").click();
   await page.getByTestId("approve-button").click();
   await page.getByTestId("review-submit-button").click();
   const card = page.getByTestId("flag-card");
-  await expect(card.locator("header")).toContainText("Verified");
+  await expect(card.locator("header")).toContainText("Rule result");
+  await expect(card).not.toContainText("Verified");
   await expect(card).not.toHaveAttribute("role", "alert");
   await expect(card.getByTestId("flag-card-rule-id")).toHaveText("BL-AMOX-01");
 });

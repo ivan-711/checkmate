@@ -28,7 +28,29 @@ describe("FrontDesk copy", () => {
     );
     expect(COPY.en.heldFinish).toBe("Held for review. No records were linked.");
     expect(COPY.es.heldFinish).toBe("En espera de revisión. No se vinculó ningún expediente.");
-    expect(COPY.en.verified).toBe("Verified");
-    expect(COPY.es.verified).toBe("Verificado");
+    expect(COPY.en.ruleResult).toBe("Rule result");
+    expect(COPY.es.ruleResult).toBe("Resultado de regla");
+  });
+
+  it("says every gate reason in plain words in both languages, with a neutral fallback", () => {
+    const reasons = [
+      "UNKNOWN_TOOL",
+      "SESSION_CLOSED",
+      "INVALID_ARGUMENTS",
+      "UNGROUNDED_FIELD",
+      "LOOP_GUARD",
+      "INCOMPLETE_DEMOGRAPHICS",
+      "INTAKE_ALREADY_RECORDED",
+      "ALREADY_LINKED",
+      "CANDIDATE_IN_REVIEW_OR_HIGHER",
+      "NO_INTAKE_RECORD",
+    ];
+    for (const lang of ["en", "es"] as const) {
+      expect(Object.keys(COPY[lang].reason).sort()).toEqual([...reasons].sort());
+      for (const text of Object.values(COPY[lang].reason)) expect(text).not.toMatch(/[A-Z]{2,}_/);
+      expect(COPY[lang].reasonFallback).toBeTruthy();
+    }
+    expect(COPY.en.reason.CANDIDATE_IN_REVIEW_OR_HIGHER).toBe("An existing chart may be yours");
+    expect(COPY.es.reason.CANDIDATE_IN_REVIEW_OR_HIGHER).toBe("Un expediente existente podría ser suyo");
   });
 });

@@ -7,7 +7,15 @@ export interface TurnSteps {
   /** What the agent did this turn, in the past tense, in call order. */
   done: string[];
   /** The gate's answer: the last line, a fact read from the gate results, never from the agent. */
-  fact: { outcome: GateFactOutcome; label: string; reason: string | null; policy: string };
+  fact: {
+    outcome: GateFactOutcome;
+    label: string;
+    /** The gate's code, kept for tests and data attributes; the screen shows `reason`. */
+    reasonCode: string | null;
+    /** The code in plain words, or a neutral phrase for a code the copy deck does not know. */
+    reason: string | null;
+    policy: string;
+  };
 }
 
 /** The turn as a short checklist ending on the gate's fact. Null when no tool ran: the gate
@@ -25,7 +33,8 @@ export function turnSteps(turn: IntakeTurn, t: KioskCopy): TurnSteps | null {
     fact: {
       outcome,
       label: t.factLabel[outcome],
-      reason: denied?.gate.reasonCode ?? null,
+      reasonCode: denied?.gate.reasonCode ?? null,
+      reason: denied ? (t.reason[denied.gate.reasonCode ?? ""] ?? t.reasonFallback) : null,
       policy: decisive.gate.policyVersion,
     },
   };

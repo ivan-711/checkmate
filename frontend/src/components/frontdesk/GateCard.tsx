@@ -5,7 +5,7 @@ import { forwardRef } from "react";
 import type { ToolCallCandidate, ToolCallRecord } from "@/api/types";
 import { BandChip } from "@/components/ui/BandChip";
 import { rankContributions } from "@/lib/display";
-import { VerifiedTag } from "@/components/ui/VerifiedTag";
+import { RuleResultTag } from "@/components/ui/RuleResultTag";
 import { sourceSystemLabel, type KioskCopy } from "./copy";
 
 const EVIDENCE_ROWS = 5; // UX 3.11: up to 5 rows, by absolute weight
@@ -34,7 +34,7 @@ export const GateCard = forwardRef<
         <ShieldAlert aria-hidden size={24} className="shrink-0 text-denied-ink" />
         {t.gateTitle}
         <span className="ml-auto">
-          <VerifiedTag label={t.verified} />
+          <RuleResultTag label={t.ruleResult} />
         </span>
       </h4>
       <p className="mt-1">{t.gateDenied}</p>

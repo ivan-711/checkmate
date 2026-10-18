@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { IntakeSession, IntakeTurn, ToolCallRecord } from "@/api/types";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
 import { SESSION_CHANGE_KEY } from "@/components/ui/ResetButton";
-import { VerifiedTag } from "@/components/ui/VerifiedTag";
+import { RuleResultTag } from "@/components/ui/RuleResultTag";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { scenario } from "@/data/scenario";
@@ -68,6 +68,7 @@ function Steps({ turn, t }: { turn: IntakeTurn; t: KioskCopy }) {
           data-testid="gate-fact"
           data-voice="verified"
           data-outcome={fact.outcome}
+          data-reason={fact.reasonCode ?? undefined}
           className={`flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-l-4 bg-surface px-3 py-2 text-ink-1 ${
             fact.outcome === "HELD" ? "border-denied-border border-l-gate-bar" : "border-allowed-border"
           }`}
@@ -79,10 +80,10 @@ function Steps({ turn, t }: { turn: IntakeTurn; t: KioskCopy }) {
           )}
           <span>{t.gateName}:</span>
           <span className="font-semibold">{fact.label}</span>
-          {fact.reason && <span className="font-mono text-[16px]">{fact.reason}</span>}
+          {fact.reason && <span>{fact.reason}</span>}
           <span className="font-mono text-[16px] text-ink-2">{fact.policy}</span>
           <span className="ml-auto">
-            <VerifiedTag label={t.verified} />
+            <RuleResultTag label={t.ruleResult} />
           </span>
         </li>
       </ol>

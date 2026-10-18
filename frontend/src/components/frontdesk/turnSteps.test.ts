@@ -26,7 +26,8 @@ describe("turnSteps", () => {
     expect(steps.fact).toEqual({
       outcome: "HELD",
       label: "HELD",
-      reason: "CANDIDATE_IN_REVIEW_OR_HIGHER",
+      reasonCode: "CANDIDATE_IN_REVIEW_OR_HIGHER",
+      reason: "An existing chart may be yours",
       policy: "frontdesk-gate/1",
     });
   });
@@ -43,7 +44,12 @@ describe("turnSteps", () => {
     } as IntakeTurn;
     const steps = turnSteps(turn, COPY.es)!;
     expect(steps.done).toEqual(["Se leyó su registro", "Se buscó un expediente existente"]);
-    expect(steps.fact).toMatchObject({ outcome: "PASSED", label: "PERMITIDO", reason: null });
+    expect(steps.fact).toMatchObject({
+      outcome: "PASSED",
+      label: "PERMITIDO",
+      reasonCode: null,
+      reason: null,
+    });
   });
 
   it("names an unknown tool by its id rather than guessing what it did", () => {
@@ -58,7 +64,21 @@ describe("turnSteps", () => {
       ],
     } as IntakeTurn;
     expect(turnSteps(turn, COPY.en)!.done[1]).toBe("Called lookup_x");
-    expect(turnSteps(turn, COPY.en)!.fact.reason).toBe("UNKNOWN_TOOL");
+    expect(turnSteps(turn, COPY.en)!.fact.reason).toBe(COPY.en.reason.UNKNOWN_TOOL);
+  });
+
+  it("falls back to a neutral phrase for a reason code it does not know", () => {
+    const turn = {
+      toolCalls: [
+        call("search_patients", {
+          outcome: "DENY",
+          reasonCode: "SOMETHING_NEW" as never,
+          handoffRequired: false,
+          policyVersion: "frontdesk-gate/1",
+        }),
+      ],
+    } as IntakeTurn;
+    expect(turnSteps(turn, COPY.es)!.fact.reason).toBe(COPY.es.reasonFallback);
   });
 
   it("claims no steps on a turn where no tool ran, so the gate never ran", async () => {
