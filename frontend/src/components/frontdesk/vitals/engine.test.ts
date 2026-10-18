@@ -115,9 +115,18 @@ describe("vitals flag and copy", () => {
     expect(Object.keys(VITALS_COPY.es).sort()).toEqual(Object.keys(VITALS_COPY.en).sort());
   });
 
-  it("labels the panel constructed and non-diagnostic in both languages", () => {
-    expect(VITALS_COPY.en.label).toBe("Constructed, non-diagnostic");
-    expect(VITALS_COPY.es.label).toMatch(/no diagnóstic/i);
+  it("labels the panel a constructed wellness demo in both languages", () => {
+    expect(VITALS_COPY.en.label).toBe("Constructed demo, wellness only");
+    expect(VITALS_COPY.es.label).toBe("Demostración construida, solo bienestar");
+  });
+
+  it("carries the exact footer the kiosk must show", () => {
+    expect(VITALS_COPY.en.footer).toBe(
+      "Wellness estimate only, not a medical measurement. Not saved, not sent to staff, not used for check-in.",
+    );
+    expect(VITALS_COPY.es.footer).toBe(
+      "Solo una estimación de bienestar, no una medición médica. No se guarda, no se envía al personal y no se usa para el registro.",
+    );
   });
 
   // eval/acceptance/g16.spec.ts NEVER_SAY plus the on-screen words DESIGN.md bans.
@@ -128,8 +137,8 @@ describe("vitals flag and copy", () => {
     "contraindicated for this patient",
     "fatal",
     "thinking",
-    "diagnosed",
-    "calibrated",
+    "diagnos", // diagnosis, diagnose, diagnosed, diagnostic, diagnóstico
+    "calibrat", // calibrated, calibration, calibrado
   ];
 
   it("never puts a banned word on screen in either language", () => {

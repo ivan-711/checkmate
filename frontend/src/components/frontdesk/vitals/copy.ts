@@ -5,7 +5,7 @@ import type { KioskLanguage } from "../copy";
 export const VITALS_COPY = {
   en: {
     heading: "Pulse (optional)",
-    label: "Constructed, non-diagnostic",
+    label: "Constructed demo, wellness only",
     consent:
       "Optional: estimate your pulse with the camera while we look up your record. Nothing is saved or shared.",
     accept: "Estimate my pulse",
@@ -27,7 +27,7 @@ export const VITALS_COPY = {
   },
   es: {
     heading: "Pulso (opcional)",
-    label: "Construido, no diagnóstico",
+    label: "Demostración construida, solo bienestar",
     consent:
       "Opcional: calcule su pulso con la cámara mientras buscamos su expediente. No se guarda ni se comparte nada.",
     accept: "Calcular mi pulso",
@@ -45,7 +45,7 @@ export const VITALS_COPY = {
     unavailable: "La cámara no está disponible. No pasa nada, su registro continúa.",
     preview: "Vista previa de la cámara",
     footer:
-      "Solo una estimación de bienestar. No se guarda, no se envía al personal y no se usa para el registro.",
+      "Solo una estimación de bienestar, no una medición médica. No se guarda, no se envía al personal y no se usa para el registro.",
   },
 } satisfies Record<KioskLanguage, unknown>;
 

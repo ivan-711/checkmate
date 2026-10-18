@@ -248,14 +248,18 @@ export default function VitalsPanel({ language }: { language: KioskLanguage }) {
               </p>
             </>
           )}
-          <button
-            type="button"
-            data-testid="vitals-stop"
-            onClick={stop}
-            className="self-start text-[16px] font-semibold text-accent underline underline-offset-2"
-          >
-            {t.stop}
-          </button>
+          {/* Stop exists only while there is a run to stop; after a timeout or a result there is
+              nothing left for it to do. */}
+          {live && (
+            <button
+              type="button"
+              data-testid="vitals-stop"
+              onClick={stop}
+              className="self-start text-[16px] font-semibold text-accent underline underline-offset-2"
+            >
+              {t.stop}
+            </button>
+          )}
         </div>
       </div>
       {fromFile && <video ref={clip} hidden muted playsInline loop />}
