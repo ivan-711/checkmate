@@ -61,7 +61,7 @@ async function reset(page: Page) {
 /** Reset on Case, then Resolve: the hero pair waits for review. */
 async function resolvedCase(page: Page) {
   await page.goto("/");
-  await expect(page.getByTestId("app-mode-badge")).toHaveText(/LOCAL/);
+  await expect(page.getByTestId("app-mode-badge")).toHaveAttribute("data-mode", "LOCAL");
   await reset(page);
   await expect(page.getByTestId("source-card")).toHaveCount(2, { timeout: RESET_MS });
   await page.getByTestId("resolve-button").click();
