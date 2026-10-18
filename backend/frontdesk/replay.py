@@ -111,14 +111,20 @@ class Transcript(ContractModel):
     turns: list[TranscriptTurn]
 
     @model_validator(mode="after")
-    def _turns_are_unique(self) -> Transcript:
-        indexes = [t.turn_index for t in self.turns]
-        if len(set(indexes)) != len(indexes):
-            raise ValueError("turnIndex values must be unique")
+    def _scripts_are_unique(self) -> Transcript:
+        # Several scripts (ES/EN, returning/new patient) share turnIndex 0 because every session
+        # starts there; the typed text picks the script, so (turnIndex, folded text) must be unique.
+        seen = [(t.turn_index, fold(t.user_text_folded)) for t in self.turns]
+        if len(set(seen)) != len(seen):
+            raise ValueError("(turnIndex, userTextFolded) must be unique")
         return self
 
-    def turn(self, index: int) -> TranscriptTurn | None:
-        return next((t for t in self.turns if t.turn_index == index), None)
+    def has_turn(self, index: int) -> bool:
+        return any(t.turn_index == index for t in self.turns)
+
+    def turn(self, index: int, user_text_folded: str) -> TranscriptTurn | None:
+        wanted = fold(user_text_folded)
+        return next((t for t in self.turns if t.turn_index == index and fold(t.user_text_folded) == wanted), None)
 
 
 def transcript_path(env: dict[str, str] | None = None) -> Path:
@@ -165,11 +171,13 @@ class ReplayAgentModel:
         self.transcript_sha256 = transcript_sha256  # the loop stamps it on AGENT_TOOL_CALLED versions
 
     def next_step(self, req: ModelRequest) -> ModelStep:
-        turn = self.transcript.turn(req.turn_index)
-        if turn is None or req.step_index >= len(turn.steps):
+        if not self.transcript.has_turn(req.turn_index):
             return _diverged()
-        if fold(req.user_text_folded) != fold(turn.user_text_folded):
+        turn = self.transcript.turn(req.turn_index, req.user_text_folded)
+        if turn is None:
             return _input_mismatch()
+        if req.step_index >= len(turn.steps):
+            return _diverged()
         if req.step_index > 0 and not self._previous_result_matches(turn, req):
             return _diverged()
         step = turn.steps[req.step_index]

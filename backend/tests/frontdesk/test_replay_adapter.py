@@ -268,11 +268,25 @@ def test_load_transcript_rejects_non_json(tmp_path: Path):
         load_transcript(path)
 
 
-def test_load_transcript_rejects_duplicate_turn_index(tmp_path: Path):
+def test_load_transcript_rejects_duplicate_script(tmp_path: Path):
     data = _transcript_dict()
     data["turns"].append(dict(data["turns"][0]))
     with pytest.raises(TranscriptError):
         load_transcript(_write(tmp_path, data))
+
+
+def test_two_scripts_share_turn_zero_and_the_typed_text_picks_one(tmp_path: Path):
+    data = _transcript_dict()
+    english = json.loads(json.dumps(data["turns"][0]))
+    english["userText"] = "My name is Ana Perez, born March 2, 1990."
+    english["userTextFolded"] = fold(english["userText"])
+    english["steps"][1]["model"]["text"] = "Thank you, Ana."
+    data["turns"].append(english)
+    adapter = ReplayAgentModel(load_transcript(_write(tmp_path, data)), pacing=False)
+    es = adapter.next_step(_req(0, 1, USER_TEXT, last_sha=SHA_A))
+    en = adapter.next_step(_req(0, 1, english["userText"], last_sha=SHA_A))
+    assert isinstance(es, TextStep) and es.text == "Gracias, Ana."
+    assert isinstance(en, TextStep) and en.text == "Thank you, Ana."
 
 
 def test_load_transcript_rejects_step_index_gap(tmp_path: Path):

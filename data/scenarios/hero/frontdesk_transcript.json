@@ -1,0 +1,200 @@
+{
+  "transcriptVersion": 1,
+  "kind": "AUTHORED",
+  "recordedAt": "2026-10-18T00:11:21Z",
+  "modelId": "authored (not a recorded model run)",
+  "promptVersion": "fd-prompt/1",
+  "toolSchemaVersion": "fd-tools/1",
+  "scorerVersion": "handset-1",
+  "thresholdSetId": "provisional-1",
+  "heroScenarioSha256": "6a977f64c6a51d65460ec4467fb850bb51b7fd3823ba4a2e19828a511890b60f",
+  "scenarioContextId": "hero-er-arrival",
+  "authoring": {
+    "constructed": true,
+    "note": "authored from the spike's verified call shapes; not a recorded model run",
+    "heroEntityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
+    "heroRecordId": "d2b173e2-0e9a-5021-a674-d1b4f730ce3d"
+  },
+  "turns": [
+    {
+      "turnIndex": 0,
+      "userText": "Me llamo Sofia Mesa-López, nací el 16 de mayo de 1964, mi teléfono es 555-757-3688, vivo en 899 Sawayn Trafficway.",
+      "userTextFolded": "me llamo sofia mesa-lopez, naci el 16 de mayo de 1964, mi telefono es 555-757-3688, vivo en 899 sawayn trafficway.",
+      "steps": [
+        {
+          "stepIndex": 0,
+          "latencyMs": 5200,
+          "model": {
+            "type": "TOOL_CALL",
+            "toolName": "propose_new_chart",
+            "args": {
+              "givenName": "Sofia",
+              "familyName": "Mesa-López",
+              "birthDate": "1964-05-16",
+              "sex": "UNKNOWN",
+              "preferredLanguage": "ES",
+              "phone": "555-757-3688",
+              "addressLine": "899 Sawayn Trafficway",
+              "evidence": {
+                "givenName": "Sofia",
+                "familyName": "Mesa-López",
+                "birthDate": "16 de mayo de 1964",
+                "phone": "555-757-3688",
+                "addressLine": "899 Sawayn Trafficway"
+              }
+            },
+            "modelCallId": null
+          },
+          "expect": {
+            "gateOutcome": "DENY",
+            "reasonCode": "CANDIDATE_IN_REVIEW_OR_HIGHER",
+            "toolResultSha256": null
+          }
+        },
+        {
+          "stepIndex": 1,
+          "latencyMs": 2700,
+          "model": {
+            "type": "TEXT",
+            "text": "Gracias, Sofia. Una persona de registro va a confirmar su expediente en un momento."
+          },
+          "expect": null
+        }
+      ]
+    },
+    {
+      "turnIndex": 0,
+      "userText": "My name is Sofia Mesa-López, born May 16, 1964, my phone is 555-757-3688, I live at 899 Sawayn Trafficway.",
+      "userTextFolded": "my name is sofia mesa-lopez, born may 16, 1964, my phone is 555-757-3688, i live at 899 sawayn trafficway.",
+      "steps": [
+        {
+          "stepIndex": 0,
+          "latencyMs": 5200,
+          "model": {
+            "type": "TOOL_CALL",
+            "toolName": "propose_new_chart",
+            "args": {
+              "givenName": "Sofia",
+              "familyName": "Mesa-López",
+              "birthDate": "1964-05-16",
+              "sex": "UNKNOWN",
+              "preferredLanguage": "EN",
+              "phone": "555-757-3688",
+              "addressLine": "899 Sawayn Trafficway",
+              "evidence": {
+                "givenName": "Sofia",
+                "familyName": "Mesa-López",
+                "birthDate": "May 16, 1964",
+                "phone": "555-757-3688",
+                "addressLine": "899 Sawayn Trafficway"
+              }
+            },
+            "modelCallId": null
+          },
+          "expect": {
+            "gateOutcome": "DENY",
+            "reasonCode": "CANDIDATE_IN_REVIEW_OR_HIGHER",
+            "toolResultSha256": null
+          }
+        },
+        {
+          "stepIndex": 1,
+          "latencyMs": 2700,
+          "model": {
+            "type": "TEXT",
+            "text": "Thank you, Sofia. A registrar will confirm your record in a moment."
+          },
+          "expect": null
+        }
+      ]
+    },
+    {
+      "turnIndex": 0,
+      "userText": "Me llamo Teodoro Quintanilla Abasolo, nací el 9 de noviembre de 1951, mi teléfono es 555-012-7734.",
+      "userTextFolded": "me llamo teodoro quintanilla abasolo, naci el 9 de noviembre de 1951, mi telefono es 555-012-7734.",
+      "steps": [
+        {
+          "stepIndex": 0,
+          "latencyMs": 5200,
+          "model": {
+            "type": "TOOL_CALL",
+            "toolName": "propose_new_chart",
+            "args": {
+              "givenName": "Teodoro",
+              "familyName": "Quintanilla Abasolo",
+              "birthDate": "1951-11-09",
+              "sex": "UNKNOWN",
+              "preferredLanguage": "ES",
+              "phone": "555-012-7734",
+              "evidence": {
+                "givenName": "Teodoro",
+                "familyName": "Quintanilla Abasolo",
+                "birthDate": "9 de noviembre de 1951",
+                "phone": "555-012-7734"
+              }
+            },
+            "modelCallId": null
+          },
+          "expect": {
+            "gateOutcome": "ALLOW",
+            "reasonCode": null,
+            "toolResultSha256": null
+          }
+        },
+        {
+          "stepIndex": 1,
+          "latencyMs": 2700,
+          "model": {
+            "type": "TEXT",
+            "text": "Gracias, Teodoro. Hemos iniciado su registro; una persona de registro lo termina con usted en un momento."
+          },
+          "expect": null
+        }
+      ]
+    },
+    {
+      "turnIndex": 0,
+      "userText": "My name is Teodoro Quintanilla Abasolo, born November 9, 1951, my phone is 555-012-7734.",
+      "userTextFolded": "my name is teodoro quintanilla abasolo, born november 9, 1951, my phone is 555-012-7734.",
+      "steps": [
+        {
+          "stepIndex": 0,
+          "latencyMs": 5200,
+          "model": {
+            "type": "TOOL_CALL",
+            "toolName": "propose_new_chart",
+            "args": {
+              "givenName": "Teodoro",
+              "familyName": "Quintanilla Abasolo",
+              "birthDate": "1951-11-09",
+              "sex": "UNKNOWN",
+              "preferredLanguage": "EN",
+              "phone": "555-012-7734",
+              "evidence": {
+                "givenName": "Teodoro",
+                "familyName": "Quintanilla Abasolo",
+                "birthDate": "November 9, 1951",
+                "phone": "555-012-7734"
+              }
+            },
+            "modelCallId": null
+          },
+          "expect": {
+            "gateOutcome": "ALLOW",
+            "reasonCode": null,
+            "toolResultSha256": null
+          }
+        },
+        {
+          "stepIndex": 1,
+          "latencyMs": 2700,
+          "model": {
+            "type": "TEXT",
+            "text": "Thank you, Teodoro. We have started your registration; a registrar will finish it with you in a moment."
+          },
+          "expect": null
+        }
+      ]
+    }
+  ]
+}

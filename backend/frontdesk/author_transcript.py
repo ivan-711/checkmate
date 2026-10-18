@@ -1,0 +1,230 @@
+"""Build the AUTHORED FrontDesk transcript from the hero files (ADR-016 §7).
+
+    uv run python -m backend.frontdesk.author_transcript [--hero-dir data/scenarios/hero] [--out <path>]
+
+The returning patient is the hero's ER-side rendering (``hero.json`` ``records.ER_FHIR``), which lands
+in REVIEW against the Clinic record, so the gate denies ``propose_new_chart`` with
+``CANDIDATE_IN_REVIEW_OR_HIGHER``. The new patient is a synthetic person who shares no block key with
+any corpus record (checked against the seed-20261017 corpus on 2026-10-17), so the gate allows.
+Every evidence quote is a verbatim substring of the typed text, as the grounding check requires.
+
+The call shapes follow the spike's verified live calls (one ``propose_new_chart`` with ``sex: UNKNOWN``
+when unstated, then plain text). ``expect.toolResultSha256`` is null until a run through the real
+engine fills it; ``ReplayAgentModel`` skips the divergence check for null hashes.
+
+Author: Christian Flores (Q1.4 builder).
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from datetime import UTC, date, datetime
+from pathlib import Path
+
+from backend.frontdesk.replay import (
+    DEFAULT_TRANSCRIPT_PATH,
+    TRANSCRIPT_VERSION,
+    StepExpect,
+    TextModelStep,
+    ToolCallModelStep,
+    Transcript,
+    TranscriptStep,
+    TranscriptTurn,
+    fold,
+)
+from contracts.models.policy import PolicyOutcome, PolicyReason
+from contracts.version import TOOL_SCHEMA_VERSION
+
+HERO_DIR = Path("data/scenarios/hero")
+AUTHORED_MODEL_ID = "authored (not a recorded model run)"
+DEFAULT_PROMPT_VERSION = "fd-prompt/1"
+# Latencies measured at the venue (docs/spikes/gemini.md): tool step 3.9–7.8 s, plain text 2.6–2.9 s.
+TOOL_STEP_LATENCY_MS = 5200
+TEXT_STEP_LATENCY_MS = 2700
+
+MONTHS_ES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)  # fmt: skip
+MONTHS_EN = (
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+)  # fmt: skip
+
+# A synthetic person far from every corpus record: no shared DOB, swapped DOB, phone last-7 or
+# (surname Double Metaphone, birth year) key in the seed-20261017 corpus.
+NEW_PATIENT = {
+    "givenName": "Teodoro",
+    "familyName": "Quintanilla Abasolo",
+    "birthDate": "1951-11-09",
+    "phone": "555-012-7734",
+}
+
+RETURNING_TEXT = {
+    "ES": "Gracias, {given}. Una persona de registro va a confirmar su expediente en un momento.",
+    "EN": "Thank you, {given}. A registrar will confirm your record in a moment.",
+}
+NEW_PATIENT_TEXT = {
+    "ES": "Gracias, {given}. Hemos iniciado su registro; una persona de registro lo termina con usted en un momento.",
+    "EN": "Thank you, {given}. We have started your registration; a registrar will finish it with you in a moment.",
+}
+
+
+def _utterance(lang: str, given: str, family: str, birth: date, phone: str | None, address: str | None) -> str:
+    if lang == "ES":
+        parts = [f"Me llamo {given} {family}, nací el {birth.day} de {MONTHS_ES[birth.month - 1]} de {birth.year}"]
+        if phone:
+            parts.append(f"mi teléfono es {phone}")
+        if address:
+            parts.append(f"vivo en {address}")
+    else:
+        parts = [f"My name is {given} {family}, born {MONTHS_EN[birth.month - 1]} {birth.day}, {birth.year}"]
+        if phone:
+            parts.append(f"my phone is {phone}")
+        if address:
+            parts.append(f"I live at {address}")
+    return ", ".join(parts) + "."
+
+
+def _birth_quote(lang: str, birth: date) -> str:
+    if lang == "ES":
+        return f"{birth.day} de {MONTHS_ES[birth.month - 1]} de {birth.year}"
+    return f"{MONTHS_EN[birth.month - 1]} {birth.day}, {birth.year}"
+
+
+def _propose_args(lang: str, given: str, family: str, birth: date, phone: str | None, address: str | None) -> dict:
+    evidence = {"givenName": given, "familyName": family, "birthDate": _birth_quote(lang, birth)}
+    args = {
+        "givenName": given,
+        "familyName": family,
+        "birthDate": birth.isoformat(),
+        "sex": "UNKNOWN",  # the patient did not state it; never invented (spike: verified call shape)
+        "preferredLanguage": lang,
+    }
+    if phone:
+        args["phone"] = phone
+        evidence["phone"] = phone
+    if address:
+        args["addressLine"] = address
+        evidence["addressLine"] = address
+    args["evidence"] = evidence
+    return args
+
+
+def _check_grounded(utterance: str, args: dict) -> None:
+    folded = fold(utterance)
+    for field, quote in args["evidence"].items():
+        if fold(quote) not in folded:
+            raise ValueError(f"evidence for {field} is not a verbatim substring of the utterance")
+
+
+def _script(
+    lang: str,
+    given: str,
+    family: str,
+    birth: date,
+    phone: str | None,
+    address: str | None,
+    expect: StepExpect,
+    text_template: dict[str, str],
+) -> TranscriptTurn:
+    utterance = _utterance(lang, given, family, birth, phone, address)
+    args = _propose_args(lang, given, family, birth, phone, address)
+    _check_grounded(utterance, args)
+    return TranscriptTurn(
+        turn_index=0,
+        user_text=utterance,
+        user_text_folded=fold(utterance),
+        steps=[
+            TranscriptStep(
+                step_index=0,
+                latency_ms=TOOL_STEP_LATENCY_MS,
+                model=ToolCallModelStep(type="TOOL_CALL", tool_name="propose_new_chart", args=args),
+                expect=expect,
+            ),
+            TranscriptStep(
+                step_index=1,
+                latency_ms=TEXT_STEP_LATENCY_MS,
+                model=TextModelStep(type="TEXT", text=text_template[lang].format(given=given)),
+            ),
+        ],
+    )
+
+
+def _prompt_version() -> str:
+    try:
+        from backend.frontdesk import prompts  # Q1.2's module; absent until that lane lands
+
+        return str(getattr(prompts, "PROMPT_VERSION", DEFAULT_PROMPT_VERSION))
+    except ImportError:
+        return DEFAULT_PROMPT_VERSION
+
+
+def build_transcript(hero_dir: Path) -> Transcript:
+    hero = json.loads((hero_dir / "hero.json").read_text(encoding="utf-8"))
+    intake = json.loads((hero_dir / "frontdesk_intake.json").read_text(encoding="utf-8"))
+    er = hero["records"]["ER_FHIR"]
+    birth = date.fromisoformat(er["birth_date"])
+    deny = StepExpect(
+        gate_outcome=PolicyOutcome.DENY,
+        reason_code=PolicyReason.CANDIDATE_IN_REVIEW_OR_HIGHER,
+        tool_result_sha256=None,
+    )
+    allow = StepExpect(gate_outcome=PolicyOutcome.ALLOW, reason_code=None, tool_result_sha256=None)
+    new_birth = date.fromisoformat(NEW_PATIENT["birthDate"])
+    turns = [
+        _script(lang, er["given_name"], er["family_name"], birth, er["phone"], er["address_line"], deny, RETURNING_TEXT)
+        for lang in ("ES", "EN")
+    ] + [
+        _script(
+            lang,
+            NEW_PATIENT["givenName"],
+            NEW_PATIENT["familyName"],
+            new_birth,
+            NEW_PATIENT["phone"],
+            None,
+            allow,
+            NEW_PATIENT_TEXT,
+        )
+        for lang in ("ES", "EN")
+    ]
+    return Transcript(
+        transcript_version=TRANSCRIPT_VERSION,
+        kind="AUTHORED",
+        recorded_at=datetime.now(UTC).replace(microsecond=0),
+        model_id=AUTHORED_MODEL_ID,
+        prompt_version=_prompt_version(),
+        tool_schema_version=TOOL_SCHEMA_VERSION,
+        scorer_version=hero["scorerVersion"],
+        threshold_set_id=hero["thresholdsId"],
+        hero_scenario_sha256=hashlib.sha256((hero_dir / "scenario.json").read_bytes()).hexdigest(),
+        scenario_context_id=intake["scenarioContextId"],
+        authoring={
+            "constructed": True,
+            "note": "authored from the spike's verified call shapes; not a recorded model run",
+            "heroEntityId": hero["entityId"],
+            "heroRecordId": er["record_id"],
+        },
+        turns=turns,
+    )
+
+
+def write_transcript(transcript: Transcript, out: Path) -> None:
+    body = json.dumps(transcript.model_dump(mode="json", by_alias=True), ensure_ascii=False, indent=2)
+    out.write_text(body + "\n", encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--hero-dir", type=Path, default=HERO_DIR)
+    parser.add_argument("--out", type=Path, default=DEFAULT_TRANSCRIPT_PATH)
+    args = parser.parse_args(argv)
+    write_transcript(build_transcript(args.hero_dir), args.out)
+    print(f"wrote {args.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
