@@ -27,7 +27,7 @@ async function review(page: Page, kind: "approve" | "reject", reason?: string, n
 test("case path: reject keeps the rule silent, then approve links and flags", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("Synthetic data. Not for clinical use.")).toBeVisible();
-  await expect(page.getByTestId("app-mode-badge")).toHaveText(/REPLAY/);
+  await expect(page.getByTestId("app-mode-badge")).toHaveText(/Replay/);
   await expect(page.getByTestId("source-card")).toHaveCount(2);
   await expect(page.getByTestId("candidate-pair")).toHaveCount(0);
   await page.getByTestId("resolve-button").click();
