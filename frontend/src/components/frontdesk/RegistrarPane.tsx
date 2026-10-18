@@ -42,7 +42,7 @@ function HeldPair({ pairId, index, total }: { pairId: string; index: number; tot
       aria-labelledby={headingId}
       className="space-y-3 border-t border-border-subtle pt-3 first:border-t-0 first:pt-0"
     >
-      <h3 id={headingId} className="text-[16px] font-semibold uppercase tracking-wider">
+      <h3 id={headingId} tabIndex={-1} className="text-[16px] font-semibold uppercase tracking-wider">
         Possible existing chart{total > 1 && ` ${index + 1} of ${total}`}
       </h3>
       <p>
@@ -60,7 +60,12 @@ function HeldPair({ pairId, index, total }: { pairId: string; index: number; tot
       </p>
       <ReviewPanel
         detail={detail}
-        onDecided={() => void queryClient.invalidateQueries({ queryKey: HANDOFF_KEY })}
+        onDecided={() => {
+          void queryClient.invalidateQueries({ queryKey: HANDOFF_KEY });
+          // The Case screen's focus target is not on this pane: go on to the next held pair.
+          const next = document.getElementById(`held-heading-${index + 1}`);
+          (next ?? document.getElementById(headingId))?.focus();
+        }}
       />
     </article>
   );
