@@ -26,10 +26,11 @@ MAX_PAYLOAD_STRING = 64  # a uuid is 36 chars, an enum under 40; a note is never
 
 _INSERT = text(
     "INSERT INTO event_log (ts, event_id, event_type, request_id, run_id, entry_point, entity_id, pair_id, "
-    "decision_id, actor, actor_type, band, outcome, latency_ms, mode, versions, payload, reason_code) "
+    "decision_id, actor, actor_type, band, outcome, latency_ms, mode, versions, payload, reason_code, "
+    "intake_session_id, gate_outcome) "
     "VALUES (:ts, :event_id, :event_type, :request_id, :run_id, :entry_point, :entity_id, :pair_id, "
     ":decision_id, :actor, :actor_type, :band, :outcome, :latency_ms, :mode, CAST(:versions AS jsonb), "
-    "CAST(:payload AS jsonb), :reason_code)"
+    "CAST(:payload AS jsonb), :reason_code, :intake_session_id, :gate_outcome)"
 )
 
 
@@ -67,6 +68,8 @@ def write_event(
     reason_code: str | None = None,
     versions: Versions | None = None,
     payload: dict | None = None,
+    intake_session_id: UUID | None = None,
+    gate_outcome: str | None = None,
 ) -> UUID:
     """Insert one event row on ``conn`` and return its event id. ``ctx`` defaults to the
     request context bound by the middleware (a CLI context outside a request)."""
@@ -95,6 +98,8 @@ def write_event(
             "versions": json.dumps((versions or Versions()).model_dump(by_alias=True, exclude_none=True)),
             "payload": json.dumps(payload, default=str),
             "reason_code": reason_code,
+            "intake_session_id": intake_session_id,
+            "gate_outcome": gate_outcome,
         },
     )
     return event_id
