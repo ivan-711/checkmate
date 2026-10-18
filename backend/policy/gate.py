@@ -177,8 +177,8 @@ def evaluate(
     user_texts: Sequence[str],
     session: SessionFacts,
 ) -> GateEvaluation:
-    action = parse_action(tool_name, raw_args, user_texts=user_texts, session=session)
     try:
+        action = parse_action(tool_name, raw_args, user_texts=user_texts, session=session)
         if isinstance(action.args, (SearchArgs, ProposeArgs)):
             candidates, snapshot, thresholds = _score(conn, session_id, action.args, session)
             thresholds_id = thresholds.threshold_set_id
