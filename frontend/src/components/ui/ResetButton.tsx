@@ -2,6 +2,7 @@
 
 import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { HANDOFF_KEY, INTAKE_KEY } from "@/components/frontdesk/intake";
 import { useDataSource } from "@/data/DataSourceProvider";
 
 /** Reset and Undo share this key so the case screen can hold Resolve until the new session has
@@ -27,6 +28,10 @@ export function ResetButton() {
       queryClient.invalidateQueries({ queryKey: ["events"] }),
       queryClient.resetQueries({ queryKey: ["timeline"] }),
       queryClient.invalidateQueries({ queryKey: ["tiles"] }),
+      // The reset removed the kiosk's check-in and its held pairs: the kiosk starts a new
+      // check-in, and the registrar pane drops the old one.
+      queryClient.resetQueries({ queryKey: INTAKE_KEY }),
+      queryClient.resetQueries({ queryKey: HANDOFF_KEY }),
     ]);
   }
 

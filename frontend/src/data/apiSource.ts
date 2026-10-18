@@ -13,6 +13,7 @@ import type {
   SessionResponse,
   TimelineEvent,
 } from "@/api/types";
+import { DEMO_SCRIPT } from "./demoScript";
 import { DataError, EVENT_FEED_ROWS, type CaseData, type DataSource } from "./source";
 
 const SCENARIO_ID = "hero";
@@ -39,6 +40,8 @@ function fail(error: unknown): never {
 export class ApiSource implements DataSource {
   readonly mode = "LOCAL" as const;
   readonly canRestore = false; // the contract has no restore route
+  // The fixture's utterance names a placeholder patient; the API kiosk offers the hero's own line.
+  readonly suggestedCheckIn = { ...DEMO_SCRIPT, demoScript: true };
   private readonly client: ReturnType<typeof createClient<paths>>;
   // The last session this tab saw: used only while GET /sessions/current is a 501 stub.
   private session: SessionResponse | null = null;

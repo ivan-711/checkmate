@@ -1,16 +1,16 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Rewind } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { IntakeSession, IntakeTurn, ToolCallRecord } from "@/api/types";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { scenario } from "@/data/scenario";
+import { DataError } from "@/data/source";
 import { COPY, type KioskCopy, type KioskLanguage } from "./copy";
 import { GateCard } from "./GateCard";
-import { INTAKE_KEY, useHandoffPair } from "./intake";
+import { HANDOFF_KEY, INTAKE_KEY, useHandoffPairs } from "./intake";
 import { ToolCallChip } from "./ToolCallChip";
 
 const MAX_CHARS = 280; // UX 3.11 composer limit; the contract allows 500
@@ -60,7 +60,7 @@ function Turn({
         const candidate = gateDenial(call);
         return (
           <li key={call.id} className="space-y-2">
-            <ToolCallChip call={call} agentMode={turn.agentMode} t={t} hasGateCard={!!candidate} />
+            <ToolCallChip call={call} t={t} hasGateCard={!!candidate} />
             {candidate && <GateCard ref={gateRef} call={call} candidate={candidate} t={t} />}
           </li>
         );
@@ -76,32 +76,51 @@ export function KioskPane() {
   const queryClient = useQueryClient();
   const [language, setLanguage] = useState<KioskLanguage>("en");
   const [text, setText] = useState("");
-  const [failedText, setFailedText] = useState<string | null>(null);
+  // Tied to the check-in it failed on, so a Reset or Start over never shows an old failure.
+  const [failed, setFailed] = useState<{ text: string; sessionId: string } | null>(null);
   const key = useRef<{ text: string; key: string } | null>(null);
   const announce = useAnnounce();
   const t = COPY[language];
-  const suggestion =
-    language === "es" ? scenario.frontdeskIntake.utteranceEs : scenario.frontdeskIntake.utteranceEn;
+  const suggested = source.suggestedCheckIn;
+  const suggestion = suggested[language];
 
+  // The server picks the agent mode; the session language only seeds the first reply.
+  const startIntake = () =>
+    source.startIntake(language === "es" ? "ES" : "EN", scenario.frontdeskIntake.scenarioContextId);
   const session = useQuery({
     queryKey: INTAKE_KEY,
-    // The server picks the agent mode; the session language only seeds the first reply.
-    queryFn: () =>
-      source.startIntake(language === "es" ? "ES" : "EN", scenario.frontdeskIntake.scenarioContextId),
+    queryFn: startIntake,
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     retry: false,
   });
   const turns = session.data?.turns ?? [];
-  // The registrar's decision, read from the server: the kiosk tells the patient what happens next.
-  const decided = useHandoffPair().data?.pair.decision.status;
+  // The registrar's decisions, read from the server: the kiosk tells the patient what happens
+  // next. One linked chart confirms the check-in; a new chart only when every pair was rejected.
+  const statuses = useHandoffPairs().map((pair) => pair.data?.pair.decision.status);
+  const decided = statuses.includes("LINKED")
+    ? "LINKED"
+    : statuses.length > 0 && statuses.every((status) => status === "REJECTED")
+      ? "REJECTED"
+      : null;
 
   const send = useMutation({
-    mutationFn: (message: { text: string; key: string }) =>
-      source.sendTurn(session.data!.id, message.text, message.key),
+    mutationFn: async (message: { text: string; key: string }) => {
+      try {
+        return await source.sendTurn(session.data!.id, message.text, message.key);
+      } catch (error) {
+        // A Reset elsewhere removed this check-in. That is not an outage: start a new check-in
+        // and send the message there.
+        if (!(error instanceof DataError && error.code === "NOT_FOUND")) throw error;
+        const fresh = await startIntake();
+        queryClient.setQueryData(INTAKE_KEY, fresh);
+        void queryClient.resetQueries({ queryKey: HANDOFF_KEY });
+        return source.sendTurn(fresh.id, message.text, message.key);
+      }
+    },
     onSuccess: (turn) => {
       key.current = null;
-      setFailedText(null);
+      setFailed(null);
       void queryClient.invalidateQueries({ queryKey: ["tiles"] }); // the gate just counted this turn
       queryClient.setQueryData<IntakeSession>(INTAKE_KEY, (s) =>
         s ? { ...s, turns: [...(s.turns ?? []), turn], registration: turn.registration } : s,
@@ -110,7 +129,7 @@ export function KioskPane() {
       if (candidate) announce(t.gateAnnounce(candidate.p.toFixed(2), t.band[candidate.band]));
     },
     onError: (_error, message) => {
-      setFailedText(message.text);
+      setFailed({ text: message.text, sessionId: session.data?.id ?? "" });
       setText((typed) => typed || message.text); // back into the composer, unless more was typed
     },
   });
@@ -131,11 +150,13 @@ export function KioskPane() {
     // One key per typed message, reused when the same message is retried.
     if (key.current?.text !== message) key.current = { text: message, key: crypto.randomUUID() };
     setText("");
+    composer.current?.focus(); // Send is disabled once the text clears; keep focus in the composer
     send.mutate(key.current);
   }
 
   const agentMode = session.data?.agentMode;
   const pending = send.isPending ? send.variables?.text : null;
+  const failedText = failed && failed.sessionId === session.data?.id ? failed.text : null;
 
   return (
     <section lang={language} aria-labelledby="kiosk-label" className="flex min-w-0 flex-col gap-4">
@@ -182,7 +203,6 @@ export function KioskPane() {
                 data-testid="agent-mode-badge"
                 className="inline-flex items-center gap-1 rounded border border-dashed border-ink-2 px-2 text-[14px] font-semibold text-ink-2"
               >
-                {agentMode === "REPLAY" && <Rewind aria-hidden size={14} />}
                 Agent: {agentMode}
               </span>
             )}
@@ -191,11 +211,12 @@ export function KioskPane() {
                 type="button"
                 disabled={send.isPending}
                 onClick={() => {
-                  setFailedText(null);
+                  setFailed(null);
                   setText("");
                   key.current = null;
                   send.reset();
                   void queryClient.resetQueries({ queryKey: INTAKE_KEY });
+                  void queryClient.resetQueries({ queryKey: HANDOFF_KEY });
                   composer.current?.focus();
                 }}
                 className="ml-auto font-semibold text-accent underline underline-offset-2 disabled:text-ink-3"
@@ -296,7 +317,13 @@ export function KioskPane() {
         </form>
         {turns.length === 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-md bg-sunken px-3 py-2 text-[16px]">
-            <span className="font-semibold">{t.suggestLabel}</span>
+            {suggested.demoScript ? (
+              <span lang="en" className="font-semibold">
+                Demo script
+              </span>
+            ) : (
+              <span className="font-semibold">{t.suggestLabel}</span>
+            )}
             <q lang={language} className="min-w-0 flex-1 text-ink-2">
               {suggestion}
             </q>
