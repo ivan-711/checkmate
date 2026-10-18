@@ -40,7 +40,7 @@ export interface PulseEngine {
 
 // The slice of the library's API this module uses. Its published types point at a missing
 // file in 0.4.5, so the shape is declared here instead.
-interface VitalLensInstance {
+export interface VitalLensInstance {
   addEventListener(event: "vitals", callback: (data: unknown) => void): void;
   setVideoStream(stream?: MediaStream, video?: HTMLVideoElement): Promise<void>;
   startVideoStream(): void;
@@ -56,8 +56,17 @@ export function readHeartRate(result: unknown): PulseReading | null {
   const hr = (result as { vitals?: { heart_rate?: { value?: unknown; confidence?: unknown } } } | null)
     ?.vitals?.heart_rate;
   if (typeof hr?.value !== "number" || !Number.isFinite(hr.value)) return null;
-  const confidence = typeof hr.confidence === "number" ? hr.confidence : 0;
-  return { bpm: hr.value, confidence };
+  return { bpm: hr.value, confidence: newestConfidence(hr.confidence) };
+}
+
+/**
+ * The library reports `confidence` either as one number or as one number per sample in the
+ * window. Its own widget takes the last element, the newest sample, so the kiosk does the same;
+ * anything else counts as no confidence at all.
+ */
+function newestConfidence(value: unknown): number {
+  const newest = Array.isArray(value) ? value[value.length - 1] : value;
+  return typeof newest === "number" && Number.isFinite(newest) ? newest : 0;
 }
 
 /** Whether a reading is steady enough to show the patient a number. */
@@ -78,7 +87,11 @@ export async function createPulseEngine(): Promise<PulseEngine> {
   await assertModelServedHere();
   const url = VENDOR_BASE + BUNDLE;
   const { VitalLens } = (await import(/* webpackIgnore: true */ url)) as VitalLensModule;
-  const lens = new VitalLens({ method: "pos" });
+  return wrapLens(new VitalLens({ method: "pos" }));
+}
+
+/** Wraps one library instance so that `stop()` wins over a `start()` still attaching the stream. */
+export function wrapLens(lens: VitalLensInstance): PulseEngine {
   let stopped = false;
   return {
     async start(stream, video, onReading) {
@@ -86,6 +99,9 @@ export async function createPulseEngine(): Promise<PulseEngine> {
         if (!stopped) onReading(readHeartRate(data));
       });
       await lens.setVideoStream(stream, video);
+      // Stopped (timeout, Stop, unmount) while the stream was attaching: close() has already run,
+      // so starting now would leave the library processing a stream nobody releases.
+      if (stopped) return;
       lens.startVideoStream();
     },
     async stop() {

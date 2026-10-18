@@ -9,10 +9,15 @@ import {
   MODEL_JSON,
   readHeartRate,
   VENDOR_BASE,
+  type VitalLensInstance,
+  wrapLens,
 } from "./engine";
-import { vitalsEnabled } from "./VitalsSlot";
+import { isVitalsOn, vitalsEnabled } from "./VitalsSlot";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 describe("pulse engine", () => {
   it("reads the heart rate out of a library result", () => {
@@ -24,6 +29,46 @@ describe("pulse engine", () => {
     expect(readHeartRate({ vitals: { heart_rate: { value: Number.NaN } } })).toBeNull();
     expect(readHeartRate(null)).toBeNull();
     expect(readHeartRate({ vitals: { heart_rate: { value: 70 } } })).toEqual({ bpm: 70, confidence: 0 });
+  });
+
+  it("takes the newest element when the library reports confidence per sample", () => {
+    // The bundle's own widget reads heart_rate.confidence as a number or an array and shows the last
+    // element; coercing the array to 0 made every real reading "unsteady".
+    expect(readHeartRate({ vitals: { heart_rate: { value: 70, confidence: [0.2, 0.5, 0.9] } } })).toEqual({
+      bpm: 70,
+      confidence: 0.9,
+    });
+    expect(readHeartRate({ vitals: { heart_rate: { value: 70, confidence: [] } } })).toEqual({
+      bpm: 70,
+      confidence: 0,
+    });
+    expect(readHeartRate({ vitals: { heart_rate: { value: 70, confidence: ["high"] } } })).toEqual({
+      bpm: 70,
+      confidence: 0,
+    });
+  });
+
+  it("does not start the stream when stopped while the library is still attaching it", async () => {
+    let attached!: () => void;
+    const lens = {
+      addEventListener: vi.fn(),
+      setVideoStream: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            attached = resolve;
+          }),
+      ),
+      startVideoStream: vi.fn(),
+      stopVideoStream: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
+    } satisfies VitalLensInstance;
+    const engine = wrapLens(lens);
+    const starting = engine.start({} as MediaStream, {} as HTMLVideoElement, () => undefined);
+    await engine.stop();
+    attached();
+    await starting;
+    expect(lens.startVideoStream).not.toHaveBeenCalled();
+    expect(lens.close).toHaveBeenCalledTimes(1);
   });
 
   it("calls a reading steady only at or above the confidence floor", () => {
@@ -52,14 +97,47 @@ describe("pulse engine", () => {
 });
 
 describe("vitals flag and copy", () => {
-  it("is off unless NEXT_PUBLIC_VITALS is exactly on", () => {
-    expect(vitalsEnabled(undefined)).toBe(false);
-    expect(vitalsEnabled("")).toBe(false);
-    expect(vitalsEnabled("true")).toBe(false);
-    expect(vitalsEnabled("on")).toBe(true);
+  it("is off unless the flag value is exactly on", () => {
+    expect(isVitalsOn(undefined)).toBe(false);
+    expect(isVitalsOn("")).toBe(false);
+    expect(isVitalsOn("true")).toBe(false);
+    expect(isVitalsOn("on")).toBe(true);
+  });
+
+  it("reads the flag from NEXT_PUBLIC_VITALS", () => {
+    vi.stubEnv("NEXT_PUBLIC_VITALS", "on");
+    expect(vitalsEnabled()).toBe(true);
+    vi.stubEnv("NEXT_PUBLIC_VITALS", "");
+    expect(vitalsEnabled()).toBe(false);
   });
 
   it("has the same keys in English and Spanish", () => {
     expect(Object.keys(VITALS_COPY.es).sort()).toEqual(Object.keys(VITALS_COPY.en).sort());
+  });
+
+  it("labels the panel constructed and non-diagnostic in both languages", () => {
+    expect(VITALS_COPY.en.label).toBe("Constructed, non-diagnostic");
+    expect(VITALS_COPY.es.label).toMatch(/no diagnóstic/i);
+  });
+
+  // eval/acceptance/g16.spec.ts NEVER_SAY plus the on-screen words DESIGN.md bans.
+  const BANNED = [
+    "prevented",
+    "would have died",
+    "the ai caught",
+    "contraindicated for this patient",
+    "fatal",
+    "thinking",
+    "diagnosed",
+    "calibrated",
+  ];
+
+  it("never puts a banned word on screen in either language", () => {
+    for (const language of ["en", "es"] as const) {
+      for (const value of Object.values(VITALS_COPY[language])) {
+        const text = (typeof value === "function" ? value(72) : value).toLowerCase();
+        for (const banned of BANNED) expect(text, `${language}: "${text}"`).not.toContain(banned);
+      }
+    }
   });
 });
