@@ -213,3 +213,24 @@ body {
     display: inline;
   }
 }
+
+/* FrontDesk status row: a turn is running. The only keyframes on the site (DESIGN.md, Motion). */
+.indeterminate {
+  background: linear-gradient(90deg, transparent 0%, var(--info) 40%, var(--info) 60%, transparent 100%);
+  background-size: 200% 100%;
+  animation: indeterminate 1.2s linear infinite;
+}
+@keyframes indeterminate {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .indeterminate {
+    animation: none;
+    background: var(--info);
+  }
+}
