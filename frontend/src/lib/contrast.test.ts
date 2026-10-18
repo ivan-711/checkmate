@@ -35,6 +35,9 @@ const PAIRS: [fg: string, bg: string, min: number][] = [
   ["ink-3", "page", TEXT],
   ["ink-3", "sunken", TEXT],
   ["ink-3", "kiosk-bg", TEXT],
+  // The agent tone (gray) and verified facts (near-black) on the kiosk pane.
+  ["ink-2", "kiosk-bg", TEXT],
+  ["ink-1", "kiosk-bg", TEXT],
   ["on-accent", "accent", TEXT],
   ["accent", "surface", TEXT],
   ["denied-ink", "denied-bg", TEXT],
