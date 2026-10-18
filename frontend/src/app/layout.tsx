@@ -6,16 +6,20 @@ import "@fontsource-variable/instrument-sans";
 import "@fontsource/dm-mono/400.css";
 import "@fontsource/dm-mono/500.css";
 import { Header } from "@/components/ui/Header";
+import { siteOrigin } from "@/lib/siteOrigin";
 import "./globals.css";
 import { Providers } from "./providers";
 
 const PITCH = "A bilingual AI check-in kiosk that can’t open duplicate charts";
 
 export const metadata: Metadata = {
-  // The demo has no public origin; link previews resolve /og.png against the dev server.
-  metadataBase: new URL("http://localhost:3000"),
+  // Link previews resolve /og.png against this origin (the local dev server unless set).
+  metadataBase: siteOrigin(process.env.NEXT_PUBLIC_SITE_ORIGIN),
   title: "CheckMate",
   description: "Synthetic-data prototype for identity reconciliation. Not for clinical use.",
+  // public/, rendered by scripts/render-assets.mjs. app/icon.svg is picked up by file convention.
+  manifest: "/manifest.webmanifest",
+  icons: { apple: "/apple-touch-icon.png" },
   // public/og.png, rendered by scripts/render-assets.mjs from the mark and the pitch.
   openGraph: {
     title: "CheckMate",
