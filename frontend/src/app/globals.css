@@ -319,8 +319,8 @@ kbd {
   }
 }
 
-/* Portrait screens are the patient-facing kiosk surface. The registrar stage stays available on
-   landscape screens, and removing it here prevents an off-screen desktop grid from widening the page. */
+/* Portrait screens stack the patient kiosk and registrar stage. Each keeps its own viewport-sized
+   surface, and the stage body scrolls internally instead of widening the page. */
 @media (max-width: 900px) {
   :root {
     --bar-h: 112px;
@@ -351,11 +351,12 @@ kbd {
     display: block;
     padding: 4px 12px 12px;
   }
-  .desk > .stage {
-    display: none;
-  }
   .desk > [aria-label="Patient kiosk"] {
     height: 100%;
+  }
+  .desk > .stage {
+    height: calc(100dvh - var(--bar-h) - 16px);
+    margin-top: 16px;
   }
 }
 

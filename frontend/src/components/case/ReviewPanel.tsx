@@ -95,6 +95,7 @@ export function ReviewPanel({
   const reasonRef = useRef<HTMLSelectElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const approveRef = useRef<HTMLButtonElement>(null);
+  const rejectRef = useRef<HTMLButtonElement>(null);
   const [registrar, setRegistrar] = useState(REGISTRARS[0]);
   const [reason, setReason] = useState<ReasonCode | "">("");
   const [note, setNote] = useState("");
@@ -147,9 +148,10 @@ export function ReviewPanel({
 
   function cancel() {
     if (decide.isPending) return;
+    const opener = sheet === "reject" ? rejectRef : approveRef;
     onSheetChange(null);
     // Back to the opener, so a keyboard user does not lose their place.
-    requestAnimationFrame(() => approveRef.current?.focus());
+    requestAnimationFrame(() => opener.current?.focus());
   }
 
   function submit() {
@@ -203,6 +205,7 @@ export function ReviewPanel({
         <button
           type="button"
           data-testid="reject-button"
+          ref={rejectRef}
           onClick={() => open("reject")}
           disabled={blocked}
           className={LINE_BUTTON}
@@ -222,6 +225,8 @@ export function ReviewPanel({
       data-testid="confirm-sheet"
       data-sheet={sheet}
       className="enter flex h-full flex-col gap-3"
+      // The browser's own bubble would block submit before the sheet can say what is missing.
+      noValidate
       onSubmit={(e) => {
         e.preventDefault();
         submit();

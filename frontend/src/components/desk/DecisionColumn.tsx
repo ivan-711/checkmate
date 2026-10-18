@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { EvidenceRail } from "@/components/case/EvidenceRail";
 import { ReviewPanel } from "@/components/case/ReviewPanel";
 import { Timeline } from "@/components/case/Timeline";
@@ -101,6 +101,23 @@ function AttachCheckIn({ c, registrar }: { c: DeskCase; registrar: string }) {
   );
 }
 
+/** The decision line of a rejection. After a Reject made here the sheet unmounts with its focused
+ * control, so focus moves to this line instead of falling to the page. */
+function RejectedLine({ c, name }: { c: DeskCase; name: string }) {
+  const line = useRef<HTMLParagraphElement>(null);
+  const { justRejected, setJustRejected } = c;
+  useEffect(() => {
+    if (!justRejected) return;
+    line.current?.focus();
+    setJustRejected(false);
+  }, [justRejected, setJustRejected]);
+  return (
+    <p ref={line} tabIndex={-1} className={EYEBROW}>
+      Rejected by {name}
+    </p>
+  );
+}
+
 /** The registrar's column (CONCEPT.md §8, L4): one pane per Desk state, so exactly one of Resolve,
  * the evidence and Approve, the confirm sheet, History, or "Kept apart" is on screen. */
 export function DecisionColumn({ c, onResolve }: { c: DeskCase; onResolve: () => void }) {
@@ -152,7 +169,7 @@ export function DecisionColumn({ c, onResolve }: { c: DeskCase; onResolve: () =>
     const reason = decision.reasonCode ?? "INSUFFICIENT_EVIDENCE";
     return (
       <div data-pane="rejected">
-        <p className={EYEBROW}>Rejected by {actorName(decision.actor)}</p>
+        <RejectedLine c={c} name={actorName(decision.actor)} />
         <h2 className={TITLE}>Kept apart</h2>
         <p className={LEAD}>{KEPT_APART[reason]} Nothing was linked. No safety check ran.</p>
         <ResolveButton c={c} label="Resolve again" tone="quiet" onResolve={onResolve} />

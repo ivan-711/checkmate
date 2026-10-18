@@ -37,6 +37,8 @@ export function useDeskCase() {
   const { setFacts, setSheet } = useDesk();
   // Set by an Approve made here; the Organism moves focus after the morph, then clears it.
   const [justApproved, setJustApproved] = useState(false);
+  // Set by a Reject made here; the Kept apart pane takes focus once, so the sheet's focus is not lost.
+  const [justRejected, setJustRejected] = useState(false);
   // Resolve again after a "not enough evidence" reject reopens that review (see reviewable).
   const [reopenAsked, setReopenAsked] = useState(false);
   // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
@@ -125,6 +127,7 @@ export function useDeskCase() {
         : d,
     );
     if (primary.decision.status === "LINKED") setJustApproved(true);
+    if (primary.decision.status === "REJECTED") setJustRejected(true);
     if (run.attach && attached) writeAttach(attached.pair.id, run.attach);
   }
 
@@ -166,5 +169,7 @@ export function useDeskCase() {
     onDecided,
     justApproved,
     setJustApproved,
+    justRejected,
+    setJustRejected,
   };
 }
