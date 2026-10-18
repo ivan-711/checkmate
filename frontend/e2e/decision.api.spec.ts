@@ -42,8 +42,8 @@ test("one Confirm links the records and attaches the held check-in: one flag, ki
 
   // The kiosk check-in: the demo line, sent once; the gate holds it for a registrar.
   // Send stays disabled until the composer has text; "Use this" fills it with the demo line.
-  await expect(page.getByRole("button", { name: "Use this" })).toBeEnabled({ timeout: 30_000 });
-  await page.getByRole("button", { name: "Use this" }).click();
+  await expect(page.getByRole("button", { name: "Use this" }).first()).toBeEnabled({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Use this" }).first().click();
   await expect(page.getByTestId("kiosk-send")).toBeEnabled();
   await page.getByTestId("kiosk-send").click();
   await expect(page.locator('[data-pane="held"]')).toBeVisible({ timeout: 30_000 });

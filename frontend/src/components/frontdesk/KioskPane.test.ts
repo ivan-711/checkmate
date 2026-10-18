@@ -80,6 +80,26 @@ describe("KioskPane states", () => {
     expect(html).not.toContain("Start over");
   });
 
+  it("offers the new patient's line under the hero's on the API, each with its own Use this", () => {
+    vi.stubEnv("NEXT_PUBLIC_CHECKMATE_SOURCE", "api");
+    try {
+      const html = renderKiosk(fresh);
+      const text = visibleText(html);
+      expect(text).toContain(COPY.en.newPatientLabel);
+      expect(text.indexOf("Sofia Mesa-López")).toBeGreaterThan(-1);
+      expect(text.indexOf("Sofia Mesa-López")).toBeLessThan(text.indexOf("Teodoro Quintanilla Abasolo"));
+      expect(html.match(new RegExp(`>${COPY.en.suggestUse}<`, "g"))).toHaveLength(2);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("offers only the one line the fixture can replay", () => {
+    const html = renderKiosk(fresh);
+    expect(visibleText(html)).not.toContain(COPY.en.newPatientLabel);
+    expect(html.match(new RegExp(`>${COPY.en.suggestUse}<`, "g"))).toHaveLength(1);
+  });
+
   it("keeps the kiosk's own agent mode badge in both replay and live sessions", () => {
     expect(renderKiosk(fresh)).toMatch(/data-testid="agent-mode-badge"[^>]*>REPLAY<\/span>/);
     expect(renderKiosk({ ...fresh, agentMode: "LIVE" })).toMatch(
