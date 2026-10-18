@@ -1,11 +1,23 @@
+"use client";
+
 import type { SourceCard } from "@/api/types";
+import { useCite } from "@/components/desk/CiteProvider";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
-import { CARD_FIELDS, type CardField } from "@/lib/display";
+import { CARD_FIELDS, CITE_CARD_FIELDS, type CardField } from "@/lib/display";
+import type { CiteField } from "@/lib/desk";
+
+/** The cite a card field answers to (hover-to-cite); sex and phone answer to none. */
+function citeKeyFor(field: CardField): CiteField | undefined {
+  return (Object.keys(CITE_CARD_FIELDS) as CiteField[]).find((k) =>
+    (CITE_CARD_FIELDS[k] as readonly string[]).includes(field),
+  );
+}
 
 const FORMAT_TAGS: Record<string, string> = { FHIR_PATIENT: "FHIR R4", CSV_ROW: "CSV" };
 
 export function SourceCardView({ card, differs }: { card: SourceCard; differs: Set<CardField> }) {
   const { record, normalized, displayLabel } = card;
+  const { cite } = useCite();
   return (
     <article
       data-testid="source-card"
@@ -24,10 +36,18 @@ export function SourceCardView({ card, differs }: { card: SourceCard; differs: S
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         {CARD_FIELDS.map(([field, label]) => {
           const value = normalized[field];
+          const citeKey = citeKeyFor(field);
+          const cited = citeKey !== undefined && cite === citeKey;
           return (
             <div key={field} className="contents">
               <dt className="text-[16px] text-ink-3">{label}</dt>
-              <dd className="break-words">
+              <dd
+                data-field={citeKey}
+                data-cited={citeKey ? String(cited) : undefined}
+                className={`-mx-1 break-words rounded-[4px] px-1 transition-colors duration-[var(--t-micro)] ${
+                  cited ? "bg-mulberry-cite" : ""
+                }`}
+              >
                 {value == null ? (
                   <span className="text-ink-3">not given</span>
                 ) : differs.has(field) ? (

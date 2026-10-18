@@ -35,6 +35,10 @@ const row = (bucket: string, series: string, count: number) => ({
 });
 
 describe("AuditTile", () => {
+  it("uses an h2 so the Desk heading outline does not skip a level", () => {
+    expect(renderTile([])).toContain('<h2 id="audit-heading"');
+  });
+
   it("labels each row with the 5-minute window agent_gate_5m counted, in CT", () => {
     const html = renderTile([
       row("2026-10-18T03:10:00Z", "ALLOW", 1),

@@ -1,0 +1,463 @@
+/* The Organism (CONCEPT.md §3, §4): a fixed 600x520 drawing. Every color is a token from
+   globals.css; every moving value (transform, clip-path, opacity) is driven by Motion in the
+   components, so nothing here transitions those. The transitions below are the instant ones:
+   hover-to-cite washes and the copy-id affordance. */
+
+.organism {
+  position: relative;
+  width: 600px;
+  height: 520px;
+}
+
+/* ── fragments ── */
+.org-frag {
+  position: absolute;
+  top: 0;
+  width: 272px;
+  height: 520px;
+  color: var(--ink);
+  will-change: transform;
+}
+.org-frag[data-side="er"] {
+  left: 0;
+}
+.org-frag[data-side="cl"] {
+  left: 328px;
+}
+.org-frag-body {
+  position: absolute;
+  inset: 0;
+  background: var(--mulberry-tint);
+  will-change: clip-path;
+}
+.org-frag[data-side="er"] .org-frag-body {
+  border-radius: var(--r-record) 0 0 var(--r-record);
+}
+.org-frag[data-side="cl"] .org-frag-body {
+  border-radius: 0 var(--r-record) var(--r-record) 0;
+}
+.org-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--mulberry);
+  opacity: 0;
+  pointer-events: none;
+}
+.org-frag-in {
+  position: absolute;
+  inset: 0;
+  padding: 26px 30px 26px;
+}
+.org-frag[data-side="er"] .org-frag-in {
+  padding-right: 40px;
+}
+.org-frag[data-side="cl"] .org-frag-in {
+  padding-left: 44px;
+}
+.org-src {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.org-src svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  color: var(--mulberry);
+}
+.org-src b {
+  display: block;
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.15;
+}
+.org-src span {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.org-rid {
+  margin: 12px 0 0 -6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 14px/1 var(--f-mono);
+  color: var(--ink-2);
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--t-micro);
+}
+.org-rid:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.org-rid svg {
+  opacity: 0;
+  transition: opacity var(--t-micro);
+}
+.org-rid:hover svg,
+.org-rid:focus-visible svg,
+.org-rid[data-copied="true"] svg {
+  opacity: 1;
+}
+.org-nm {
+  font: 650 30px/1.08 var(--f-display);
+  letter-spacing: -0.025em;
+  margin: 22px 0 20px;
+}
+.org-nm > span {
+  display: block;
+  border-radius: 6px;
+  margin-left: -4px;
+  padding: 0 4px;
+  transition: background var(--t-micro);
+}
+/* The hyphen story: the run one spelling has is underlined; the other shows a gap where it is missing. */
+.org-d {
+  font-style: normal;
+  text-decoration: underline;
+  text-decoration-color: var(--mulberry);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 5px;
+}
+.org-gap {
+  display: inline-block;
+  width: 3px;
+  height: 0.8em;
+  background: var(--mulberry);
+  border-radius: 2px;
+  margin: 0 2px;
+  vertical-align: -1px;
+  opacity: 0.75;
+}
+.org-frag dl > div {
+  padding: 7px 4px;
+  margin: 0 -4px;
+  border-radius: 8px;
+  transition: background var(--t-micro);
+}
+.org-frag dt {
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.2;
+}
+.org-frag dd {
+  font-size: 17px;
+  line-height: 1.35;
+}
+.org-missing {
+  color: var(--ink-3);
+}
+.org-cs {
+  position: absolute;
+  bottom: 18px;
+  left: 30px;
+}
+.org-frag[data-side="cl"] .org-cs {
+  left: 44px;
+}
+
+/* ── hover-to-cite: an evidence row lights its field in both records, its thread and its node ── */
+.organism[data-cite="given"] [data-field="given"],
+.organism[data-cite="family"] [data-field="family"],
+.organism[data-cite="dob"] [data-field="dob"],
+.organism[data-cite="addr"] [data-field="addr"] {
+  background: var(--mulberry-cite);
+}
+
+/* ── threads ── */
+.org-threads-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.org-threads {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.org-threads line {
+  stroke: var(--ink-3);
+  stroke-width: 1.5;
+  transition:
+    stroke var(--t-micro),
+    stroke-width var(--t-micro);
+}
+.org-node {
+  position: absolute;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 0 0 1.5px var(--ink);
+  display: grid;
+  place-items: center;
+  font: 600 16px/1 var(--f-text);
+  transition:
+    background var(--t-micro),
+    color var(--t-micro),
+    box-shadow var(--t-micro);
+}
+.organism[data-cite="given"] .org-node[data-k="given"],
+.organism[data-cite="family"] .org-node[data-k="family"],
+.organism[data-cite="dob"] .org-node[data-k="dob"],
+.organism[data-cite="addr"] .org-node[data-k="addr"] {
+  background: var(--mulberry);
+  color: var(--paper);
+  box-shadow: 0 0 0 1.5px var(--mulberry);
+}
+.organism[data-cite="given"] line[data-k="given"],
+.organism[data-cite="family"] line[data-k="family"],
+.organism[data-cite="dob"] line[data-k="dob"],
+.organism[data-cite="addr"] line[data-k="addr"] {
+  stroke: var(--mulberry);
+  stroke-width: 2.5;
+}
+
+/* ── the joined record ── */
+.org-joined {
+  position: absolute;
+  left: 28px;
+  top: 0;
+  width: 544px;
+  height: 520px;
+  border-radius: var(--r-record);
+  background: var(--mulberry);
+  color: var(--paper);
+  padding: 28px 36px;
+}
+/* The seam heals: a 2 px paper line that fades; a short stem stays where the notice rose from. */
+.org-heal {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  pointer-events: none;
+}
+.org-stem {
+  position: absolute;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--paper) 70%, transparent));
+  pointer-events: none;
+}
+.org-g-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--on-mulberry-2);
+}
+.org-g-top > svg {
+  width: 26px;
+  height: 26px;
+  color: var(--paper);
+}
+.org-cs2 {
+  margin-left: auto;
+}
+/* The constructed chip on a mulberry surface: paper ink, its explanation keeps its paper card. */
+.org-cs2 [data-testid="constructed-scenario-chip"] {
+  color: var(--paper);
+  border-color: var(--on-mulberry-2);
+}
+.org-joined h2 {
+  font: 700 46px/1 var(--f-display);
+  letter-spacing: -0.035em;
+  margin-top: 18px;
+  outline: none;
+}
+.org-alt {
+  font-size: 15px;
+  color: var(--on-mulberry-2);
+  margin-top: 8px;
+}
+.org-g-grid {
+  display: grid;
+  grid-template-columns: 150px 104px 1fr;
+  gap: 14px 22px;
+  margin-top: 20px;
+}
+.org-g-grid .org-wide {
+  grid-column: span 2;
+}
+.org-g-grid dt {
+  font-size: 14px;
+  color: var(--on-mulberry-2);
+}
+.org-g-grid dd {
+  font-size: 17px;
+  line-height: 1.3;
+}
+.org-from {
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: -2px;
+}
+.org-from svg {
+  width: 14px;
+  height: 14px;
+  color: var(--on-mulberry-2);
+}
+.org-quiet {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 22px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--on-mulberry-2);
+}
+.org-quiet svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* ── crosswalk tabs, hanging under the record's bottom edge ── */
+.org-tabs {
+  position: absolute;
+  top: 520px;
+  left: 24px;
+  display: flex;
+  gap: 10px;
+}
+.org-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--mulberry-tint);
+  color: var(--mulberry-deep);
+  padding: 9px 14px 10px;
+  border-radius: 0 0 12px 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.org-tab svg {
+  width: 16px;
+  height: 16px;
+}
+.org-tab code {
+  font: 400 13px/1 var(--f-mono);
+  color: var(--ink-2);
+}
+
+/* ── the notice, risen from the seam: paper and ink on the record, the one floating card ── */
+.org-notice {
+  position: absolute;
+  left: 44px; /* 72 px from the organism's edge: the record sits 28 px in */
+  width: 456px;
+  top: 306px;
+  z-index: 4;
+  color: var(--ink);
+}
+.org-notice-card {
+  background: var(--paper);
+  border-radius: 22px;
+  padding: 18px 20px 16px;
+  box-shadow:
+    0 18px 40px -16px rgba(40, 10, 35, 0.45),
+    0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent);
+  position: relative;
+}
+.org-n-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.org-n-top svg {
+  flex: none;
+}
+.org-n-top h3 {
+  font: 650 20px/1.1 var(--f-display);
+  letter-spacing: -0.01em;
+  outline: none;
+}
+.org-rule {
+  margin-left: auto;
+  font: 500 13px/1 var(--f-mono);
+  color: var(--ink-2);
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+.org-notice-card > p {
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--ink-2);
+  margin-top: 10px;
+}
+.org-notice-card > p b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.org-n-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 12px;
+  padding-right: 84px; /* room for the Details control */
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.org-n-foot [data-testid="constructed-scenario-chip"],
+.org-n-foot [data-testid="rule-result-tag"] {
+  font-size: 13px;
+  line-height: 22px;
+}
+.org-n-details > summary {
+  position: absolute;
+  right: 20px;
+  bottom: 16px;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 4px 0;
+}
+.org-n-details > summary::-webkit-details-marker {
+  display: none;
+}
+.org-chev {
+  transition: transform var(--t-micro) var(--ease-out);
+}
+.org-n-details[open] .org-chev {
+  transform: rotate(90deg);
+}
+.org-n-body {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+  max-height: 300px;
+  overflow: auto;
+  padding-bottom: 28px;
+}
+.org-n-text,
+.org-n-source,
+.org-n-limits {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  max-width: 68ch;
+}
+.org-n-source,
+.org-n-limits {
+  margin-top: 8px;
+}
+.org-n-limits {
+  color: var(--ink-3);
+}
+.org-n-source a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  color: var(--ink);
+}

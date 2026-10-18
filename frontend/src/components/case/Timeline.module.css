@@ -1,0 +1,20 @@
+/* History rows arrive one after another (CONCEPT.md §5): 60 ms apart, newest first. */
+.row {
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+  transition-delay: calc(var(--i, 0) * 60ms);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    transition: opacity 150ms linear;
+    transition-delay: 0ms;
+    @starting-style {
+      transform: none;
+    }
+  }
+}

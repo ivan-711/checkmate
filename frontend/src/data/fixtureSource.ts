@@ -13,6 +13,7 @@ import type {
   ReviewResponse,
   SafetyAlert,
   SessionResponse,
+  ThresholdSet,
   TilesResponse,
   TimelineEvent,
 } from "@/api/types";
@@ -157,6 +158,10 @@ export class FixtureSource implements DataSource {
       return { ...tile, buckets, total: tile.total + recent.reduce((n, b) => n + b.count, 0) };
     });
     return { ...this.fixture.tiles, tiles };
+  }
+
+  async getThresholds(): Promise<ThresholdSet> {
+    return this.fixture.thresholds;
   }
 
   async startIntake(language: Language): Promise<IntakeSession> {

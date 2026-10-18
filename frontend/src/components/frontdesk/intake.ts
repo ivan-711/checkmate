@@ -12,6 +12,9 @@ export const INTAKE_KEY = ["intake-session"] as const;
 export const HANDOFF_KEY = ["handoff-pair"] as const;
 export const handoffPairKey = (pairId: string) => [...HANDOFF_KEY, pairId] as const;
 
+/** Shared key for the kiosk turn mutation, including buttons rendered outside its hook instance. */
+export const SEND_TURN_KEY = ["send-intake-turn"] as const;
+
 const INTAKE_HASH = hashKey(INTAKE_KEY);
 
 /** Calls onChange after the kiosk's check-in changes, never inside a render. The cache notifies
@@ -21,6 +24,18 @@ const INTAKE_HASH = hashKey(INTAKE_KEY);
 export function subscribeToIntake(queryClient: QueryClient, onChange: () => void): () => void {
   return queryClient.getQueryCache().subscribe((event) => {
     if (event.query.queryHash === INTAKE_HASH) notifyManager.schedule(onChange);
+  });
+}
+
+/** Re-reads the held pairs whenever a mutation succeeds. The registrar decides on the Desk with
+ * the case's own review (not a kiosk mutation), so nothing else tells the kiosk that its pair is
+ * now LINKED or REJECTED. Any success is enough: re-reading two pairs is cheap, and keying on one
+ * screen's mutation would miss the next screen's. */
+export function refreshHandoffOnMutation(queryClient: QueryClient): () => void {
+  return queryClient.getMutationCache().subscribe((event) => {
+    if (event.type === "updated" && event.action.type === "success") {
+      void queryClient.invalidateQueries({ queryKey: HANDOFF_KEY });
+    }
   });
 }
 
@@ -38,11 +53,10 @@ export function useIntakeSession(): IntakeSession | undefined {
     (onChange: () => void) => subscribeToIntake(queryClient, onChange),
     [queryClient],
   );
-  return useSyncExternalStore(
-    subscribe,
-    () => queryClient.getQueryData<IntakeSession>(INTAKE_KEY),
-    () => undefined,
-  );
+  const read = useCallback(() => queryClient.getQueryData<IntakeSession>(INTAKE_KEY), [queryClient]);
+  // The server snapshot reads the cache too: it is empty during real SSR and hydration (the
+  // check-in starts after mount), and a static render of a seeded cache then sees the check-in.
+  return useSyncExternalStore(subscribe, read, read);
 }
 
 /** Every pair the turn handed off (the hero has two: the ER and the Clinic record). */

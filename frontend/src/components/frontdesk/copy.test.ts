@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { FEATURE_LABELS } from "@/lib/display";
-import { COPY, sourceSystemLabel } from "./copy";
+import { COPY, kioskSourceLabel, sourceSystemLabel } from "./copy";
+
+/** Every string the deck holds, functions called with sample values, so a scan covers them all. */
+function strings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (typeof value === "function") return strings(value("1.00", "x", 2));
+  if (Array.isArray(value)) return value.flatMap(strings);
+  if (value && typeof value === "object") return Object.values(value).flatMap(strings);
+  return [];
+}
 
 describe("FrontDesk copy", () => {
   it("names every feature the registrar rail names, with the rail's words in English", () => {
@@ -15,21 +24,43 @@ describe("FrontDesk copy", () => {
     expect(Object.keys(COPY.es).sort()).toEqual(Object.keys(COPY.en).sort());
     expect(COPY.es.feature.dob_exact).toBe("Fecha de nacimiento");
     expect(COPY.es.band.REVIEW).toBe("REVISIÓN");
+    expect(COPY.es.band.AUTO_LINK).toBe("VÍNCULO AUTOMÁTICO");
   });
 
-  it("reads source systems the way the source cards do", () => {
+  it("reads source systems the way the source cards do, and in plain words on the kiosk", () => {
     expect(sourceSystemLabel("CLINIC_CSV")).toBe("Clinic CSV");
     expect(sourceSystemLabel("ER_FHIR")).toBe("ER FHIR");
+    expect(kioskSourceLabel("ER_FHIR", COPY.en)).toBe("Emergency room");
+    expect(kioskSourceLabel("ER_FHIR", COPY.es)).toBe("Urgencias");
+    expect(kioskSourceLabel("CLINIC_CSV", COPY.es)).toBe("Clínica");
+    expect(kioskSourceLabel("FRONTDESK_INTAKE", COPY.en)).toBe("Kiosk check-in");
+    expect(kioskSourceLabel("SOMETHING_ELSE", COPY.en)).toBe("Another record");
   });
-  it("carries the trust lines in both languages", () => {
-    expect(COPY.en.promise).toBe("Nothing is linked to your chart until a staff member approves.");
-    expect(COPY.es.promise).toBe(
-      "No se vincula nada a su expediente hasta que un miembro del personal lo apruebe.",
-    );
-    expect(COPY.en.heldFinish).toBe("Held for review. No records were linked.");
-    expect(COPY.es.heldFinish).toBe("En espera de revisión. No se vinculó ningún expediente.");
-    expect(COPY.en.ruleResult).toBe("Rule result");
-    expect(COPY.es.ruleResult).toBe("Resultado de regla");
+
+  it("carries the promise, the gate card and the done state in both languages", () => {
+    expect(COPY.en.promise).toEqual(["FrontDesk gets it ready.", "A registrar confirms."]);
+    expect(COPY.es.promise).toEqual(["FrontDesk lo prepara.", "Admisión lo confirma."]);
+    expect(COPY.en.gateTitle).toBe("A chart may already be yours");
+    expect(COPY.es.gateTitle).toBe("Puede que ya tenga un expediente");
+    expect(COPY.en.gateHeld).toBe("Held for a registrar. Please have a seat; they’ll confirm it with you.");
+    expect(COPY.es.gateHeld).toBe("En espera de admisión. Tome asiento; confirmarán sus datos con usted.");
+    expect(COPY.en.doneTitle("Sofia")).toBe("You’re checked in, Sofia.");
+    expect(COPY.en.doneTitle(null)).toBe("You’re checked in.");
+    expect(COPY.es.doneTitle("Sofia")).toBe("Su llegada está registrada, Sofia.");
+    expect(COPY.es.doneTitle(null)).toBe("Su llegada está registrada.");
+  });
+
+  it("puts no machine name in front of the patient: no snake_case ids, policy ids or mode codes", () => {
+    for (const lang of ["en", "es"] as const) {
+      // feature and band label the registrar's evidence rows (data words), not patient copy.
+      const deck = Object.fromEntries(
+        Object.entries(COPY[lang]).filter(([key]) => key !== "feature" && key !== "band"),
+      );
+      for (const text of strings(deck)) {
+        expect(text, text).not.toMatch(/\b[a-z]+_[a-z_]+\b|frontdesk-gate|\bREPLAY\b|\bLIVE\b|\bLOCAL\b/);
+        expect(text, text).not.toMatch(/—|!/); // UX §5: no em dashes, no exclamation points
+      }
+    }
   });
 
   it("says every gate reason in plain words in both languages, with a neutral fallback", () => {

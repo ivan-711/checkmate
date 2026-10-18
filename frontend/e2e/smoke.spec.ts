@@ -7,7 +7,8 @@ const scenario = JSON.parse(
   readFileSync(path.join(__dirname, "../../contracts/fixtures/scenario.json"), "utf8"),
 );
 
-const reviewPanel = (page: Page) => page.getByRole("region", { name: "Review" });
+// The confirm sheet (L4) holds the reason, the registrar and the note.
+const reviewPanel = (page: Page) => page.getByTestId("confirm-sheet");
 
 /** Reset, then Resolve: the pair panel waits for Resolve identity, as the G16 path does. */
 async function resolved(page: Page) {
@@ -17,8 +18,9 @@ async function resolved(page: Page) {
   await expect(page.getByTestId("candidate-pair")).toBeVisible();
 }
 
-async function review(page: Page, kind: "approve" | "reject", reason?: string, note = "") {
+async function review(page: Page, kind: "approve" | "reject", reason?: string, note = "", registrar = "") {
   await page.getByTestId(kind === "approve" ? "approve-button" : "reject-button").click();
+  if (registrar) await reviewPanel(page).getByLabel("Registrar").selectOption(registrar);
   if (reason) await page.getByTestId("review-reason-select").selectOption(reason);
   if (note) await page.getByTestId("review-note-input").fill(note);
   await page.getByTestId("review-submit-button").click();
@@ -27,41 +29,47 @@ async function review(page: Page, kind: "approve" | "reject", reason?: string, n
 test("case path: reject keeps the rule silent, then approve links and flags", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("Synthetic data. Not for clinical use.")).toBeVisible();
-  await expect(page.getByTestId("app-mode-badge")).toHaveText(/REPLAY/);
+  await expect(page.getByTestId("app-mode-badge")).toHaveText(/Replay/);
   await expect(page.getByTestId("source-card")).toHaveCount(2);
   await expect(page.getByTestId("candidate-pair")).toHaveCount(0);
   await page.getByTestId("resolve-button").click();
   await expect(page.getByTestId("candidate-pair")).toBeVisible();
   await expect(page.getByTestId("pair-band")).toHaveText(/REVIEW/);
 
-  const er = page.getByRole("article", { name: "ER FHIR record" });
+  // The Desk names sources in plain words (record/labels.ts): "Emergency room", "Clinic".
+  const er = page.getByRole("article", { name: "Emergency room record" });
   await expect(er).toBeVisible();
   await expect(er.getByText("constructed scenario")).toBeVisible();
-  await expect(page.getByRole("article", { name: "Clinic CSV record" })).toBeVisible();
-  await expect(
-    page.getByText("Probability estimate fitted on our synthetic development distribution"),
-  ).toBeVisible();
+  await expect(page.getByRole("article", { name: "Clinic record" })).toBeVisible();
+  // The rail leads with the match score (L4); the probability caption left with the old rail.
+  await expect(page.getByRole("heading", { name: "Match score" })).toBeVisible();
   await expect(page.getByRole("list", { name: "Top evidence" }).getByRole("listitem")).toHaveCount(5);
-  await expect(page.getByText("No safety check yet. It runs after a link is approved.")).toBeVisible();
+  // The stage holds no notice until a link is approved (the quiet pre-link lines left with the old card).
+  await expect(page.getByTestId("flag-card")).toHaveCount(0);
 
-  await reviewPanel(page).getByLabel("Registrar").selectOption("Registrar B");
-  await review(page, "reject", "DIFFERENT_PERSON");
-  await expect(
-    page.getByText(/Rejected by Registrar B at \d\d:\d\d:\d\d CT\. Reason: Different person\./),
-  ).toBeVisible();
-  await expect(page.getByText("No safety check ran: no link was approved.")).toBeVisible();
+  // "Not enough evidence" keeps the pair open to Resolve again; "different person" would close it.
+  await review(page, "reject", "INSUFFICIENT_EVIDENCE", "", "Registrar B");
+  await expect(page.getByText("Rejected by Registrar B")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kept apart" })).toBeVisible();
+  await expect(page.getByTestId("flag-card")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Flagged for clinician review" })).toHaveCount(0);
   await expect(page.locator('[data-testid="event-row"][data-event-type="LINK_REJECTED"]')).toHaveCount(1);
 
-  await review(page, "approve", undefined, "second review approves");
+  await page.getByTestId("resolve-button").click();
+  await review(page, "approve", undefined, "second review approves", "Registrar B");
   // The approval raised the flag: focus lands on the flag card's heading.
   await expect(page.getByRole("heading", { name: "Flagged for clinician review" })).toBeFocused();
-  const goldenRegion = page.getByRole("region", { name: "Golden record" });
-  await expect(goldenRegion.getByText("Clinic CSV").first()).toBeVisible();
-  await expect(goldenRegion.getByText("ER FHIR").first()).toBeVisible();
-  await expect(page.getByRole("article", { name: "ER FHIR record" })).toHaveCount(0);
+  // The joined record is headed by the patient's name; its tabs name both sources.
+  const goldenRegion = page.getByTestId("golden-record");
+  await expect(
+    goldenRegion.locator('[data-testid="crosswalk-chip"][data-source-system="CLINIC_CSV"]'),
+  ).toContainText("Clinic");
+  await expect(
+    goldenRegion.locator('[data-testid="crosswalk-chip"][data-source-system="ER_FHIR"]'),
+  ).toContainText("Emergency room");
+  await expect(page.getByRole("article", { name: "Emergency room record" })).toHaveCount(0);
 
-  const timeline = page.getByRole("region", { name: "Timeline" });
+  const timeline = page.getByTestId("timeline");
   for (const event of scenario.timelineIfApproved) {
     await expect(timeline.getByText(event.display)).toBeVisible();
   }
@@ -71,7 +79,7 @@ test("case path: reject keeps the rule silent, then approve links and flags", as
   await expect(flag.getByText("constructed scenario")).toBeVisible();
   // The card leads with one line; the full text and the rule's limits sit under Details.
   await expect(flag.getByTestId("flag-card-headline")).toHaveText(
-    "Penicillin V allergy (anaphylaxis) from Clinic CSV · active amoxicillin order from ER FHIR",
+    "Penicillin V allergy (anaphylaxis) on the Clinic record, and an active amoxicillin order on the Emergency room record. A clinician decides.",
   );
   const { cardFooter, ruleId, ruleVersion } = scenario.alertIfApproved;
   const footer = flag.getByText(cardFooter.replace(`Rule ${ruleId} ${ruleVersion}.`, "").trim());
@@ -89,12 +97,12 @@ test("case path: reject keeps the rule silent, then approve links and flags", as
   await expect(page.locator('[data-testid="event-row"][data-event-type="LINK_APPROVED"]')).toHaveCount(1);
   await expect(page.locator('[data-testid="event-row"][data-event-type="ALERT_RAISED"]')).toHaveCount(1);
   await expect(page.getByTestId("tile-human-review-total")).toHaveText("2");
-  await expect(page.getByText(/Approved by Registrar B at \d\d:\d\d:\d\d CT\./)).toBeVisible();
+  await expect(timeline.getByText(/^Linked by Registrar B/)).toBeVisible();
   // Scoped to main: Next.js keeps its own empty route announcer outside it.
   await expect(page.locator('main [role="alert"]')).toHaveCount(0);
 });
 
-test("after Approve the flag card is on screen, under the golden record and above the timeline", async ({
+test("after Approve the flag card is on screen under the golden record, with History beside it", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -106,14 +114,15 @@ test("after Approve the flag card is on screen, under the golden record and abov
   const flagBox = await flag.boundingBox();
   const timelineBox = await page.getByTestId("timeline").boundingBox();
   expect(flagBox!.y).toBeGreaterThan(golden!.y);
-  expect(flagBox!.y).toBeLessThan(timelineBox!.y);
+  // History lives in the decision column (L4), to the right of the record and its notice.
+  expect(timelineBox!.x).toBeGreaterThanOrEqual(flagBox!.x + flagBox!.width);
 });
 
 test("reject without a reason asks for one and records nothing", async ({ page }) => {
   await resolved(page);
   await page.getByTestId("reject-button").click();
   await page.getByTestId("review-submit-button").click();
-  await expect(page.getByText("Select a reason to reject the link.")).toBeVisible();
+  await expect(page.getByText("Select a reason to keep these records apart.")).toBeVisible();
   await expect(reviewPanel(page).getByLabel("Reason")).toBeFocused();
   await expect(page.getByText(/Rejected by/)).toHaveCount(0);
 });
@@ -125,6 +134,19 @@ test("Cancel returns focus to the button that opened the step", async ({ page })
     await page.getByRole("button", { name: "Cancel" }).click();
     await expect(page.getByTestId(id)).toBeFocused();
   }
+});
+
+test("a double-click on Approve opens the confirm sheet and records nothing", async ({ page }) => {
+  await resolved(page);
+  // Confirm sits where Approve was: the second click of a double-click must not confirm the link.
+  await page.getByTestId("approve-button").dblclick();
+  await expect(page.getByTestId("confirm-sheet")).toBeVisible();
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId("golden-record")).toHaveCount(0);
+  await expect(page.locator('[data-testid="event-row"][data-event-type="LINK_APPROVED"]')).toHaveCount(0);
+  // A plain click on Confirm still links.
+  await page.getByTestId("review-submit-button").click();
+  await expect(page.getByTestId("golden-record")).toBeVisible();
 });
 
 test("a recorded reject moves focus to the decision line", async ({ page }) => {
@@ -168,13 +190,13 @@ test("reset returns to the separate records and Undo reset brings the link back"
   await page.goto("/");
   await page.getByTestId("resolve-button").click();
   await review(page, "approve");
-  await expect(page.getByRole("heading", { name: "Golden record" })).toBeVisible();
+  await expect(page.getByTestId("golden-record")).toBeVisible();
 
   await page.getByRole("button", { name: "Reset demo" }).click();
-  await expect(page.getByRole("article", { name: "ER FHIR record" })).toBeVisible();
+  await expect(page.getByRole("article", { name: "Emergency room record" })).toBeVisible();
   await page.getByRole("button", { name: "Undo reset" }).click();
-  const golden = page.getByRole("heading", { name: "Golden record" });
-  await expect(golden).toBeVisible();
+  await expect(page.getByTestId("golden-record")).toBeVisible();
+  const golden = page.locator("#golden-heading");
   // Focus moves to the golden record only after an approval made here, not after Undo.
   await expect(golden).not.toBeFocused();
 });
@@ -187,33 +209,41 @@ test("keyboard path reaches Approve link and moves focus to the raised flag", as
   }
   await expect(approve).toBeFocused();
   await page.keyboard.press("Enter");
-  // The dialog opens with focus on the note; Enter in the form submits it.
+  // The sheet opens with focus on the note. The note is a textarea (Enter is a new line), so the
+  // keyboard path tabs on to Confirm and presses Enter there.
   await expect(page.getByTestId("review-note-input")).toBeFocused();
+  const confirm = page.getByTestId("review-submit-button");
+  for (let i = 0; i < 10 && !(await confirm.evaluate((el) => el === document.activeElement)); i++) {
+    await page.keyboard.press("Tab");
+  }
+  await expect(confirm).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: "Flagged for clinician review" })).toBeFocused();
 });
 
-test("FrontDesk shell: empty chat pane, ES/EN switch and the agent gate tile", async ({ page }) => {
-  await page.goto("/frontdesk");
-  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
+test("FrontDesk shell: the kiosk starts idle and switches ES/EN; the gate tile starts empty", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const kiosk = page.getByTestId("kiosk");
+  await expect(kiosk).toHaveAttribute("data-k", "idle");
   await page.getByRole("button", { name: "Español" }).click();
   await expect(page.getByText("Le damos la bienvenida. Registremos su llegada.")).toBeVisible();
-  await expect(page.getByRole("region", { name: "Conversación de registro" })).toBeVisible();
-  await expect(page.locator('section[lang="es"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="kiosk"][lang="es"]')).toHaveCount(1);
   await page.getByRole("button", { name: "English" }).click();
-  await expect(page.getByText("Welcome. Let's get you checked in.")).toBeVisible();
+  await expect(page.getByText("Welcome. Let’s get you checked in.")).toBeVisible();
+  await expect(page.locator('[data-testid="kiosk"][lang="en"]')).toHaveCount(1);
 
-  const tile = page.getByRole("region", { name: "Agent actions per 5 minutes" });
-  await expect(tile.getByText("No agent actions yet.")).toBeVisible();
-  // The caption names the aggregate only; it never changes with the data source's mode.
-  await expect(tile.getByText("agent_gate_5m · continuous aggregate", { exact: true })).toBeVisible();
+  // The gate tile lives in the Activity strip: counts in words, the window in the caption.
+  const tile = page.getByTestId("tile-agent-gate");
+  await expect(tile).toContainText("0 denied · 0 allowed");
+  await expect(tile).toContainText(/Gate, last \d+ min/);
 });
 
 test("FrontDesk check-in: the gate denies a new chart at REVIEW and hands it to a registrar", async ({
   page,
 }) => {
-  await page.goto("/frontdesk");
-  await expect(page.getByTestId("agent-mode-badge")).toHaveText("Agent: REPLAY");
+  await page.goto("/");
   await page.getByRole("button", { name: "Use this" }).click();
   await expect(page.getByTestId("kiosk-composer")).toBeFocused();
   await page.keyboard.press("Enter");
@@ -223,32 +253,37 @@ test("FrontDesk check-in: the gate denies a new chart at REVIEW and hands it to 
   await expect(chips.nth(0)).toHaveAttribute("data-outcome", "ALLOW");
   await expect(chips.nth(1)).toHaveAttribute("data-outcome", "DENY");
   const gate = page.getByTestId("gate-card");
-  await expect(gate).toBeInViewport();
-  await expect(gate).toContainText("Blocked by identity gate");
-  await expect(gate).toContainText("Policy frontdesk-gate/1");
-  await expect(gate).toContainText("Values hidden on this screen.");
+  await expect(gate).toBeInViewport({ ratio: 1 });
+  await expect(gate).toContainText("A chart may already be yours");
+  await expect(gate).toHaveAttribute("data-policy", "frontdesk-gate/1");
+  await expect(gate).not.toContainText("frontdesk-gate/1");
   await expect(gate).not.toHaveAttribute("role", "alert");
+  await gate.locator("summary").click();
+  await expect(gate).toContainText("Values hidden on this screen.");
   // The kiosk never shows the other chart's values.
   const masked = scenario.pair.recordB.normalized;
   for (const value of [masked.birthDate, masked.addressLine]) await expect(gate).not.toContainText(value!);
-  await expect(page.getByText("A registrar will confirm it with you.")).toBeVisible();
+  await expect(gate).toContainText("Held for a registrar. Please have a seat");
   await expect(page.getByRole("status")).toContainText("New chart request denied by the identity gate.");
+  // The Desk knows the check-in is held.
+  await expect(page.locator('[data-kiosk="held"]')).toHaveCount(1);
 
-  const tile = page.getByRole("region", { name: "Agent actions per 5 minutes" });
-  await expect(tile.getByText("1 denied · 1 allowed")).toBeVisible();
+  const tile = page.getByTestId("tile-agent-gate");
+  await expect(tile).toContainText("1 denied · 1 allowed");
 
   await page.getByRole("button", { name: "Start over" }).click();
-  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
-  await expect(tile.getByText("1 denied · 1 allowed")).toBeVisible(); // the audit history stays
+  await expect(page.getByTestId("kiosk")).toHaveAttribute("data-k", "idle");
+  await expect(tile).toContainText("1 denied · 1 allowed"); // the audit history stays
 });
 
 test("FrontDesk in Spanish: the gate card, band and evidence fields are in Spanish", async ({ page }) => {
-  await page.goto("/frontdesk");
+  await page.goto("/");
   await page.getByRole("button", { name: "Español" }).click();
   await page.getByRole("button", { name: "Usar este" }).click();
   await page.keyboard.press("Enter");
   const gate = page.getByTestId("gate-card");
-  await expect(gate).toContainText("Bloqueado por el control de identidad");
+  await expect(gate).toContainText("Puede que ya tenga un expediente");
+  await gate.locator("summary").click();
   await expect(gate).toContainText("REVISIÓN");
   await expect(gate).toContainText("Fecha de nacimiento");
   await expect(gate).not.toContainText("REVIEW ");
@@ -257,68 +292,59 @@ test("FrontDesk in Spanish: the gate card, band and evidence fields are in Spani
   await expect(page.getByTestId("kiosk-composer")).toHaveValue("");
 });
 
-test("FrontDesk registrar: the held check-in is decided through the review step and the kiosk says what is next", async ({
-  page,
-}) => {
-  await page.goto("/frontdesk");
-  await expect(page.getByText("No held check-ins.")).toBeVisible();
+/** The demo check-in on the Desk: the gate holds it and the decision column offers Resolve. */
+async function heldCheckIn(page: Page) {
+  await page.goto("/");
   await page.getByRole("button", { name: "Use this" }).click();
   await page.keyboard.press("Enter");
-  const held = page.getByTestId("registrar-held");
-  await expect(held).toContainText("Held check-ins (1)");
-  await expect(held.getByTestId("source-card")).toHaveCount(2);
+  await expect(page.getByTestId("gate-card")).toBeVisible();
+  await expect(page.locator('[data-pane="held"]')).toBeVisible();
+}
 
-  await review(page, "reject", "DIFFERENT_PERSON");
-  await expect(held.getByText(/Rejected by .* Records kept separate\./)).toBeVisible();
-  await expect(page.getByText("A registrar is creating a new chart for you.")).toBeVisible();
+test("FrontDesk registrar: the held check-in is decided on the Desk and the kiosk says what is next", async ({
+  page,
+}) => {
+  await heldCheckIn(page);
+  const kiosk = page.getByTestId("kiosk");
+  await expect(kiosk).toHaveAttribute("data-k", "held");
+  await page.getByTestId("resolve-button").click();
 
-  await review(page, "approve");
-  await expect(held.getByText(/Approved by /)).toBeVisible();
-  await expect(page.getByText("Your chart is confirmed. Please wait to be called.")).toBeVisible();
-  await expect(page.getByText("A registrar is creating a new chart for you.")).toHaveCount(0);
+  // Approve beside the held check-in: one Confirm links the records and attaches the check-in.
+  // In REPLAY the hand-off pair is the hero pair, so this Confirm decides the check-in too and no
+  // separate attach row shows; decision.api.spec.ts covers the attach row on the API.
+  await page.getByTestId("approve-button").click();
+  await expect(page.getByTestId("attach-checkin")).toHaveCount(0);
+  await page.getByTestId("review-submit-button").click();
+  await expect(page.getByTestId("golden-record")).toBeVisible();
+  await expect(kiosk).toHaveAttribute("data-k", "done");
+  await expect(page.getByTestId("attach-checkin-button")).toHaveCount(0);
   // The kiosk never shows the allergy or the flag card.
-  await expect(page.getByTestId("flag-card")).toHaveCount(0);
+  await expect(kiosk.getByTestId("flag-card")).toHaveCount(0);
+  await expect(kiosk).not.toContainText("amoxicillin");
 });
 
-test("FrontDesk registrar: the approval that raises the flag shows it there, eased in, and opens the case", async ({
+test("FrontDesk registrar: the approval that raises the flag shows it on the Desk, said once, never an alert", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto("/frontdesk");
-  await page.getByRole("button", { name: "Use this" }).click();
-  await page.keyboard.press("Enter");
-  const held = page.getByTestId("registrar-held");
-  await expect(held).toContainText("Held check-ins (1)");
-  await expect(held.getByTestId("registrar-flag-summary")).toHaveCount(0);
+  await heldCheckIn(page);
+  await page.getByTestId("resolve-button").click();
+  await expect(page.getByTestId("flag-card")).toHaveCount(0);
 
   await review(page, "approve");
-  const summary = held.getByTestId("registrar-flag-summary");
-  await expect(summary).toBeVisible();
-  await expect(summary.getByTestId("registrar-flag-headline")).toHaveText(
-    "Penicillin V allergy (anaphylaxis) from Clinic CSV · active amoxicillin order from ER FHIR",
+  const flag = page.getByTestId("flag-card");
+  await expect(flag).toBeVisible();
+  await expect(flag.getByTestId("flag-card-headline")).toHaveText(
+    "Penicillin V allergy (anaphylaxis) on the Clinic record, and an active amoxicillin order on the Emergency room record. A clinician decides.",
   );
-  await expect(summary.getByTestId("registrar-flag-count")).toHaveText("1 safety flag on the linked chart");
-  const openCase = summary.getByRole("link", { name: "Open case" });
-  await expect(openCase).toBeFocused();
-  await expect(summary).toBeInViewport();
-  // Said once, politely: the summary itself is not a live region and nothing is an alert.
+  await expect(page.getByRole("heading", { name: "Flagged for clinician review" })).toBeFocused();
+  await expect(flag).toBeInViewport();
+  // Said once, politely: the notice itself is not a live region and nothing is an alert.
   await expect(page.getByRole("status")).toHaveText(
-    "Link approved. Flagged for clinician review: Penicillin V allergy (anaphylaxis) · active amoxicillin order. 1 safety flag on the linked chart.",
+    "Link approved. The two records are one record now. Flagged for clinician review: a rule found a documented allergy beside an active order.",
   );
-  await expect(summary.locator("[aria-live], [role=alert], [role=status]")).toHaveCount(0);
+  await expect(flag.locator("[aria-live], [role=alert], [role=status]")).toHaveCount(0);
   await expect(page.locator('main [role="alert"]')).toHaveCount(0);
-  const motion = await summary.evaluate((el) => {
-    const style = getComputedStyle(el);
-    return { duration: style.transitionDuration, easing: style.transitionTimingFunction };
-  });
-  expect(motion.duration).toBe("0.3s, 0.3s");
-  expect(motion.easing).toBe("cubic-bezier(0.16, 1, 0.3, 1), cubic-bezier(0.16, 1, 0.3, 1)");
-
-  await openCase.click();
-  await expect(page).toHaveURL(new RegExp(`/queue/${scenario.pair.pair.id}$`));
-  await expect(page.getByTestId("flag-card-headline")).toHaveText(
-    "Penicillin V allergy (anaphylaxis) from Clinic CSV · active amoxicillin order from ER FHIR",
-  );
 });
 
 // Landscape demo sizes and portrait kiosk sizes: no tooltip, open or closed, may add sideways scroll.
@@ -336,20 +362,21 @@ for (const viewport of SIDE_SCROLL_VIEWPORTS) {
     page,
   }) => {
     await page.setViewportSize(viewport);
-    await page.goto("/frontdesk");
+    await page.goto("/");
     await expect(page.getByRole("button", { name: "Use this" })).toBeVisible();
     expect(await sideScroll(page), "before a turn").toBeLessThanOrEqual(0);
 
     await page.getByRole("button", { name: "Use this" }).click();
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("gate-card")).toBeVisible();
-    await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (1)");
+    await expect(page.locator('[data-pane="held"]')).toBeVisible();
     expect(await sideScroll(page), "after a turn").toBeLessThanOrEqual(0);
 
-    // The staff pane is a landscape surface: approve there, then look again at this size.
+    // The Desk is a landscape surface: approve there, then look again at this size.
     await page.setViewportSize({ width: 1280, height: 720 });
+    await page.getByTestId("resolve-button").click();
     await review(page, "approve");
-    await expect(page.getByTestId("registrar-flag-summary")).toBeVisible();
+    await expect(page.getByTestId("flag-card")).toBeVisible();
     await page.setViewportSize(viewport);
     expect(await sideScroll(page), "after Approve").toBeLessThanOrEqual(0);
 
@@ -366,28 +393,31 @@ for (const viewport of SIDE_SCROLL_VIEWPORTS) {
   });
 }
 
-test("FrontDesk registrar: with reduced motion the flag summary appears without a transition", async ({
+test("FrontDesk registrar: with reduced motion the flag notice fades in place, without rising", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/frontdesk");
-  await page.getByRole("button", { name: "Use this" }).click();
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (1)");
+  await heldCheckIn(page);
+  await page.getByTestId("resolve-button").click();
   await review(page, "approve");
-  const summary = page.getByTestId("registrar-flag-summary");
-  await expect(summary).toBeVisible();
-  expect(await summary.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe("0s");
+  const card = page.getByTestId("flag-card").locator(".org-notice-card");
+  await expect(card).toBeVisible();
+  // Under reduced motion the morph is a crossfade (record/motion.ts): no rise, no clip, at any frame.
+  const style = await card.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { transform: s.transform, clipPath: s.clipPath };
+  });
+  expect(style).toEqual({ transform: "none", clipPath: "none" });
 });
 
 test("FrontDesk Start over: a new check-in starts at once and the next message is sent", async ({ page }) => {
-  await page.goto("/frontdesk");
+  await page.goto("/");
   await page.getByRole("button", { name: "Use this" }).click();
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("registrar-held")).toBeVisible();
+  await expect(page.locator('[data-kiosk="held"]')).toHaveCount(1);
   await page.getByRole("button", { name: "Start over" }).click();
-  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
-  await expect(page.getByText("No held check-ins.")).toBeVisible();
+  await expect(page.getByTestId("kiosk")).toHaveAttribute("data-k", "idle");
+  await expect(page.locator('[data-kiosk="idle"]')).toHaveCount(1);
   await page.getByTestId("kiosk-composer").fill("I have an appointment at three.");
   await expect(page.getByTestId("kiosk-send")).toBeEnabled();
   await page.getByTestId("kiosk-send").click();
@@ -399,25 +429,24 @@ test("FrontDesk Start over: a new check-in starts at once and the next message i
 test("FrontDesk Reset demo: clears the kiosk and the held check-in; the next message starts a new check-in", async ({
   page,
 }) => {
-  await page.goto("/frontdesk");
+  await page.goto("/");
   await page.getByRole("button", { name: "Use this" }).click();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("gate-card")).toBeVisible();
-  await expect(page.getByTestId("registrar-held")).toBeVisible();
+  await expect(page.locator('[data-kiosk="held"]')).toHaveCount(1);
   await page.getByRole("button", { name: "Reset demo" }).click();
-  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
+  await expect(page.getByTestId("kiosk")).toHaveAttribute("data-k", "idle");
   await expect(page.getByTestId("gate-card")).toHaveCount(0);
-  await expect(page.getByTestId("registrar-held")).toHaveCount(0);
-  await expect(page.getByText("No held check-ins.")).toBeVisible();
+  await expect(page.locator('[data-kiosk="held"]')).toHaveCount(0);
   await page.getByRole("button", { name: "Use this" }).click();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("gate-card")).toBeVisible();
-  await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (1)");
+  await expect(page.locator('[data-kiosk="held"]')).toHaveCount(1);
   await expect(page.getByText("could not reach the agent service")).toHaveCount(0);
 });
 
 test("FrontDesk tool chips carry no mode-specific suffix", async ({ page }) => {
-  await page.goto("/frontdesk");
+  await page.goto("/");
   await page.getByRole("button", { name: "Use this" }).click();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("tool-call-chip")).toHaveCount(2);
@@ -425,7 +454,7 @@ test("FrontDesk tool chips carry no mode-specific suffix", async ({ page }) => {
 });
 
 test("FrontDesk: other text gets the template answer and no tool runs", async ({ page }) => {
-  await page.goto("/frontdesk");
+  await page.goto("/");
   await page.getByTestId("kiosk-composer").fill("I have an appointment at three.");
   await page.getByTestId("kiosk-send").click();
   await expect(page.getByText("automatic message")).toBeVisible();
@@ -455,10 +484,22 @@ for (const scheme of ["light", "dark"] as const) {
           .map((el) => el.outerHTML.slice(0, 80));
       });
       expect(reds, route).toEqual([]);
-      // The evidence tokens themselves, not just the bars the fixture happens to draw.
+      // The colour tokens themselves, not just what the fixture happens to draw: the record's
+      // mulberry family, the working glow, the gate's amber and the ink the evidence is drawn in.
       const tokens = await page.evaluate(() => {
         const cs = getComputedStyle(document.documentElement);
-        return ["--evidence-against", "--evidence-for"].map((name) => cs.getPropertyValue(name).trim());
+        return [
+          "--mulberry",
+          "--mulberry-deep",
+          "--mulberry-tint",
+          "--mulberry-cite",
+          "--glow",
+          "--amber-surface",
+          "--amber-line",
+          "--amber-ink",
+          "--ink",
+          "--ink-3",
+        ].map((name) => cs.getPropertyValue(name).trim());
       });
       for (const token of tokens) {
         const m = token.match(/^#([0-9a-f]{6})$/i);
