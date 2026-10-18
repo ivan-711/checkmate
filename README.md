@@ -14,7 +14,7 @@ At build time:
 - Coding agents built each lane in its own git worktree from a one-page build brief (`CLAUDE.md`, mirrored as `AGENTS.md`) and the lane's spec section.
 - A paired adversarial reviewer agent reviewed lane pull requests: it ran the app and the acceptance script, wrote tests meant to fail, and posted PASS or BLOCK on the pull request.
 - Codex, in a read-only sandbox, reviewed several pull requests. The build brief also called for GitHub Copilot code review, but it did not run on any merged pull request.
-- The evaluation harness ran on every merge to `main` and posted per-band precision and recall with n.
+- The evaluation harness ran on most merges to `main` once CI landed and posted per-band precision and recall with n as a commit comment. A few runs were cancelled by a newer push or stopped on a failed job and posted nothing.
 - A human clicked every merge until 17:15 CT on Saturday. After that, the lead orchestration session merged pull requests under the owner's standing authorization, normally once CI was green, the paired reviewer had posted PASS and a second review had passed. On the subset of pull requests Codex reviewed, that second review was Codex's cross-review; on others it was the lead session's own review. Two small pull requests on Sunday morning (the evaluation sweep and the never-say list) merged on green CI and the lead session's own reading of the diff, with the owner's approval. Either of us could still click merge.
 
 Separately, the running app can use a model. In `LIVE` mode Gemini runs the intake conversation, the language handling and the tool arguments (`backend/frontdesk/gemini.py`). The API starts in `REPLAY` mode (`backend/app/config.py`, `docker-compose.yml`), where a committed transcript stands in for the model and plays through the real gate, matcher and database (`backend/frontdesk/replay.py`). That transcript is marked `AUTHORED`: the team wrote it from the call shapes a Gemini spike verified; it is not a recorded model run (`data/scenarios/hero/frontdesk_transcript.json`). In every mode, matching, the rules gate, the allergy rule and the approval are deterministic code or a human decision, so no language model is on the decision path.
@@ -147,10 +147,11 @@ The harness measures the code the app runs: the synthetic corpus built from the 
 
 ### Held-out test partition
 
-Source: harness run 1c3f8f96, with a committed copy of the run's metrics in `docs/eval/run-1c3f8f96-metrics.json`. The run directory itself is in the gitignored `eval/runs/`; reproduce the run with the eval command below.
+Source: harness run 1c3f8f96, with a committed copy of the run's metrics in `docs/eval/run-1c3f8f96-metrics.json`. In that copy every cell the harness flags "do not read" has its value withheld (null). The run directory itself is in the gitignored `eval/runs/`; reproduce the run with the eval command below.
 
 - The run scored the development partition out of fold, then scored the test partition once. The test partition holds 144 of the 500 dependency components. They are kept out of the development scoring and the cutoff selection (manifest `regime`: "development + single test pass"; split rules in `eval/expectations/splits.json`).
 - Settings: seed 20261017, scorer `handset-1`, threshold row `provisional-1` (`c_low` 0.0, `c_high` 4.0). Every band number is computed at that row; auto-link is off in the app, so the `AUTO_LINK` rows describe the band only.
+- The top-level `thresholds` block in the metrics copy (`c_low` -0.35, `c_high` 0.44375, id `oof-4dc28f256de9`) is the harness's out-of-fold proposal, recorded as descriptive; this run did not use it and banded every pair at `provisional-1` (`c_low` 0.0, `c_high` 4.0), as the run manifest records.
 - The run was made at commit `95be994`, an ancestor of `main`. `backend/core`, `backend/ingest` and `eval/harness` are unchanged since then, and the engine hash recorded in the run equals the hash of `backend/core` on `main`.
 - Intervals are 95% percentile bootstrap intervals over dependency components, with 1000 resamples.
 - A number is not reported when the harness flags it "do not read": under 30 components or under 100 pairs (`eval/harness/metrics.py`).
