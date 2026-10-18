@@ -166,6 +166,8 @@ Source: harness run 1c3f8f96 (local `eval/runs/`, gitignored; reproduce with the
 | Review burden | 0.681319 | 0.567974 to 0.794252 | 273 | 122 |
 | Blocking recall | 0.898148 | 0.845794 to 0.946433 | 216 | 125 |
 
+Read the STRICT row with the design in mind. Auto-linking is meant to be rare: the high cutoff is chosen false-merge first, and auto-link is off in the demo (`auto_link_enabled = false`, `contracts/models/thresholds.py`), so no link is ever made without a person. The thresholds send most true pairs to a registrar (REVIEW share of true pairs 0.865979): the STRICT row counts only the pairs the system would link with no human, while LENIENT recall (0.847222) counts the pairs a registrar is shown. The weights are hand-set (`handset-1`), not trained, so these are demo numbers, not a claim about a trained matcher.
+
 What the rows mean (`eval/harness/metrics.py`):
 - Strict recall counts true pairs that land in `AUTO_LINK`. Lenient recall counts true pairs that land in `AUTO_LINK` or `REVIEW`. Both are taken over all true pairs, including pairs that blocking missed.
 - Review burden is the share of scored pairs that go to `REVIEW`.
