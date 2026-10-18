@@ -35,7 +35,7 @@ export function FlagCard({ state }: { state: FlagState }) {
     >
       <header className="mb-2 flex flex-wrap items-center gap-2">
         <Flag aria-hidden size={20} />
-        <h2 id="flag-heading" className="text-[18px] font-semibold uppercase tracking-wider">
+        <h2 id="flag-heading" tabIndex={-1} className="text-[18px] font-semibold uppercase tracking-wider">
           Flagged for clinician review
         </h2>
         {alert.constructedScenario && <ConstructedChip />}

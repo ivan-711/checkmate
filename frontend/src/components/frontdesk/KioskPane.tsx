@@ -26,6 +26,24 @@ const LANGUAGES: { value: KioskLanguage; label: string }[] = [
   { value: "es", label: "Español" },
 ];
 
+/** The pane the kiosk scrolls in when the panes sit side by side (globals.css, .pane); null when
+ * they stack and the page scrolls. */
+function scrollPane(el: Element): HTMLElement | null {
+  for (let box = el.parentElement; box; box = box.parentElement) {
+    if (/auto|scroll/.test(getComputedStyle(box).overflowY)) return box;
+  }
+  return null;
+}
+
+/** How a new gate card's row (the tool chip, then the card) scrolls into view: the whole row when
+ * it fits; else its foot, which shows the whole card; else its top, so the card's top shows. */
+function gateRowBlock(row: HTMLElement, card: HTMLElement): ScrollLogicalPosition {
+  const margin = parseFloat(getComputedStyle(row).scrollMarginTop) || 0;
+  const room = (scrollPane(row)?.clientHeight ?? window.innerHeight) - 2 * margin;
+  if (row.offsetHeight <= room) return "nearest";
+  return card.offsetHeight <= room ? "end" : "start";
+}
+
 /** The denied new chart that a registrar now holds: the card the demo is about. */
 function gateDenial(call: ToolCallRecord) {
   const candidate = call.candidates?.[0];
@@ -111,7 +129,8 @@ function Turn({
       {calls.map((call) => {
         const candidate = gateDenial(call);
         return (
-          <li key={call.id} className="space-y-2">
+          // scroll-my-4: a gate card scrolled into view keeps 16 px from the pane's edge.
+          <li key={call.id} className="scroll-my-4 space-y-2">
             <ToolCallChip call={call} t={t} hasGateCard={!!candidate} />
             {candidate && <GateCard ref={gateRef} call={call} candidate={candidate} t={t} />}
           </li>
@@ -211,12 +230,6 @@ export function KioskPane() {
     wasResetting.current = resetting;
   }, [resetting]);
   const gateCount = turns.filter((turn) => (turn.toolCalls ?? []).some((c) => gateDenial(c))).length;
-  useEffect(() => {
-    // A new gate card always scrolls fully into view: it is the moment the demo is about.
-    if (gateCount === 0) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    gateCard.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
-  }, [gateCount]);
 
   function submit() {
     const message = text.trim();
@@ -233,6 +246,35 @@ export function KioskPane() {
   const held = session.data?.registration?.state === "PENDING_REGISTRAR" && decided === null;
   const pending = send.isPending ? send.variables?.text : null;
   const failedText = failed && failed.sessionId === session.data?.id ? failed.text : null;
+
+  // New lines come into view. A new gate card comes first: its row is scrolled into view, the whole
+  // card at least (it is the moment the demo is about; the row, as the card's entrance transform
+  // would skew the card), and lines under it may stay below. Otherwise the newest line scrolls into
+  // view when a turn, a decision, a "reading" row or a failure is added; the "reading" row going
+  // away is not an addition, so it never pulls the gate card off. Side by side only the kiosk pane
+  // scrolls (globals.css, .pane); stacked, only a new gate card moves the page, so a registrar's
+  // decision never pulls the page away from the staff pane.
+  const transcript = useRef<HTMLOListElement>(null);
+  const shown = useRef({ turns: 0, gates: 0, decided: null as string | null, pending: false, failed: false });
+  useEffect(() => {
+    const was = shown.current;
+    const now = { turns: turns.length, gates: gateCount, decided, pending: !!pending, failed: !!failedText };
+    shown.current = now;
+    const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    const card = gateCard.current;
+    const row = card?.parentElement;
+    if (now.gates > was.gates && card && row) {
+      row.scrollIntoView({ block: gateRowBlock(row, card), behavior });
+      return;
+    }
+    const added =
+      now.turns > was.turns ||
+      (now.decided !== null && now.decided !== was.decided) ||
+      (now.pending && !was.pending) ||
+      (now.failed && !was.failed);
+    const last = transcript.current?.lastElementChild;
+    if (added && last && scrollPane(last)) last.scrollIntoView({ block: "nearest", behavior });
+  }, [turns.length, gateCount, decided, pending, failedText]);
 
   return (
     <section lang={language} aria-labelledby="kiosk-label" className="flex min-w-0 flex-col gap-4">
@@ -319,7 +361,7 @@ export function KioskPane() {
             // pt-4 matches the 16 px gap to the composer below, so the line sits centred between them.
             <p className="m-auto pt-4 text-center text-ink-3">{t.empty}</p>
           ) : (
-            <ol aria-live="off" className="mt-3 flex flex-col gap-3">
+            <ol ref={transcript} aria-live="off" className="mt-3 flex flex-col gap-3">
               {turns.map((turn) => (
                 <Turn key={turn.turnIndex} turn={turn} t={t} gateRef={(el) => (gateCard.current = el)} />
               ))}
