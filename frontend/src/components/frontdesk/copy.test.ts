@@ -21,4 +21,14 @@ describe("FrontDesk copy", () => {
     expect(sourceSystemLabel("CLINIC_CSV")).toBe("Clinic CSV");
     expect(sourceSystemLabel("ER_FHIR")).toBe("ER FHIR");
   });
+  it("carries the trust lines in both languages", () => {
+    expect(COPY.en.promise).toBe("Nothing is linked to your chart until a staff member approves.");
+    expect(COPY.es.promise).toBe(
+      "No se vincula nada a su expediente hasta que un miembro del personal lo apruebe.",
+    );
+    expect(COPY.en.heldFinish).toBe("Held for review. No records were linked.");
+    expect(COPY.es.heldFinish).toBe("En espera de revisión. No se vinculó ningún expediente.");
+    expect(COPY.en.verified).toBe("Verified");
+    expect(COPY.es.verified).toBe("Verificado");
+  });
 });

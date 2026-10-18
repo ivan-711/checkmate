@@ -1,6 +1,7 @@
 "use client";
 
 import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { IntakeSession, IntakeTurn, ToolCallRecord } from "@/api/types";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
@@ -14,6 +15,8 @@ import { needsNewCheckIn } from "./checkIn";
 import { GateCard } from "./GateCard";
 import { HANDOFF_KEY, INTAKE_KEY, useHandoffPairs } from "./intake";
 import { ToolCallChip } from "./ToolCallChip";
+import { turnSteps } from "./turnSteps";
+import { VerifiedTag } from "./VerifiedTag";
 
 const MAX_CHARS = 280; // UX 3.11 composer limit; the contract allows 500
 const COUNTER_FROM = 240;
@@ -30,6 +33,8 @@ function gateDenial(call: ToolCallRecord) {
   return held && candidate ? candidate : null;
 }
 
+/** Words the model wrote are set in the gray agent tone; text the system wrote (templates, the
+ * gate's hand-off, the registrar's outcome) is a fact and stays near-black. */
 function Agent({ text, automatic, t }: { text: string; automatic: boolean; t: KioskCopy }) {
   return (
     <li className="max-w-[80%] text-[20px]">
@@ -37,7 +42,45 @@ function Agent({ text, automatic, t }: { text: string; automatic: boolean; t: Ki
         {t.speaker}
         {automatic && <span className="ml-2 font-normal text-ink-3">{t.automatic}</span>}
       </p>
-      <p>{text}</p>
+      <p data-voice={automatic ? "system" : "agent"} className={automatic ? "text-ink-1" : "text-ink-2"}>
+        {text}
+      </p>
+    </li>
+  );
+}
+
+/** The turn as a past-tense checklist whose last line is the gate's fact (HELD or PASSED). */
+function Steps({ turn, t }: { turn: IntakeTurn; t: KioskCopy }) {
+  const steps = turnSteps(turn, t);
+  if (!steps) return null;
+  const { fact } = steps;
+  return (
+    <li data-testid="turn-steps">
+      <ol aria-label={t.stepsLabel} className="space-y-1 text-[18px]">
+        {steps.done.map((step) => (
+          <li key={step} className="flex items-center gap-2 text-ink-2">
+            <Check aria-hidden size={18} className="shrink-0" />
+            {step}
+          </li>
+        ))}
+        <li
+          data-testid="gate-fact"
+          data-voice="verified"
+          data-outcome={fact.outcome}
+          className={`flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-l-4 bg-surface px-3 py-2 text-ink-1 ${
+            fact.outcome === "HELD" ? "border-denied-border border-l-gate-bar" : "border-allowed-border"
+          }`}
+        >
+          <ShieldCheck aria-hidden size={18} className="shrink-0" />
+          <span>{t.gateName}:</span>
+          <span className="font-semibold">{fact.label}</span>
+          {fact.reason && <span className="font-mono text-[16px]">{fact.reason}</span>}
+          <span className="font-mono text-[16px] text-ink-2">{fact.policy}</span>
+          <span className="ml-auto">
+            <VerifiedTag label={t.verified} />
+          </span>
+        </li>
+      </ol>
     </li>
   );
 }
@@ -58,6 +101,7 @@ function Turn({
       <li className="ml-auto max-w-[80%] rounded-lg border border-border-subtle bg-surface px-4 py-3 text-[20px]">
         {turn.userText}
       </li>
+      <Steps turn={turn} t={t} />
       {calls.map((call) => {
         const candidate = gateDenial(call);
         return (
@@ -179,6 +223,8 @@ export function KioskPane() {
   }
 
   const agentMode = session.data?.agentMode;
+  // Held and not yet decided: say what did not happen, so the patient is not left guessing.
+  const held = session.data?.registration?.state === "PENDING_REGISTRAR" && decided === null;
   const pending = send.isPending ? send.variables?.text : null;
   const failedText = failed && failed.sessionId === session.data?.id ? failed.text : null;
 
@@ -187,7 +233,10 @@ export function KioskPane() {
       <h2 id="kiosk-label" className="text-[16px] font-semibold uppercase tracking-wider text-ink-3">
         {t.pane}
       </h2>
-      <div className="flex min-h-[560px] flex-col gap-4 rounded-lg border border-border-subtle bg-kiosk p-6">
+      <div
+        data-working={send.isPending}
+        className="kiosk-frame flex min-h-[560px] flex-col gap-4 rounded-lg border border-border-subtle bg-kiosk p-6"
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[24px] font-semibold">FrontDesk</span>
           <div
@@ -268,6 +317,11 @@ export function KioskPane() {
               {turns.map((turn) => (
                 <Turn key={turn.turnIndex} turn={turn} t={t} gateRef={(el) => (gateCard.current = el)} />
               ))}
+              {held && (
+                <li data-testid="kiosk-finish-held" className="text-[20px] font-semibold text-ink-1">
+                  {t.heldFinish}
+                </li>
+              )}
               {decided === "LINKED" && <Agent text={t.approved} automatic t={t} />}
               {decided === "REJECTED" && <Agent text={t.rejected} automatic t={t} />}
               {pending && (
@@ -338,6 +392,9 @@ export function KioskPane() {
             {text.length >= COUNTER_FROM && (
               <span className="ml-2 tabular-nums">{t.counter(text.length)}</span>
             )}
+          </p>
+          <p data-testid="kiosk-promise" className="text-[18px] text-ink-1">
+            {t.promise}
           </p>
         </form>
         {turns.length === 0 && (

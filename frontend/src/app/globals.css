@@ -234,3 +234,22 @@ body {
     background: var(--info);
   }
 }
+
+/* FrontDesk: a soft accent glow at the kiosk edge while the agent works on a turn. It fades in
+   and out once with the state (DESIGN.md: motion marks a real state change; no pulsing), never
+   amber or red, and is absent under reduced motion. */
+.kiosk-frame {
+  transition: box-shadow var(--dur-move) var(--ease-out-strong);
+}
+.kiosk-frame[data-working="true"] {
+  box-shadow:
+    0 0 0 2px var(--accent-soft),
+    0 0 24px 2px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-frame,
+  .kiosk-frame[data-working="true"] {
+    transition: none;
+    box-shadow: none;
+  }
+}

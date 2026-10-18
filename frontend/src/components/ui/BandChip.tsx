@@ -14,13 +14,22 @@ export const BAND_LABELS = {
   KEEP_SEPARATE: BANDS.KEEP_SEPARATE.label,
 } as const satisfies Record<Band, string>;
 
-/** `label` replaces the English text where the screen is in another language (the kiosk). */
-export function BandChip({ band, label: override }: { band: Band; label?: string }) {
+/** `label` replaces the English text where the screen is in another language (the kiosk);
+ * `kiosk` sets it at 16 px, the kiosk's smallest text size. */
+export function BandChip({
+  band,
+  label: override,
+  kiosk = false,
+}: {
+  band: Band;
+  label?: string;
+  kiosk?: boolean;
+}) {
   const { label, Icon, className } = BANDS[band];
   return (
     <span
       data-testid="band-chip"
-      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[14px] font-semibold ${className}`}
+      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 ${kiosk ? "text-[16px]" : "text-[14px]"} font-semibold ${className}`}
     >
       <Icon aria-hidden size={16} />
       {override ?? label}
