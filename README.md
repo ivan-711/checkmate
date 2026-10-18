@@ -175,6 +175,33 @@ What the rows mean (`eval/harness/metrics.py`):
 - Review burden is the share of scored pairs that go to `REVIEW`.
 - Blocking recall is the share of true pairs that blocking puts forward as candidate pairs: 194 of 216. The run itself notes that the keys were built after reading the corruption taxonomy, so this number is partly true by construction.
 
+### Parallel evaluation sweep
+
+`eval/sweep/` runs the harness over several seeds in parallel and reports each metric's mean and 95% interval across seeds; the interval is a two-sided Student t interval on the per-seed values (`eval/sweep/results.py`). `--executor` chooses where the runs happen: `local` is a process pool on this machine, `modal` is Modal and needs a token from `uvx modal token new`, and `auto`, the default, uses Modal when a token is configured and the local pool otherwise (`eval/sweep/executors.py`).
+
+```sh
+uvx modal token new
+uv run modal volume create checkmate-synthea-raw
+uv run modal volume put checkmate-synthea-raw data/raw/zips /zips
+uv run python -m eval.sweep --seeds 20261017 20261018 20261019 20261020 20261021 --scorer-versions handset-1 --tiers synthea --executor modal
+```
+
+The Modal volume holds the Synthea archives that `data/download.py` leaves in `data/raw/zips`. With `--executor local` the same sweep runs on the local pool and needs neither the token nor the volume. Each sweep writes `eval/runs/sweeps/<utc>-<sha12>/sweep.json`.
+
+Development pass, five seeds (20261017 to 20261021), scorer `handset-1`, executor Modal, held-out families excluded; not the held-out test pass above.
+
+| Number | Mean across seeds | 95% interval across seeds |
+|---|---|---|
+| AUTO_LINK precision | not reported (harness floor) | n/a |
+| REVIEW precision | 0.901 | 0.864 to 0.939 |
+| LENIENT recall (end to end) | 0.889 | 0.874 to 0.904 |
+| KEEP_SEPARATE precision | not reported (harness floor) | n/a |
+| False-merge rate (auto-links) | not reported (harness floor) | n/a |
+| Review burden | 0.747 | 0.722 to 0.771 |
+| Blocking recall | 0.925 | 0.913 to 0.937 |
+
+Every seed uses the same 555-patient Synthea sample, so the interval measures variation between generated corpora only. Modal and the local pool gave identical numbers on all five seeds.
+
 ### Running the harness
 
 The harness has no Makefile target; run it with `uv`. It needs the Synthea sample from `data/download.py`.
@@ -244,7 +271,7 @@ Contract routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the co
 | `contracts/` | lead session | The frozen contract, tag `contracts-v1`, plus additive routes (`contracts/README.md`) |
 | `backend/` | W1, W2, W3a, W3b and wave 2 | API routes (`backend/api/`), FrontDesk agent loop (`backend/frontdesk/`), rules gate (`backend/policy/`), chart-store writes (`backend/chart_store/`), matching core (`backend/core/`), links, golden record, timeline and rule (`backend/link/`, `backend/golden/`, `backend/rule/`), event writer (`backend/events/`), loader (`backend/ingest/`), scenario loading (`backend/scenarios/`), tests (`backend/tests/`) |
 | `frontend/` | W4 and wave 2 UI lanes | Next.js app: FrontDesk, Case and Work queue screens (`frontend/src/`), design rules (`frontend/DESIGN.md`), unit tests beside the code, Playwright specs (`frontend/e2e/`) |
-| `eval/` | W5, Q2, Q5 | Evaluation harness (`eval/harness/`), protected expectations (`eval/expectations/`), the G16 acceptance script (`eval/acceptance/`), tests (`eval/tests/`, `eval/tests_r5/`) |
+| `eval/` | W5, Q2, Q5 | Evaluation harness (`eval/harness/`), protected expectations (`eval/expectations/`), the G16 acceptance script (`eval/acceptance/`), the parallel seed sweep (`eval/sweep/`), tests (`eval/tests/`, `eval/tests_r5/`) |
 | `data/` | W1, W5 | `data/download.py` and `data/HASHES.json`; hero selector and export (`data/hero_select.py`, `data/hero_export.py`, `data/hero_overlay.py`), `data/fixture_check.py`, and the exported hero with the replay transcript in `data/scenarios/hero/`; raw data stays gitignored |
 | `docs/` | D1, D2, D3 | `docs/LICENSES.md`, `docs/devpost-outline.md` |
 | `tools/` | Q15 | Empty |
