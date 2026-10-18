@@ -194,7 +194,19 @@ export function KioskPane() {
               </button>
             )}
           </div>
-          {turns.length === 0 && !pending ? (
+          {session.isError ? (
+            <div data-testid="kiosk-start-error" className="m-auto text-center text-[16px]">
+              <p>{t.startFailed}</p>
+              <p className="text-ink-3">{session.error.message}</p>
+              <button
+                type="button"
+                onClick={() => void session.refetch()}
+                className="mt-1 font-semibold text-accent underline underline-offset-2"
+              >
+                {t.tryAgain}
+              </button>
+            </div>
+          ) : turns.length === 0 && !pending ? (
             <p className="m-auto text-ink-3">{t.empty}</p>
           ) : (
             <ol aria-live="off" className="mt-3 flex flex-col gap-3">
