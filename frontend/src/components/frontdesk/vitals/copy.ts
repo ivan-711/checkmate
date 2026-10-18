@@ -5,6 +5,7 @@ import type { KioskLanguage } from "../copy";
 export const VITALS_COPY = {
   en: {
     heading: "Pulse (optional)",
+    label: "Constructed, non-diagnostic",
     consent:
       "Optional: estimate your pulse with the camera while we look up your record. Nothing is saved or shared.",
     accept: "Estimate my pulse",
@@ -23,6 +24,7 @@ export const VITALS_COPY = {
   },
   es: {
     heading: "Pulso (opcional)",
+    label: "Construido, no diagnóstico",
     consent:
       "Opcional: calcule su pulso con la cámara mientras buscamos su expediente. No se guarda ni se comparte nada.",
     accept: "Calcular mi pulso",

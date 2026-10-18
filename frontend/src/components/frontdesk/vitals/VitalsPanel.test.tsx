@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VITALS_COPY } from "./copy";
 import { createPulseEngine, type PulseEngine, type PulseReading } from "./engine";
-import VitalsPanel, { MEASURE_SECONDS } from "./VitalsPanel";
+import VitalsPanel, { MEASURE_SECONDS, VITALS_TIMEOUT_MS } from "./VitalsPanel";
 
 vi.mock("./engine", async (original) => ({
   ...(await original<typeof import("./engine")>()),
@@ -42,7 +42,7 @@ async function click(id: string) {
 }
 
 beforeEach(() => {
-  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout", "Date"] });
   track = { stop: vi.fn() };
   const stream = { getTracks: () => [track] } as unknown as MediaStream;
   getUserMedia = vi.fn().mockResolvedValue(stream);
@@ -61,8 +61,16 @@ afterEach(async () => {
   container.remove();
   vi.useRealTimers();
   vi.unstubAllGlobals();
-  vi.clearAllMocks();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
+
+/** The library never finishes loading: the run stays in "starting" until something ends it. */
+function libraryNeverLoads() {
+  vi.mocked(createPulseEngine).mockReturnValue(new Promise<PulseEngine>(() => undefined));
+}
+
+const stopButton = () => byTestId("vitals-stop") as HTMLButtonElement | null;
 
 describe("VitalsPanel", () => {
   it("asks first and always shows the footer", async () => {
@@ -129,14 +137,71 @@ describe("VitalsPanel", () => {
     root = createRoot(container); // afterEach unmounts again
   });
 
-  it("stops the camera when the patient presses Stop", async () => {
+  it("stops the camera when the patient presses Stop and says no reading was taken", async () => {
     engineReports({ bpm: 70, confidence: 0.9 });
     await render();
     await click("vitals-accept");
-    const stop = [...container.querySelectorAll("button")].find((b) => b.textContent === en.stop)!;
-    await act(async () => stop.click());
+    expect(stopButton()?.textContent).toBe(en.stop);
+    await click("vitals-stop");
     expect(track.stop).toHaveBeenCalled();
-    expect(byTestId("vitals-status")?.textContent).toBe(en.declined);
+    expect(engine.stop).toHaveBeenCalled();
+    expect(byTestId("vitals-countdown")).toBeNull();
+    expect(byTestId("vitals-status")?.textContent).toBe(en.stopped);
+  });
+
+  it("offers Stop from the moment the camera opens, before the library has loaded", async () => {
+    libraryNeverLoads();
+    await render();
+    await click("vitals-accept");
+    expect(byTestId("vitals-status")?.textContent).toBe(en.starting);
+    expect(stopButton()).not.toBeNull();
+    await click("vitals-stop");
+    expect(track.stop).toHaveBeenCalled();
+    expect(byTestId("vitals-status")?.textContent).toBe(en.stopped);
+  });
+
+  it("gives up 45 s after the patient says yes when the library never gets going", async () => {
+    libraryNeverLoads();
+    await render();
+    await click("vitals-accept");
+    await act(async () => vi.advanceTimersByTimeAsync(VITALS_TIMEOUT_MS - 1));
+    expect(byTestId("vitals-status")?.textContent).toBe(en.starting);
+    expect(track.stop).not.toHaveBeenCalled();
+
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(track.stop).toHaveBeenCalled();
+    expect(byTestId("vitals-status")?.textContent).toBe(en.timedOut);
+    expect(stopButton()).toBeNull();
+  });
+
+  it("bounds the whole run at 45 s, countdown included, when starting took long", async () => {
+    const slowStart = VITALS_TIMEOUT_MS - (MEASURE_SECONDS * 1000) / 2; // the countdown cannot finish in time
+    vi.mocked(createPulseEngine).mockImplementation(
+      () => new Promise<PulseEngine>((resolve) => setTimeout(() => resolve(engine as unknown as PulseEngine), slowStart)),
+    );
+    engineReports({ bpm: 70, confidence: 0.9 });
+    await render();
+    await click("vitals-accept");
+    await act(async () => vi.advanceTimersByTimeAsync(slowStart));
+    expect(byTestId("vitals-countdown")).not.toBeNull();
+
+    await act(async () => vi.advanceTimersByTimeAsync(VITALS_TIMEOUT_MS - slowStart));
+    expect(byTestId("vitals-result")).toBeNull();
+    expect(container.textContent).not.toContain("70");
+    expect(byTestId("vitals-status")?.textContent).toBe(en.timedOut);
+    expect(track.stop).toHaveBeenCalled();
+    expect(engine.stop).toHaveBeenCalled();
+  });
+
+  it("keeps a finished reading; the 45 s bound never fires after the run ended", async () => {
+    engineReports({ bpm: 70, confidence: 0.9 });
+    await render();
+    await click("vitals-accept");
+    await act(async () => vi.advanceTimersByTimeAsync(MEASURE_SECONDS * 1000));
+    expect(byTestId("vitals-result")?.textContent).toBe(en.result(70));
+    await act(async () => vi.advanceTimersByTimeAsync(VITALS_TIMEOUT_MS));
+    expect(byTestId("vitals-result")?.textContent).toBe(en.result(70));
+    expect(byTestId("vitals-status")).toBeNull();
   });
 
   it("says the camera isn't available when access is refused, and loads nothing", async () => {
@@ -145,6 +210,16 @@ describe("VitalsPanel", () => {
     await click("vitals-accept");
     expect(byTestId("vitals-status")?.textContent).toBe(en.unavailable);
     expect(createPulseEngine).not.toHaveBeenCalled();
+  });
+
+  it("logs why no reading could be taken, without any frame or record", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const refused = new DOMException("denied", "NotAllowedError");
+    getUserMedia.mockRejectedValue(refused);
+    await render();
+    await click("vitals-accept");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("vitals"), refused);
   });
 
   it("releases the camera when the library cannot start", async () => {
@@ -159,6 +234,15 @@ describe("VitalsPanel", () => {
     await render("es");
     expect(container.textContent).toContain(VITALS_COPY.es.consent);
     expect(byTestId("vitals-footer")?.textContent).toBe(VITALS_COPY.es.footer);
+    expect(byTestId("vitals-label")?.textContent).toBe(VITALS_COPY.es.label);
+  });
+
+  it("labels itself constructed and non-diagnostic beside the footer, in every phase", async () => {
+    await render();
+    expect(byTestId("vitals-label")?.textContent).toBe(en.label);
+    expect(byTestId("vitals-footer")?.textContent).toBe(en.footer);
+    await click("vitals-decline");
+    expect(byTestId("vitals-label")?.textContent).toBe(en.label);
   });
 
   it("offers a recorded clip instead of the webcam with ?vitalsSource=file", async () => {
@@ -168,6 +252,19 @@ describe("VitalsPanel", () => {
       await click("vitals-accept");
       expect(byTestId("vitals-file")).not.toBeNull();
       expect(getUserMedia).not.toHaveBeenCalled();
+    } finally {
+      window.history.replaceState(null, "", "/");
+    }
+  });
+
+  it("ignores ?vitalsSource=file in a production build and opens the webcam", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    window.history.replaceState(null, "", "/frontdesk?vitalsSource=file");
+    try {
+      await render();
+      await click("vitals-accept");
+      expect(byTestId("vitals-file")).toBeNull();
+      expect(getUserMedia).toHaveBeenCalledTimes(1);
     } finally {
       window.history.replaceState(null, "", "/");
     }
