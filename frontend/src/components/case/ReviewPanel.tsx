@@ -1,7 +1,7 @@
 "use client";
 
 import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useRef, useState, type Ref } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from "react";
 import type {
   CandidatePairDetail,
   MatchDecision,
@@ -54,9 +54,11 @@ function DecisionLine({
 interface Props {
   detail: CandidatePairDetail;
   onDecided: (response: ReviewResponse) => void;
+  /** Shown right under the decision line: what the decision led to, where the caller has it. */
+  children?: ReactNode;
 }
 
-export function ReviewPanel({ detail, onDecided }: Props) {
+export function ReviewPanel({ detail, onDecided, children }: Props) {
   const source = useDataSource();
   const queryClient = useQueryClient();
   const ids = useId();
@@ -153,6 +155,7 @@ export function ReviewPanel({ detail, onDecided }: Props) {
         Review
       </h2>
       <DecisionLine decision={decision} lineRef={decisionRef} />
+      {children}
       {decision.status !== "LINKED" && (
         <>
           <div className="grid grid-cols-[8rem_1fr] items-center gap-x-3 gap-y-2">
