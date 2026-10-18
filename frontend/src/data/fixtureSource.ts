@@ -131,14 +131,24 @@ export class FixtureSource implements DataSource {
    * AGENT_GATE counting every gate outcome so far (agent actions are not undone by a reset). */
   async getTiles(): Promise<TilesResponse> {
     const reviews = this.current.history.filter((d) => d.actorType === "REGISTRAR").length;
-    const gate = this.intake.gateCounts;
+    // Each outcome in the 5-minute bucket it happened in, never in the fixture's 18:00 snapshot
+    // bucket; like the API, only series with a count get a row.
+    const gate = [...this.intake.gateCounts].flatMap(([bucket, counts]) =>
+      (["ALLOW", "DENY"] as const)
+        .filter((series) => counts[series] > 0)
+        .map((series) => ({
+          bucket,
+          series,
+          count: counts[series],
+          meanLatencyMs: null,
+          maxLatencyMs: null,
+        })),
+    );
     const tiles = this.fixture.tiles.tiles.map((tile) => {
       if (tile.id === "HUMAN_REVIEW") return { ...tile, total: tile.total + reviews };
       if (tile.id !== "AGENT_GATE") return tile;
-      const added = (series: string) => (series === "ALLOW" || series === "DENY" ? gate[series] : 0);
-      // The fixture has one bucket per series (its 18:00 snapshot); new outcomes are added there.
-      const buckets = tile.buckets.map((b) => ({ ...b, count: b.count + added(b.series) }));
-      return { ...tile, buckets, total: tile.total + gate.ALLOW + gate.DENY };
+      const buckets = [...tile.buckets.filter((b) => b.count > 0), ...gate];
+      return { ...tile, buckets, total: tile.total + gate.reduce((n, b) => n + b.count, 0) };
     });
     return { ...this.fixture.tiles, tiles };
   }

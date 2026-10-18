@@ -1,4 +1,5 @@
 import type { IntakeSession, IntakeTurn, Language, ToolCallRecord } from "@/api/types";
+import { bucketStart } from "@/lib/buckets";
 import type { ScenarioFixture } from "./scenario";
 import { DataError } from "./source";
 
@@ -71,8 +72,9 @@ interface KeyedTurn {
 export class FixtureIntake {
   private readonly sessions = new Map<string, IntakeSession>();
   private readonly keys = new Map<string, KeyedTurn>();
-  /** Gate outcomes so far; the AGENT_GATE tile adds them (the tile keeps history across resets). */
-  readonly gateCounts = { ALLOW: 0, DENY: 0 };
+  /** Gate outcomes so far by 5-minute bucket, as agent_gate_5m counts them; the AGENT_GATE tile
+   * adds them (the tile keeps history across resets). */
+  readonly gateCounts = new Map<string, Record<ToolCallRecord["gate"]["outcome"], number>>();
 
   constructor(
     private readonly fixture: ScenarioFixture,
@@ -119,7 +121,10 @@ export class FixtureIntake {
       language && turnIndex === 0
         ? this.recordedTurn(text, language)
         : this.degradedTurn(session, text, turnIndex);
-    for (const call of turn.toolCalls ?? []) this.gateCounts[call.gate.outcome] += 1;
+    const bucket = bucketStart(this.now());
+    const counts = this.gateCounts.get(bucket) ?? { ALLOW: 0, DENY: 0 };
+    for (const call of turn.toolCalls ?? []) counts[call.gate.outcome] += 1;
+    this.gateCounts.set(bucket, counts);
     this.sessions.set(sessionId, { ...session, turns: [...turns, turn], registration: turn.registration });
     this.keys.set(keyId, { text, turn });
     return turn;

@@ -116,6 +116,17 @@ describe("FixtureSource FrontDesk intake", () => {
     );
   });
 
+  it("the AGENT_GATE tile counts each outcome in the 5-minute bucket it happened in, as agent_gate_5m does", async () => {
+    const s = new FixtureSource(scenario, () => new Date("2026-10-18T03:13:42Z"));
+    const { id } = await s.startIntake("EN");
+    await s.sendTurn(id, utteranceEn, "k1");
+    const counted = gateTile(await s.getTiles()).buckets.filter((b) => b.count > 0);
+    expect(counted.map((b) => [b.bucket, b.series, b.count])).toEqual([
+      ["2026-10-18T03:10:00Z", "ALLOW", 1],
+      ["2026-10-18T03:10:00Z", "DENY", 1],
+    ]);
+  });
+
   it("getCandidatePair reads the held pair with its current decision", async () => {
     const s = new FixtureSource(scenario, () => NOW);
     const id = scenario.pair.pair.id;
