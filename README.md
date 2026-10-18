@@ -1,6 +1,6 @@
 # CheckMate
 
-Check-in plus match. A front-desk intake agent checks patients in, in Spanish or English, behind a deterministic rules gate. An identity-resolution engine reconnects a patient's records filed under different identities, requires a recorded human approval for every link, and shows the safety fact that was invisible while the records were apart.
+CheckMate is check-in plus match. A front-desk intake agent checks patients in, in Spanish or English, behind a deterministic rules gate. An identity-resolution engine reconnects a patient's records that were filed under different identities. Every link needs a recorded human approval, and once the records are joined the app shows the safety fact that could not be seen while they were apart.
 
 Author: Christian Flores (docs) · 2026-10-18
 
@@ -8,18 +8,18 @@ Built at HackGB 2026 (UW-Green Bay, October 17 to 18) by a team of two. **Not fo
 
 ## How we used AI
 
-We used coding and research agents; we reviewed, integrated, and evaluated what they produced. This use is disclosed per commit (every commit carries the `[AI-assisted]` tag) and here.
+We used coding and research agents, and we reviewed, integrated and evaluated what they produced. We disclose this on every commit, which carries the `[AI-assisted]` tag, and in this section.
 
 At build time:
 - Coding agents built each lane in its own git worktree from a one-page build brief (`CLAUDE.md`, mirrored as `AGENTS.md`) and the lane's spec section.
 - A paired adversarial reviewer agent reviewed every lane: it ran the app and the acceptance script, wrote tests meant to fail, and posted PASS or BLOCK on the pull request.
 - Codex (read-only sandbox) and GitHub Copilot code review ran on every pull request.
-- The evaluation harness ran on every merge to `main` and posts per-band precision and recall with n.
-- Merges: a human clicked every merge until 17:15 CT on Saturday. From then on, under the owner's standing authorization, the lead orchestration session merged a pull request only when every gate was green: CI, the paired reviewer's PASS and a second independent review. Either of us could still click merge.
+- The evaluation harness ran on every merge to `main` and posted per-band precision and recall with n.
+- A human clicked every merge until 17:15 CT on Saturday. After that, the lead orchestration session merged pull requests under the owner's standing authorization, and only when every gate was green: CI, the paired reviewer's PASS and a second independent review. Either of us could still click merge.
 
-At runtime, separately: in `LIVE` mode Gemini runs the intake conversation, language handling and tool arguments (`backend/frontdesk/gemini.py`). The API starts in `REPLAY` mode (`backend/app/config.py`, `docker-compose.yml`), where a committed transcript stands in for the model and plays through the real gate, matcher and database (`backend/frontdesk/replay.py`). That transcript is marked `AUTHORED`: the team wrote it from the call shapes a Gemini spike verified; it is not a recorded model run (`data/scenarios/hero/frontdesk_transcript.json`). In every mode, matching, the rules gate, the allergy rule and the approval are deterministic code or a human decision. No language model sits on the decision path.
+Separately, the running app can use a model. In `LIVE` mode Gemini runs the intake conversation, the language handling and the tool arguments (`backend/frontdesk/gemini.py`). The API starts in `REPLAY` mode (`backend/app/config.py`, `docker-compose.yml`), where a committed transcript stands in for the model and plays through the real gate, matcher and database (`backend/frontdesk/replay.py`). That transcript is marked `AUTHORED`: the team wrote it from the call shapes a Gemini spike verified; it is not a recorded model run (`data/scenarios/hero/frontdesk_transcript.json`). In every mode, matching, the rules gate, the allergy rule and the approval are deterministic code or a human decision, so no language model is on the decision path.
 
-All design documents (PRD, architecture, evaluation plan, UX spec) were written before the event and shown to the organizers' rule; every line of code, every migration, and every prompt file in this repository was written after 12:00 CT on 2026-10-17. Confirmed with the organizers at the 11:00 opening.
+All design documents (PRD, architecture, evaluation plan, UX spec) were written before the event and shown to the organizers' rule. Every line of code, every migration and every prompt file in this repository was written after 12:00 CT on 2026-10-17. We confirmed this arrangement with the organizers at the 11:00 opening.
 
 ## What it does
 
@@ -27,14 +27,14 @@ The app has three screens: FrontDesk, Case and Work queue. Every screen shows th
 
 ### FrontDesk: a bilingual check-in agent behind a rules gate
 
-The patient kiosk takes a typed check-in (name, date of birth, phone, address) in English or Spanish; a language toggle switches the kiosk text and the check-in language (`frontend/src/components/frontdesk/KioskPane.tsx`, `copy.ts`). The agent has three tools: `search_patients`, `propose_new_chart` and `attach_history` (`contracts/tools/`). It never writes anything itself. Every tool call goes first to a deterministic gate, policy `frontdesk-gate/1` (`backend/policy/`, `contracts/version.py`), which:
+The patient kiosk takes a typed check-in (name, date of birth, phone, address) in English or Spanish; a language toggle switches the kiosk text and the check-in language (`frontend/src/components/frontdesk/KioskPane.tsx`, `copy.ts`). The agent has three tools: `search_patients`, `propose_new_chart` and `attach_history` (`contracts/tools/`). It never writes anything itself: every tool call goes first to a deterministic gate, policy `frontdesk-gate/1` (`backend/policy/`, `contracts/version.py`), which:
 
 - validates the arguments and checks that every identity field the model filled is grounded in the patient's own words: the model must quote what the patient typed, and the value must agree with that quote after case and accent folding (`backend/policy/args.py`);
 - finds candidate charts itself, from blocking keys recomputed from the arguments, and scores them with the same matcher and the same current thresholds the registrar sees; the model never supplies candidates (`backend/policy/gate.py`);
 - answers `ALLOW`, or `DENY` with a reason code, from a 13-row decision table (`backend/policy/decide.py`);
 - fails closed: if the matcher or the database fails, the turn degrades to a fixed template line in the session's language and nothing is written (`backend/policy/gate.py`, `backend/frontdesk/executor.py`, `backend/frontdesk/templates.py`).
 
-**When an existing chart scores REVIEW or higher, a new chart is denied.** If a candidate in the `REVIEW` or `AUTO_LINK` band has not been linked or rejected by a person, `propose_new_chart` is denied with `CANDIDATE_IN_REVIEW_OR_HIGHER` (`backend/policy/decide.py`). No chart is created. The check-in is recorded as an intake record, and for each blocking candidate the executor writes a candidate pair with origin `FRONTDESK_HANDOFF` and a `PROPOSED` decision, which hands the check-in to a registrar (`backend/frontdesk/executor.py`, `backend/chart_store/writes.py`). The check-in's registration state then reads `PENDING_REGISTRAR`, derived from the database on every read (`backend/frontdesk/registration.py`).
+When an existing chart scores REVIEW or higher, the gate denies a new chart. If a candidate in the `REVIEW` or `AUTO_LINK` band has not been linked or rejected by a person, `propose_new_chart` is denied with `CANDIDATE_IN_REVIEW_OR_HIGHER` (`backend/policy/decide.py`) and no chart is created. The check-in is recorded as an intake record, and for each blocking candidate the executor writes a candidate pair with origin `FRONTDESK_HANDOFF` and a `PROPOSED` decision, which hands the check-in to a registrar (`backend/frontdesk/executor.py`, `backend/chart_store/writes.py`). The check-in's registration state then reads `PENDING_REGISTRAR`, derived from the database on every read (`backend/frontdesk/registration.py`).
 
 On screen, the kiosk lists what FrontDesk did in the turn and ends with the gate's result. A denied new chart shows the gate card: the denied tool, the candidate's band and display score, the policy id, up to five evidence rows, and a masked candidate (no name, date, address or phone of the other chart) (`frontend/src/components/frontdesk/GateCard.tsx`). The kiosk then tells the patient a registrar will confirm the chart, and that nothing is linked until a staff member approves (`frontend/src/components/frontdesk/copy.ts`).
 
@@ -53,11 +53,13 @@ The FrontDesk screen also holds the registrar workspace. It lists every pair the
 - An approval links the records into one entity and builds the golden record at read time, with a crosswalk to the source of every value (`backend/link/`, `backend/golden/`). Rule BL-AMOX-01 then runs on the linked entity (`backend/rule/bl_amox_01.py`): it looks for a penicillin-class allergy and an active penicillin-class order on the same patient. Only the approval that brings the allergy and the order into one entity raises the flag (`frontend/e2e/registrar-flag.api.spec.ts`).
 - The registrar workspace then shows "Flagged for clinician review" with one line per flag and an **Open case** link to the full flag card. The kiosk tells the patient the chart is confirmed (`frontend/src/components/frontdesk/RegistrarPane.tsx`, `KioskPane.tsx`).
 
-The flag card is neutral by design: it says "Flagged for clinician review", carries the rule id and version, a "constructed scenario" chip when the allergy and order were added for the demo, and a Details section with the card text, the drug-label citation when the flag has one, and the rule's limits. It has no alert role (`frontend/src/components/case/FlagCard.tsx`). No approval, no rule run: a rejected link shows "No safety check ran" (`frontend/src/lib/flagState.ts`).
+The flag card is neutral by design: it says "Flagged for clinician review", carries the rule id and version, a "constructed scenario" chip when the allergy and order were added for the demo, and a Details section with the card text, the drug-label citation when the flag has one, and the rule's limits. It has no alert role (`frontend/src/components/case/FlagCard.tsx`). The rule runs only after an approval, so a rejected link shows "No safety check ran" (`frontend/src/lib/flagState.ts`).
 
 ### Case and Work queue: identity resolution
 
-The Case screen shows the demo hero's two source records (an ER FHIR record and a Clinic CSV row). **Resolve identity** starts a match run, `POST /api/v1/match-runs`, which blocks, scores and bands the loaded records; the hero pair then appears with its band, the evidence rail and the review controls (`frontend/src/components/case/CaseScreen.tsx`). After an approval, the two cards collapse into one golden record with crosswalk chips, the timeline shows events from both sources, and the flag card appears. The Work queue lists every scored candidate pair, filterable by band and decision status, and opens any pair as a case; after Resolve identity it shows the match run's funnel (`frontend/src/components/queue/WorkQueue.tsx`).
+The Case screen shows the demo hero's two source records (an ER FHIR record and a Clinic CSV row). **Resolve identity** starts a match run, `POST /api/v1/match-runs`, which blocks, scores and bands the loaded records; the hero pair then appears with its band, the evidence rail and the review controls (`frontend/src/components/case/CaseScreen.tsx`). After an approval, the two cards collapse into one golden record with crosswalk chips, the timeline shows events from both sources, and the flag card appears.
+
+The Work queue lists every scored candidate pair, filterable by band and decision status, and opens any pair as a case; after Resolve identity it shows the match run's funnel (`frontend/src/components/queue/WorkQueue.tsx`).
 
 How the engine scores (`backend/core/`):
 - Blocking: phonetic surname plus birth year, exact date of birth, swapped day and month, phone last 7 digits, ZIP plus initial; placeholder values never form a key (`backend/core/block.py`, `backend/core/placeholders.py`).
@@ -67,7 +69,7 @@ How the engine scores (`backend/core/`):
 - The score shown on the gate card and the registrar pane is the display-only `p`. With no Platt map fitted, `p` is the plain sigmoid of the raw score; it is not a calibrated probability (`backend/core/score.py`).
 - The demo hero pair scores a raw `s` of 2.15, band `REVIEW` (`data/scenarios/hero/hero.json`).
 
-Resets, match runs, scored pairs, decisions, alerts and agent actions are appended to `event_log`, a TimescaleDB hypertable, and `GET /api/v1/metrics/tiles` reads real-time continuous aggregates over it: `band_flow_1m`, `review_outcomes_5m`, `agent_gate_5m` (`contracts/migrations/0001_initial.sql`, `backend/api/tiles.py`).
+Resets, match runs, scored pairs, decisions, alerts and agent actions are appended to `event_log`, a TimescaleDB hypertable. `GET /api/v1/metrics/tiles` reads real-time continuous aggregates over it: `band_flow_1m`, `review_outcomes_5m`, `agent_gate_5m` (`contracts/migrations/0001_initial.sql`, `backend/api/tiles.py`).
 
 ## The demo, in order
 
@@ -76,11 +78,11 @@ Run the demo setup under [How to run](#how-to-run) first, then open http://127.0
 1. **Reset demo**. The API clears the demo state, reloads the hero scenario and records `DEMO_RESET`; the event log is kept (`backend/api/sessions.py`). The kiosk holds Send and "Use this" until the reset has finished (`frontend/e2e/frontdesk.api.spec.ts`).
 2. **"Use this"**. The kiosk offers a demo script line, the hero's check-in from the replay transcript; "Use this" puts it in the message box (`frontend/src/data/demoScript.ts`). Switch the kiosk to Español first for the Spanish line ("Usar este").
 3. **Send**. FrontDesk reads the check-in and asks to create a new chart. The gate checks the hero's existing charts and holds the request.
-4. **The gate card.** The kiosk shows that `propose_new_chart` was denied by the identity gate, the existing chart's score and band (`REVIEW`), policy `frontdesk-gate/1`, the evidence rows and "Sent to a registrar". The registrar workspace now holds the check-in, with two possible existing charts to decide.
+4. The kiosk shows the gate card: `propose_new_chart` was denied by the identity gate, with the existing chart's score and band (`REVIEW`), policy `frontdesk-gate/1`, the evidence rows and "Sent to a registrar". The registrar workspace now holds the check-in, with two possible existing charts to decide.
 5. **The Case tab.** It shows the hero's two records, one from ER FHIR and one from Clinic CSV.
 6. **Resolve identity.** The match run scores the loaded records; the hero pair appears in `REVIEW` with the evidence rail.
 7. **Approve link**, optionally add a note, then **confirm** ("Confirm approve").
-8. **The flag card.** The two records collapse into one golden record with crosswalk chips, the timeline shows both sources, and the flag card reads "Flagged for clinician review", rule `BL-AMOX-01`, with the constructed-scenario chip. Details shows the card text, the drug-label citation and the rule's limits.
+8. The two records collapse into one golden record with crosswalk chips, the timeline shows both sources, and the flag card reads "Flagged for clinician review", rule `BL-AMOX-01`, with the constructed-scenario chip. Details shows the card text, the drug-label citation and the rule's limits.
 
 Instead of steps 5 to 7, the registrar can approve the held pairs from the FrontDesk screen; the approval that joins the allergy to the order shows the flag summary there, with **Open case** leading to the same flag card.
 
@@ -137,7 +139,7 @@ NEXT_PUBLIC_CHECKMATE_SOURCE=api npm run dev
 | `npm run e2e:api` (in `frontend/`) | Playwright against a running API named by `CHECKMATE_API_ORIGIN`; it presses Reset demo on that API (`frontend/playwright.api.config.ts`) |
 | `npm test` (in `eval/acceptance/`) | The G16 acceptance path against the running UI and API: reset, resolve, reject, resolve, approve, flag card, event counts, review tile; it presses Reset demo (`eval/acceptance/README.md`) |
 
-CI runs ruff, the OpenAPI snapshot check, pytest, a schemathesis contract test against an API it starts, the protected-paths check, the hero-export regeneration and fixture check, the acceptance script's type check, the frontend build, a secret scan, and on every merge to `main` the evaluation harness (`.github/workflows/ci.yml`). CI and agents use only the `REPLAY` adapter; no key exists in CI.
+CI runs ruff, the OpenAPI snapshot check, pytest, a schemathesis contract test against an API it starts, the protected-paths check, the hero-export regeneration and fixture check, the acceptance script's type check, the frontend build and a secret scan. On every merge to `main` it also runs the evaluation harness (`.github/workflows/ci.yml`). CI and agents use only the `REPLAY` adapter; no key exists in CI.
 
 ## Evaluation
 
@@ -166,7 +168,7 @@ Source: harness run 1c3f8f96 (local `eval/runs/`, gitignored; reproduce with the
 | Review burden | 0.681319 | 0.567974 to 0.794252 | 273 | 122 |
 | Blocking recall | 0.898148 | 0.845794 to 0.946433 | 216 | 125 |
 
-Read the STRICT row with the design in mind. Auto-linking is meant to be rare: the high cutoff is chosen false-merge first, and auto-link is off in the demo (`auto_link_enabled = false`, `contracts/models/thresholds.py`), so no link is ever made without a person. The thresholds send most true pairs to a registrar (REVIEW share of true pairs 0.865979): the STRICT row counts only the pairs the system would link with no human, while LENIENT recall (0.847222) counts the pairs a registrar is shown. The weights are hand-set (`handset-1`), not trained, so these are demo numbers, not a claim about a trained matcher.
+The STRICT row follows from the design. Auto-linking is meant to be rare: the high cutoff is chosen false-merge first, and auto-link is off in the demo (`auto_link_enabled = false`, `contracts/models/thresholds.py`), so no link is ever made without a person. The thresholds send most true pairs to a registrar (REVIEW share of true pairs 0.865979). STRICT counts only the pairs the system would link with no human, while LENIENT recall (0.847222) counts the pairs a registrar is shown. The weights are hand-set (`handset-1`) and not trained, so these are demo numbers, not a claim about a trained matcher.
 
 What the rows mean (`eval/harness/metrics.py`):
 - Strict recall counts true pairs that land in `AUTO_LINK`. Lenient recall counts true pairs that land in `AUTO_LINK` or `REVIEW`. Both are taken over all true pairs, including pairs that blocking missed.
@@ -188,7 +190,7 @@ Not measured yet: the gate suite, the injection suite and the BL-AMOX-01 case li
 
 ## Architecture
 
-What exists on `main` today. Components are added to this diagram only when their pull request merges.
+The diagram shows what exists on `main` today; a component is added to it only when its pull request merges.
 
 ```mermaid
 flowchart LR
