@@ -6,12 +6,30 @@ import "@fontsource-variable/instrument-sans";
 import "@fontsource/dm-mono/400.css";
 import "@fontsource/dm-mono/500.css";
 import { Header } from "@/components/ui/Header";
+import { siteOrigin } from "@/lib/siteOrigin";
 import "./globals.css";
 import { Providers } from "./providers";
 
+const PITCH = "A bilingual AI check-in kiosk that can’t open duplicate charts";
+
 export const metadata: Metadata = {
+  // Link previews resolve /og.png against this origin (the local dev server unless set).
+  metadataBase: siteOrigin(process.env.NEXT_PUBLIC_SITE_ORIGIN),
   title: "CheckMate",
   description: "Synthetic-data prototype for identity reconciliation. Not for clinical use.",
+  // public/, rendered by scripts/render-assets.mjs. Setting icons makes Next drop the app/icon.svg
+  // link it adds by file convention, so the SVG tab icon is named here as well.
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: { url: "/icon.svg", type: "image/svg+xml", sizes: "any" },
+    apple: "/apple-touch-icon.png",
+  },
+  // public/og.png, rendered by scripts/render-assets.mjs from the mark and the pitch.
+  openGraph: {
+    title: "CheckMate",
+    description: PITCH,
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "CheckMate. " + PITCH }],
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
