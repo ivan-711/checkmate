@@ -8,16 +8,20 @@ The project's own code license is not set yet.
 
 ## Python: `uv.lock`
 
-These are all 74 third-party packages in `uv.lock`; the project itself is the 75th entry. Versions come from `uv.lock`. Licenses come from the installed package metadata (`importlib.metadata`), read from a `.venv` synced from this `uv.lock`, at the version pinned there. The "Read from" column shows where in that metadata the license came from: the `License-Expression` field (an SPDX expression), the free-text `License` field, or a `License ::` classifier. A package that is not installed on macOS is marked as such.
+These are all 92 third-party packages in `uv.lock`; the project itself is the 93rd entry. Versions come from `uv.lock`. Licenses come from the installed package metadata (`importlib.metadata`), read from a `.venv` synced from this `uv.lock`, at the version pinned there. The "Read from" column shows where in that metadata the license came from: the `License-Expression` field (an SPDX expression), the free-text `License` field, or a `License ::` classifier. A package that is not installed on macOS is marked as such.
 
-Scope: **runtime** packages are reached from `[project].dependencies` in `pyproject.toml`, including the `uvicorn[standard]` extra. **dev** packages are reached only from the `dev` and `train` dependency groups. That gives 42 runtime and 32 dev packages.
+Scope: **runtime** packages are reached from `[project].dependencies` in `pyproject.toml`, including the `uvicorn[standard]` extra. **dev** packages are reached only from the `dev` and `train` dependency groups. That gives 42 runtime and 50 dev packages.
 
 | Package | Version | License, as the package declares it | Read from | Scope |
 |---|---|---|---|---|
+| aiohappyeyeballs | 2.7.1 | PSF-2.0 | `License` field | dev |
+| aiohttp | 3.14.5 | Apache-2.0 AND MIT | `License-Expression` | dev |
+| aiosignal | 1.4.0 | Apache 2.0 | `License` field | dev |
 | annotated-doc | 0.0.5 | MIT | `License-Expression` | runtime |
 | annotated-types | 0.8.0 | MIT | `License-Expression` | runtime |
 | anyio | 4.15.1 | MIT | `License-Expression` | runtime |
 | attrs | 26.1.0 | MIT | `License-Expression` | dev |
+| cbor2 | 6.1.5 | MIT | `License-Expression` | dev |
 | certifi | 2026.7.22 | MPL-2.0 | `License` field | runtime |
 | cffi | 2.1.1 | MIT-0 | `License-Expression` | runtime |
 | charset-normalizer | 3.5.2 | MIT | `License` field | runtime |
@@ -27,14 +31,19 @@ Scope: **runtime** packages are reached from `[project].dependencies` in `pyproj
 | cryptography | 50.0.2 | Apache-2.0 OR BSD-3-Clause | `License-Expression` | runtime |
 | distro | 1.9.0 | Apache License, Version 2.0 | `License` field | runtime |
 | fastapi | 0.143.3 | MIT | `License-Expression` | runtime |
+| frozenlist | 1.8.0 | Apache-2.0 | `License` field | dev |
 | google-auth | 2.62.0 | Apache 2.0 | `License` field | runtime |
 | google-genai | 2.31.0 | Apache-2.0 | `License-Expression` | runtime |
 | graphql-core | 3.2.13 | MIT license | `License` field | dev |
+| grpclib | 0.4.9 | BSD-3-Clause | `License` field | dev |
 | h11 | 0.16.0 | MIT | `License` field | runtime |
+| h2 | 4.4.1 | MIT | `License-Expression` | dev |
 | harfile | 0.5.0 | MIT | `License-Expression` | dev |
+| hpack | 4.2.0 | MIT | `License-Expression` | dev |
 | httpcore | 1.0.9 | BSD-3-Clause | `License-Expression` | runtime |
 | httptools | 0.9.0 | MIT | `License-Expression` | runtime |
 | httpx | 0.28.1 | BSD-3-Clause | `License` field | runtime |
+| hyperframe | 6.1.0 | MIT License | classifier | dev |
 | hypothesis | 6.170.1 | MPL-2.0 | `License-Expression` | dev |
 | hypothesis-graphql | 0.13.2 | MIT | `License-Expression` | dev |
 | idna | 3.20 | BSD-3-Clause | `License-Expression` | runtime |
@@ -48,11 +57,15 @@ Scope: **runtime** packages are reached from `[project].dependencies` in `pyproj
 | markupsafe | 3.0.4 | BSD-3-Clause | `License-Expression` | dev |
 | mdurl | 0.1.2 | MIT License | classifier | dev |
 | metaphone | 0.6 | BSD | `License` field | runtime |
+| modal | 1.6.2 | Apache-2.0 | `License-Expression` | dev |
+| multidict | 7.1.0 | Apache-2.0 | `License-Expression` | dev |
 | narwhals | 2.27.1 | MIT | `License-Expression` | dev |
 | numpy | 2.5.4 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | `License-Expression` | dev |
 | opentelemetry-api | 1.45.1 | Apache-2.0 | `License-Expression` | runtime |
 | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | `License-Expression` | dev |
 | pluggy | 1.7.0 | MIT | `License` field | dev |
+| propcache | 0.5.4 | Apache-2.0 | `License` field | dev |
+| protobuf | 7.36.2 | 3-Clause BSD License | `License` field | dev |
 | psycopg | 3.3.6 | LGPL-3.0-only | `License-Expression` | runtime |
 | psycopg-binary | 3.3.6 | LGPL-3.0-only | `License-Expression` | runtime |
 | pyasn1 | 0.6.4 | BSD-2-Clause | `License` field | runtime |
@@ -77,8 +90,12 @@ Scope: **runtime** packages are reached from `[project].dependencies` in `pyproj
 | sortedcontainers | 2.4.0 | Apache 2.0 | `License` field | dev |
 | sqlalchemy | 2.1.5 | MIT | `License-Expression` | runtime |
 | starlette | 1.8.0 | BSD-3-Clause | `License-Expression` | runtime |
+| synchronicity | 0.12.6 | Apache Software License | classifier | dev |
 | tenacity | 9.1.4 | Apache 2.0 | `License` field | runtime |
 | threadpoolctl | 3.7.0 | BSD-3-Clause | `License-Expression` | dev |
+| toml | 0.10.2 | MIT | `License` field | dev |
+| types-certifi | 2021.10.8.3 | Apache-2.0 license | `License` field | dev |
+| types-toml | 0.10.8.20260518 | Apache-2.0 | `License-Expression` | dev |
 | typing-extensions | 4.16.0 | PSF-2.0 | `License-Expression` | runtime |
 | typing-inspection | 0.4.4 | MIT | `License-Expression` | runtime |
 | tzdata | 2026.5 | Apache-2.0 | `License` field in the uv cache's wheel metadata (Windows only: `sys_platform == 'win32'`, not installed on macOS) | runtime |
@@ -88,6 +105,7 @@ Scope: **runtime** packages are reached from `[project].dependencies` in `pyproj
 | watchfiles | 1.3.0 | MIT | `License` field | runtime |
 | websockets | 16.1.1 | BSD-3-Clause | `License-Expression` | runtime |
 | werkzeug | 3.1.9 | BSD-3-Clause | `License-Expression` | dev |
+| yarl | 1.25.1 | Apache-2.0 | `License` field | dev |
 
 ## JavaScript: `frontend/package.json` and `eval/acceptance/package.json`
 
@@ -133,6 +151,8 @@ These are the direct dependencies and devDependencies only; transitive packages 
 | `timescale/timescaledb-ha:pg18` | `docker-compose.yml` | pinned by digest (PG 18.6, TimescaleDB 2.30.2) | PostgreSQL License for PostgreSQL. TimescaleDB is Apache-2.0 for its core and Timescale License (TSL) for its community features, which include the continuous aggregates this repository uses. Other bundled extensions carry their own licenses. |
 | `python:3.12-slim` | `backend/Dockerfile` | tag, not pinned by digest | Python under PSF-2.0 on a Debian base; Debian packages carry their own licenses |
 | uv | `backend/Dockerfile` (`pip install uv`) | not pinned | MIT OR Apache-2.0 |
+| Modal `debian_slim` image, Python 3.12 | `eval/sweep/modal_app.py` (the optional Modal sweep executor) | not pinned by digest | Python under PSF-2.0 on a Debian base; Debian packages carry their own licenses |
+| uv binary from `ghcr.io/astral-sh/uv:latest` | `eval/sweep/modal_app.py` | `latest`, not pinned | MIT OR Apache-2.0 |
 
 ## Data sources
 
