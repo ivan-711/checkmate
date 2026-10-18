@@ -6,12 +6,16 @@ type Schemas = components["schemas"];
 
 export type Band = Schemas["Band"];
 export type DecisionStatus = Schemas["DecisionStatus"];
+export type PairOrigin = Schemas["PairOrigin"];
 export type ReasonCode = Schemas["ReasonCode"];
 export type Contribution = Schemas["Contribution"];
 export type SourceCard = Schemas["SourceCard"];
 export type NormalizedRecord = Schemas["NormalizedRecord"];
 export type MatchDecision = Schemas["MatchDecision"];
+export type CandidatePair = Schemas["CandidatePair"];
 export type CandidatePairDetail = Schemas["CandidatePairDetail"];
+export type CandidatePairPage = Schemas["Page_CandidatePair_"];
+export type MatchRunResponse = Schemas["MatchRunResponse"];
 export type CandidatePairQuery = NonNullable<
   operations["list_candidate_pairs_api_v1_candidate_pairs_get"]["parameters"]["query"]
 >;

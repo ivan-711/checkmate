@@ -1,5 +1,8 @@
 import type {
   CandidatePairDetail,
+  CandidatePairPage,
+  CandidatePairQuery,
+  MatchRunResponse,
   EventLogRow,
   ReviewRequest,
   ReviewResponse,
@@ -36,9 +39,15 @@ export interface DataSource {
   readonly canRestore: boolean;
   /** The session the screen is showing; null when this tab has not reset yet in LOCAL. */
   getSession(): Promise<SessionResponse | null>;
+  /** The session's Case pair, or the pair `pairId` names when the work queue opened one. */
   getCase(pairId?: string): Promise<CaseData>;
-  /** UX "Resolve identity": block, score, band (POST /match-runs in LOCAL). */
-  resolve(): Promise<void>;
+  /** UX "Resolve identity": block, score, band (POST /match-runs in LOCAL). Returns the run's
+   * receipt, which feeds the work-queue funnel; null where the source is already scored. */
+  resolve(): Promise<MatchRunResponse | null>;
+  /** One keyset page of stored candidate pairs, read-only, in the server's order. */
+  getCandidatePairs(query: CandidatePairQuery): Promise<CandidatePairPage>;
+  /** One pair with both records and its evidence; DataError NOT_FOUND when it is not stored. */
+  getCandidatePair(pairId: string): Promise<CandidatePairDetail>;
   review(pairId: string, body: ReviewRequest, idempotencyKey: string): Promise<ReviewResponse>;
   /** null when this source has no timeline for the entity. */
   getTimeline(entityId: string): Promise<TimelineEvent[] | null>;

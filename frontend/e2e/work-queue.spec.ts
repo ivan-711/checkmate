@@ -1,65 +1,78 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
+// Runs against the fixture adapter (REPLAY), with no API behind it and nothing mocked: the queue
+// must read the same source as Case, so any /api/v1 request here is a failure.
 const scenario = JSON.parse(
   readFileSync(path.join(__dirname, "../../contracts/fixtures/scenario.json"), "utf8"),
 );
-const pairId = "00000000-0000-4000-8000-000000000099";
-const nonHero = {
-  ...scenario.pair,
-  pair: {
-    ...scenario.pair.pair,
-    id: pairId,
-    decision: {
-      ...scenario.pair.pair.decision,
-      pairId,
-      p: 0.61,
-      status: "PROPOSED",
-      band: "REVIEW",
-    },
-  },
-};
+const pairId: string = scenario.pair.pair.id;
 
-test("opens a non-hero pair from the real work-queue flow", async ({ page }) => {
-  await page.route("**/api/v1/**", async (route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    if (request.method() === "POST" && url.pathname === "/api/v1/match-runs") {
-      return route.fulfill({
-        status: 201,
-        json: {
-          runId: "00000000-0000-4000-8000-000000000096",
-          records: 1161,
-          entities: 555,
-          allPairs: 673380,
-          candidatePairs: 1163,
-          reductionRatio: 0.9983,
-          bandCounts: { AUTO_LINK: 31, REVIEW: 742, KEEP_SEPARATE: 390 },
-          pairsSkippedOversized: 0,
-          scorerVersion: "test",
-          thresholdSetId: "test",
-          elapsedMs: 84,
-        },
-      });
-    }
-    if (request.method() === "GET" && url.pathname === "/api/v1/candidate-pairs") {
-      return route.fulfill({ json: { items: [nonHero.pair], nextCursor: "next" } });
-    }
-    if (request.method() === "GET" && url.pathname === `/api/v1/candidate-pairs/${pairId}`) {
-      return route.fulfill({ json: nonHero });
-    }
-    return route.fulfill({ status: 404, json: { error: { code: "NOT_FOUND", message: "not mocked" } } });
+function apiRequests(page: Page): string[] {
+  const seen: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/v1/"))
+      seen.push(`${request.method()} ${request.url()}`);
   });
+  return seen;
+}
 
-  await page.goto("/queue");
-  await expect(page.getByText("673,380 all possible pairs")).toBeVisible();
-  const nonHeroRow = page.getByTestId("work-queue-row");
-  await expect(nonHeroRow).toContainText("61.0%");
-  await nonHeroRow.click();
+const tab = (page: Page, name: string) =>
+  page.getByRole("navigation", { name: "Main" }).getByRole("link", { name });
+
+test("REPLAY: the queue reads the fixture and Case keeps its golden record across tabs", async ({ page }) => {
+  const api = apiRequests(page);
+  await page.goto("/");
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText([
+    "FrontDesk",
+    "Case",
+    "Work queue",
+  ]);
+  await page.getByTestId("resolve-button").click();
+  await page.getByTestId("approve-button").click();
+  await page.getByTestId("review-note-input").fill("work queue round trip");
+  await page.getByTestId("review-submit-button").click();
+  await expect(page.getByRole("heading", { name: "Golden record" })).toBeVisible();
+
+  await tab(page, "Work queue").click();
+  await expect(page).toHaveURL(/\/queue$/);
+  await expect(page.getByTestId("app-mode-badge")).toHaveText(/REPLAY/);
+  await expect(page.getByTestId("work-queue-no-funnel")).toHaveText(/REPLAY has no match-run funnel/);
+  const columns = page.getByTestId("work-queue-columns");
+  await expect(columns).toContainText("Probability estimate");
+  await expect(columns).toContainText("fitted on our synthetic development distribution");
+  const row = page.getByTestId("work-queue-row");
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText(scenario.pair.pair.decision.p.toFixed(2));
+  await expect(row).toContainText("Linked");
+  await expect(row).not.toContainText("%");
+
+  await tab(page, "Case").click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { name: "Golden record" })).toBeVisible();
+  await expect(page.getByRole("article", { name: "ER FHIR record" })).toHaveCount(0);
+  expect(api).toEqual([]);
+});
+
+test("REPLAY: a queue row opens Case for that pair", async ({ page }) => {
+  const api = apiRequests(page);
+  await page.goto("/");
+  await expect(page.getByTestId("candidate-pair")).toHaveCount(0);
+  await tab(page, "Work queue").click();
+  await expect(
+    page.getByText("No candidate pairs yet. Resolve identity on Case scores the loaded records."),
+  ).toBeVisible();
+
+  await tab(page, "Case").click();
+  await page.getByTestId("resolve-button").click();
+  await expect(page.getByTestId("candidate-pair")).toBeVisible();
+  await tab(page, "Work queue").click();
+  await page.getByTestId("work-queue-row").click();
   await expect(page).toHaveURL(new RegExp(`/queue/${pairId}$`));
   await expect(page.getByTestId("candidate-pair")).toBeVisible();
   await expect(page.getByRole("article", { name: "ER FHIR record" })).toBeVisible();
   await expect(page.getByTestId("approve-button")).toBeVisible();
   await expect(page.getByTestId("reject-button")).toBeVisible();
+  expect(api).toEqual([]);
 });

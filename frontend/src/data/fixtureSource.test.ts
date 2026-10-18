@@ -154,3 +154,33 @@ describe("FixtureSource G16 path", () => {
     expect((await s.getTiles()).tiles.find((t) => t.id === "HUMAN_REVIEW")?.total).toBe(0);
   });
 });
+
+describe("FixtureSource work queue", () => {
+  it("lists nothing before Resolve, then the fixture pair with this session's decision", async () => {
+    const s = source();
+    expect(await s.getCandidatePairs({})).toEqual({ items: [], nextCursor: null });
+    expect(await s.resolve()).toBeNull(); // no match-run receipt: REPLAY has no funnel
+    await s.review(pairId, approve, "key-queue-1");
+    const page = await s.getCandidatePairs({});
+    expect(page.items.map((p) => [p.id, p.decision.status])).toEqual([[pairId, "LINKED"]]);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it("filters by band and status the way the API does", async () => {
+    const s = source();
+    await s.resolve();
+    const { band } = scenario.pair.pair.decision;
+    expect((await s.getCandidatePairs({ band, status: "PROPOSED" })).items).toHaveLength(1);
+    expect((await s.getCandidatePairs({ status: "LINKED" })).items).toHaveLength(0);
+  });
+
+  it("opens the fixture pair by id with the shared session state, and nothing else", async () => {
+    const s = source();
+    await s.review(pairId, reject, "key-queue-2");
+    expect((await s.getCase(pairId)).detail!.pair.decision.status).toBe("REJECTED");
+    expect((await s.getCase()).detail!.pair.decision.status).toBe("REJECTED");
+    await expect(s.getCandidatePair("00000000-0000-4000-8000-000000000099")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+});

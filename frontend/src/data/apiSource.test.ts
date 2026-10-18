@@ -64,13 +64,18 @@ describe("ApiSource", () => {
     expect(s.canRestore).toBe(false);
   });
 
-  it("returns the match-run receipt for the work queue", async () => {
-    const run = { runId: "run-77", allPairs: 6, candidatePairs: 2 };
+  it("Resolve identity posts a match run", async () => {
     const calls = stubFetch({
-      "POST /api/v1/match-runs": () => ({ status: 201, body: run }),
+      "POST /api/v1/match-runs": () => ({ status: 201, body: { queuedPairIds: [hero.pair.id] } }),
     });
-    expect(await new ApiSource(ORIGIN).runMatch()).toEqual(run);
+    await new ApiSource(ORIGIN).resolve();
     expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(["POST /api/v1/match-runs"]);
+  });
+
+  it("Resolve returns the match-run receipt, which the work queue's funnel reads", async () => {
+    const run = { runId: "run-77", allPairs: 6, candidatePairs: 2 };
+    stubFetch({ "POST /api/v1/match-runs": () => ({ status: 201, body: run }) });
+    expect(await new ApiSource(ORIGIN).resolve()).toEqual(run);
   });
 
   it("lists a keyset page with its band and status filters", async () => {

@@ -9,8 +9,8 @@ import { ResetButton } from "./ResetButton";
 
 const TABS = [
   { href: "/frontdesk", label: "FrontDesk" },
-  { href: "/queue", label: "Work queue" },
   { href: "/", label: "Case" },
+  { href: "/queue", label: "Work queue" },
 ] as const;
 
 export function Header() {

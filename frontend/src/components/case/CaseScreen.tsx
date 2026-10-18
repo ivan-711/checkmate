@@ -4,7 +4,12 @@ import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/
 import { useState } from "react";
 import type { ReviewResponse } from "@/api/types";
 import { useAnnounce } from "@/components/ui/LiveRegion";
-import { RESOLVE_KEY, SESSION_CHANGE_KEY } from "@/components/ui/ResetButton";
+import {
+  LATEST_MATCH_RUN_KEY,
+  RESOLVE_KEY,
+  SESSION_CHANGE_KEY,
+  WORK_QUEUE_KEY,
+} from "@/components/ui/ResetButton";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { DataError } from "@/data/source";
 import { differingFields, type CardField } from "@/lib/display";
@@ -51,7 +56,10 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
   const resolve = useMutation({
     mutationKey: RESOLVE_KEY,
     mutationFn: () => source.resolve(),
-    onSuccess: async () => {
+    onSuccess: async (run) => {
+      // Kept for the work queue's funnel, so the queue never has to start a run of its own.
+      if (run) queryClient.setQueryData(LATEST_MATCH_RUN_KEY, run);
+      await queryClient.invalidateQueries({ queryKey: WORK_QUEUE_KEY });
       await queryClient.invalidateQueries({ queryKey: ["case"] });
       await queryClient.invalidateQueries({ queryKey: ["events"] });
       announce("Identity resolved. The candidate pair is ready for review.");
