@@ -23,6 +23,7 @@ dev = [
   "ruff>=0.6",
   "pyyaml>=6.0,<7",
   "schemathesis==4.31.1",
+  "modal>=1.6.2,<2",
   { include-group = "train" },
 ]
 train = [

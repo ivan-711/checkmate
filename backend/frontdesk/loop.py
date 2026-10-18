@@ -244,7 +244,14 @@ def _run_claimed(
                 if hit is None:
                     text, source = step.text, AssistantTextSource.MODEL
                 else:
-                    log.info("banned phrase swapped for the template session=%s turn=%s", session.id, turn_index)
+                    # `hit` is an entry from the tracked list, never the model's or the patient's text,
+                    # so the log can tell a true catch from a list entry that needs tuning.
+                    log.info(
+                        "banned phrase swapped for the template session=%s turn=%s phrase=%s",
+                        session.id,
+                        turn_index,
+                        hit,
+                    )
                 break
             calls_this_turn += 1
             outcome = execute(
