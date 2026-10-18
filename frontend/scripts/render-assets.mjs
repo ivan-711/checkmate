@@ -16,17 +16,20 @@ const OG_TEMPLATE = path.join(ROOT, "scripts/assets/og.html");
 // CONCEPT.md §4. Declared once here because the render runs outside the app's stylesheet.
 const TOKENS = { mulberry: "#8C1D7E", porcelain: "#F5F3F4", ink: "#1B1419", ink2: "#5C5259" };
 
-// icon.svg draws the disc (radius 9) in a viewBox 22 units wide, so the disc is 18/22 of the box.
-const DISC_PER_BOX = 18 / 22;
-// Launcher icons keep the disc inside the maskable safe zone (the central 80 % circle).
-const LAUNCHER_DISC_FRACTION = 0.62;
+// icon.svg has a viewBox 22 units wide. The mark is 20 units wide (two 9-unit half-discs and the
+// 2-unit gap) and 18 tall, so its width is the side that has to fit the box.
+const MARK_WIDTH_PER_BOX = 20 / 22;
+// Launcher icons keep the mark inside the maskable safe zone (the central 80 % circle): the mark's
+// farthest point is half its width from the centre, so 0.69 of the box puts it at 0.345.
+const LAUNCHER_MARK_FRACTION = 0.69;
 const LAUNCHER_ICONS = [
   { file: "icon-192.png", px: 192 },
   { file: "icon-512.png", px: 512 },
   { file: "apple-touch-icon.png", px: 180 },
 ];
-// The tab icon has no background, so the disc can nearly fill the box.
-const FAVICON = { file: "favicon.ico", px: 32, discFraction: 0.94 };
+// The tab icon has no background, so the mark can fill most of the box, with a pixel or two clear on
+// each side so nothing is cut off.
+const FAVICON = { file: "favicon.ico", px: 32, markFraction: 0.85 };
 const OG = { file: "og.png", width: 1200, height: 630 };
 
 // Variable fonts from the @fontsource packages CONCEPT.md §9 names (the "standard" file carries
@@ -63,9 +66,9 @@ function fill(template, values) {
   });
 }
 
-/** The mark alone, centred in a square box, on a background or on nothing. */
-function iconPage(svg, px, discFraction, background) {
-  const size = Math.round((px * discFraction) / DISC_PER_BOX);
+/** The mark alone, centred in a square box, its width markFraction of the box. */
+function iconPage(svg, px, markFraction, background) {
+  const size = Math.round((px * markFraction) / MARK_WIDTH_PER_BOX);
   const sized = svg.replace("<svg ", `<svg width="${size}" height="${size}" `);
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     html, body { margin: 0; }
@@ -107,14 +110,14 @@ async function main() {
   const written = [];
   try {
     for (const { file, px } of LAUNCHER_ICONS) {
-      const png = await shoot(browser, iconPage(svg, px, LAUNCHER_DISC_FRACTION, TOKENS.porcelain), px, px);
+      const png = await shoot(browser, iconPage(svg, px, LAUNCHER_MARK_FRACTION, TOKENS.porcelain), px, px);
       writeFileSync(path.join(PUBLIC_DIR, file), png);
       written.push(file);
     }
 
     const faviconPng = await shoot(
       browser,
-      iconPage(svg, FAVICON.px, FAVICON.discFraction, "transparent"),
+      iconPage(svg, FAVICON.px, FAVICON.markFraction, "transparent"),
       FAVICON.px,
       FAVICON.px,
       { transparent: true },
