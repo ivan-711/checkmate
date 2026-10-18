@@ -243,10 +243,6 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
-
-
 # Filling expect.toolResultSha256 by running the scripts through the real engine. The recorder
 # learns each step's result hash from the next request, so wrapping the replay adapter in it and
 # driving the loop once per script yields exactly the hashes playback will check.
@@ -388,3 +384,7 @@ def _purge_intake_session(engine, session_id) -> None:
         conn.execute(text("DELETE FROM intake_session WHERE id = :s"), {"s": session_id})
         if record is not None:
             conn.execute(text("DELETE FROM source_record WHERE id = :r"), {"r": record})
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

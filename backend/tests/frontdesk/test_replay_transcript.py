@@ -222,3 +222,50 @@ def test_fill_hashes_refuses_a_database_with_leftover_intake_state(intake_sessio
     intake_sessions.append(str(sid))
     with pytest.raises(SystemExit, match="clean state"):
         author_transcript.fill_hashes(load_transcript(TRANSCRIPT), engine)
+
+
+def test_fill_hashes_cli_entry_point_reaches_fill_hashes(tmp_path: Path):
+    """``python -m backend.frontdesk.author_transcript --fill-hashes URL`` is the documented refill path:
+    run as ``__main__`` it must reach ``fill_hashes`` (here its non-test-database refusal, before any
+    connection is opened), never a NameError from a guard placed above the function."""
+    import subprocess
+    import sys
+
+    out = tmp_path / "t.json"
+    done = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "backend.frontdesk.author_transcript",
+            "--fill-hashes",
+            "postgresql://nobody:nothing@127.0.0.1:1/checkmate_demo",
+            "--out",
+            str(out),
+        ],
+        check=False,
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert "NameError" not in done.stderr, done.stderr
+    assert done.returncode != 0
+    assert "refusing to run on database 'checkmate_demo'" in done.stderr
+    assert not out.exists()
+
+
+def test_author_cli_entry_point_writes_the_transcript(tmp_path: Path):
+    import subprocess
+    import sys
+
+    out = tmp_path / "t.json"
+    done = subprocess.run(
+        [sys.executable, "-m", "backend.frontdesk.author_transcript", "--out", str(out)],
+        check=False,
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert done.returncode == 0, done.stderr
+    assert load_transcript(out).turns
