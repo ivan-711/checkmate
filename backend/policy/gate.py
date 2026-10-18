@@ -58,6 +58,11 @@ _RECORDS_BY_KEYS = text(
     "(SELECT unnest(CAST(:types AS text[])), unnest(CAST(:values AS text[])))"
 )
 _STICKY = text("SELECT DISTINCT unnest(evidence_ids) AS record_id FROM agent_tool_call WHERE session_id = :session_id")
+# Every band a candidate was ever given in this session, read from the audit rows (never process memory).
+_STICKY_BANDS = text(
+    "SELECT c->>'recordId' AS record_id, c->>'band' AS band FROM agent_tool_call, "
+    "jsonb_array_elements(evidence_snapshot->'candidates') AS c WHERE session_id = :session_id"
+)
 _RECORD = text(
     "SELECT sr.id AS record_id, sr.source_system, nr.given_name, nr.family_name, nr.given_name_folded, "
     "nr.family_name_folded, nr.birth_date, nr.birth_year, nr.birth_month, nr.birth_day, nr.sex, nr.phone_e164, "
@@ -98,6 +103,19 @@ def _sticky_ids(conn: Connection, session_id: UUID) -> set[UUID]:
     return {r.record_id for r in conn.execute(_STICKY, {"session_id": session_id})}
 
 
+def _sticky_bands(conn: Connection, session_id: UUID) -> dict[UUID, Band]:
+    """Highest band each candidate ever had in this session (ADR-016 §2(b), §8(3)): a REVIEW-or-higher
+    hit stays blocking even when the model's next arguments no longer resemble that record."""
+    highest: dict[UUID, Band] = {}
+    for r in conn.execute(_STICKY_BANDS, {"session_id": session_id}):
+        if not r.record_id or not r.band:
+            continue
+        record_id, band = UUID(r.record_id), Band(r.band)
+        if record_id not in highest or BAND_RANK[band] > BAND_RANK[highest[record_id]]:
+            highest[record_id] = band
+    return highest
+
+
 def _pair_status(conn: Connection, intake_record_id: UUID | None) -> dict[UUID, tuple[UUID, UUID, DecisionStatus]]:
     """candidate record id -> (pair id, latest decision id, status) over every pair with the intake record."""
     if intake_record_id is None:
@@ -109,14 +127,16 @@ def _pair_status(conn: Connection, intake_record_id: UUID | None) -> dict[UUID, 
     return out
 
 
-def _snapshot_entry(record_id: UUID, source_system: str, result) -> dict:
+def _snapshot_entry(record_id: UUID, source_system: str, result, band: Band, sticky: Band | None) -> dict:
     contributions = sorted(result.evidence.contributions, key=lambda c: -abs(c.logit))
     return {
         "recordId": str(record_id),
         "sourceSystem": source_system,
         "s": result.evidence.raw_score,
         "p": result.p,
-        "band": Band(result.band).value,
+        "band": band.value,
+        "bandNow": Band(result.band).value,
+        "bandSticky": sticky.value if sticky else None,
         "negativeRulesFired": list(result.evidence.negative_rules_fired),
         "topContributions": [
             c.model_dump(mode="json", by_alias=True) for c in contributions[:TOP_CONTRIBUTIONS_IN_LIST_VIEWS]
@@ -134,13 +154,18 @@ def _score(conn: Connection, session_id: UUID, args: SearchArgs | ProposeArgs, s
     probe = normalize_record(demographics_of(args))
     ids = _candidate_ids_by_block(conn, probe) | _sticky_ids(conn, session_id)
     ids.discard(session.intake_record_id)
+    sticky_bands = _sticky_bands(conn, session_id)
     statuses = _pair_status(conn, session.intake_record_id)
     candidates: list[ScoredCandidate] = []
     entries: list[dict] = []
     if ids:
         for row in conn.execute(_RECORD, {"ids": list(ids)}):
             result = CORE.match(probe, row._mapping, thresholds)
-            entry = _snapshot_entry(row.record_id, row.source_system, result)
+            sticky = sticky_bands.get(row.record_id)
+            band = Band(result.band)
+            if sticky is not None and BAND_RANK[sticky] > BAND_RANK[band]:
+                band = sticky
+            entry = _snapshot_entry(row.record_id, row.source_system, result, band, sticky)
             sha = _sha256(entry)
             entry["sha256"] = sha
             pair_id, decision_id, status = statuses.get(row.record_id, (None, None, None))
@@ -150,7 +175,7 @@ def _score(conn: Connection, session_id: UUID, args: SearchArgs | ProposeArgs, s
                     source_system=row.source_system,
                     s=result.evidence.raw_score,
                     p=result.p,
-                    band=result.band,
+                    band=band,
                     negative_rules_fired=list(result.evidence.negative_rules_fired),
                     human_status=status,
                     pair_id=pair_id,

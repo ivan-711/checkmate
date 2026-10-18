@@ -131,3 +131,20 @@ def test_every_month_name_grounds_a_date(month):
         text = f"born 15 {name} 1990"
         args = {**ARGS, "birthDate": f"1990-{month:02d}-15", "evidence": {**EVIDENCE, "birthDate": text}}
         assert parse(args=args, texts=(TEXT_ES + " " + text,)).grounding_ok
+
+
+def test_sex_unknown_needs_no_quote():
+    no_sex_quote = {k: v for k, v in EVIDENCE.items() if k != "sex"}
+    assert parse(args={**ARGS, "sex": "UNKNOWN", "evidence": no_sex_quote}).grounding_ok
+    # a quote given for UNKNOWN is ignored, even one that is not in the user text
+    assert parse(args={**ARGS, "sex": "UNKNOWN", "evidence": {**no_sex_quote, "sex": "not typed"}}).grounding_ok
+
+
+def test_stated_sex_needs_a_quote_with_a_sex_word():
+    no_sex_quote = {k: v for k, v in EVIDENCE.items() if k != "sex"}
+    assert not parse(args={**ARGS, "sex": "FEMALE", "evidence": no_sex_quote}).grounding_ok
+    assert parse(
+        args={**ARGS, "evidence": {**no_sex_quote, "sex": "soy mujer"}}, texts=(TEXT_ES + " soy mujer",)
+    ).grounding_ok
+    # the quote is in the text but names the other sex: ungrounded
+    assert not parse(args={**ARGS, "sex": "MALE", "evidence": {**no_sex_quote, "sex": "mujer"}}).grounding_ok

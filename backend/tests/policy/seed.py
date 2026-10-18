@@ -90,14 +90,25 @@ def insert_session(conn) -> UUID:
     return sid
 
 
-def insert_tool_call(conn, session_id: UUID, evidence_ids: list[UUID], step_index: int = 0) -> UUID:
+def insert_tool_call(
+    conn, session_id: UUID, evidence_ids: list[UUID], step_index: int = 0, bands: dict[UUID, str] | None = None
+) -> UUID:
+    """An earlier search_patients audit row; ``bands`` is what its snapshot said about each candidate."""
     tid = uuid4()
+    snapshot = {"candidates": [{"recordId": str(i), "band": (bands or {}).get(i, "REVIEW")} for i in evidence_ids]}
     conn.execute(
         text(
             "INSERT INTO agent_tool_call (id, session_id, turn_index, step_index, tool_name, args_sha256, gate_outcome, "
             "evidence_ids, evidence_snapshot, effect_status, policy_version) VALUES (:id, :sid, 0, :step, "
-            "'search_patients', :sha, 'ALLOW', CAST(:ids AS uuid[]), '{}', 'NONE', 'frontdesk-gate/1')"
+            "'search_patients', :sha, 'ALLOW', CAST(:ids AS uuid[]), CAST(:snapshot AS jsonb), 'NONE', 'frontdesk-gate/1')"
         ),
-        {"id": tid, "sid": session_id, "step": step_index, "sha": "f" * 64, "ids": [str(i) for i in evidence_ids]},
+        {
+            "id": tid,
+            "sid": session_id,
+            "step": step_index,
+            "sha": "f" * 64,
+            "ids": [str(i) for i in evidence_ids],
+            "snapshot": json.dumps(snapshot),
+        },
     )
     return tid

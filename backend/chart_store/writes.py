@@ -224,6 +224,8 @@ def create_handoff_pairs(
                 scorer_version=scorer_version, threshold_set_id=thresholds_id, policy_version=POLICY_VERSION
             ),
             payload={"intakeSessionId": str(session_id), "candidateRecordId": str(candidate.record_id)},
+            intake_session_id=session_id,
+            gate_outcome=token.decision.outcome.value,
         )
     return pair_ids
 
