@@ -33,6 +33,8 @@ describe("FixtureSource FrontDesk intake", () => {
       handoffRequired: true,
       policyVersion: "frontdesk-gate/1",
     });
+    // Well-formed calls carry their validated arguments; only an invalid call has null args.
+    expect(propose.args).toMatchObject({ birthDate: scenario.pair.recordA.normalized.birthDate });
     expect(propose.candidates![0]).toMatchObject({
       band: scenario.pair.pair.decision.band,
       pairId: scenario.pair.pair.id,

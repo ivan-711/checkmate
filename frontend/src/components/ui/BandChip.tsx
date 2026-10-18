@@ -7,14 +7,15 @@ const BANDS = {
   KEEP_SEPARATE: { label: "KEEP SEPARATE", Icon: Split, className: "bg-band-keep text-on-band-keep" },
 } as const satisfies Record<Band, unknown>;
 
-export function BandChip({ band }: { band: Band }) {
+/** `label` replaces the English text where the screen is in another language (the kiosk). */
+export function BandChip({ band, label: override }: { band: Band; label?: string }) {
   const { label, Icon, className } = BANDS[band];
   return (
     <span
       className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[14px] font-semibold ${className}`}
     >
       <Icon aria-hidden size={16} />
-      {label}
+      {override ?? label}
     </span>
   );
 }

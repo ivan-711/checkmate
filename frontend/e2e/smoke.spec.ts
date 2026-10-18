@@ -232,6 +232,21 @@ test("FrontDesk check-in: the gate denies a new chart at REVIEW and hands it to 
   await expect(tile.getByText("1 denied · 1 allowed")).toBeVisible(); // the audit history stays
 });
 
+test("FrontDesk in Spanish: the gate card, band and evidence fields are in Spanish", async ({ page }) => {
+  await page.goto("/frontdesk");
+  await page.getByRole("button", { name: "Español" }).click();
+  await page.getByRole("button", { name: "Usar este" }).click();
+  await page.keyboard.press("Enter");
+  const gate = page.getByTestId("gate-card");
+  await expect(gate).toContainText("Bloqueado por el control de identidad");
+  await expect(gate).toContainText("REVISIÓN");
+  await expect(gate).toContainText("Fecha de nacimiento");
+  await expect(gate).not.toContainText("REVIEW ");
+  await page.getByRole("button", { name: "Empezar de nuevo" }).click();
+  await expect(page.getByTestId("kiosk-composer")).toBeFocused();
+  await expect(page.getByTestId("kiosk-composer")).toHaveValue("");
+});
+
 test("FrontDesk: other text gets the template answer and no tool runs", async ({ page }) => {
   await page.goto("/frontdesk");
   await page.getByTestId("kiosk-composer").fill("I have an appointment at three.");
