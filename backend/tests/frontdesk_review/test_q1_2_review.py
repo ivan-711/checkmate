@@ -196,7 +196,7 @@ def handoff_events(engine, pair_ids):
 
 
 def test_session_create_pins_mode_server_side_and_rejects_a_mode_field(api, engine):
-    client, use, start, turn, _ = api
+    client, _use, start, _turn, _ = api
     body = start("EN")
     assert body["agentMode"] == "REPLAY" and body["promptVersion"] == "fd-prompt/1"
     assert body["toolSchemaVersion"] == "fd-tools/1" and body["registration"]["state"] == "NONE"
@@ -229,7 +229,7 @@ def test_turn_envelope_404_422_idempotency(api, engine):
 
 
 def test_in_flight_same_key_is_409_and_closed_session_is_409(api, engine):
-    client, use, start, turn, _ = api
+    _client, use, start, turn, _ = api
     use(ScriptedModel([say("x")], engine))
     sid = start("EN")["id"]
     key = str(uuid.uuid4())
@@ -256,7 +256,7 @@ def test_in_flight_same_key_is_409_and_closed_session_is_409(api, engine):
 
 
 def test_stale_lease_is_failed_at_next_claim_and_reclaimable(api, engine):
-    client, use, start, turn, _ = api
+    _client, use, start, turn, _ = api
     use(ScriptedModel([say("x"), say("y")], engine))
     sid = start("EN")["id"]
     key = str(uuid.uuid4())
@@ -294,7 +294,7 @@ def test_served_openapi_matches_frozen_for_intake_paths(api):
 
 
 def test_propose_on_near_duplicate_is_denied_audited_and_handed_off(api, engine, seeded):
-    er, clinic, unrelated = seeded
+    er, clinic, _unrelated = seeded
     client, use, start, turn, _ = api
     model = ScriptedModel(
         [call("propose_new_chart", HERO_ARGS), say("Gracias, una persona de registro le ayudará.")], engine
@@ -366,7 +366,7 @@ def test_propose_on_near_duplicate_is_denied_audited_and_handed_off(api, engine,
 
 
 def test_denied_twice_does_not_duplicate_handoff_pairs(api, engine, seeded):
-    client, use, start, turn, _ = api
+    _client, use, start, turn, _ = api
     use(
         ScriptedModel(
             [call("propose_new_chart", HERO_ARGS), say("a"), call("propose_new_chart", HERO_ARGS), say("b")], engine
@@ -396,7 +396,7 @@ def test_denied_twice_does_not_duplicate_handoff_pairs(api, engine, seeded):
 
 
 def test_new_patient_is_allowed_once_then_replayed(api, engine, seeded):
-    client, use, start, turn, _ = api
+    _client, use, start, turn, _ = api
     use(
         ScriptedModel(
             [
@@ -429,7 +429,7 @@ def test_new_patient_is_allowed_once_then_replayed(api, engine, seeded):
 
 
 def test_model_claiming_a_chart_without_the_effect_is_swapped_for_the_template(api, engine, seeded):
-    client, use, start, turn, _ = api
+    _client, use, start, turn, _ = api
     use(ScriptedModel([say("Great news, I created your chart.")], engine))
     sid = start("EN")["id"]
     body = turn(sid, NEW_TEXT).json()
@@ -449,7 +449,7 @@ def test_model_claiming_a_chart_without_the_effect_is_swapped_for_the_template(a
 
 
 def test_unknown_tool_extra_property_bad_postal_are_audited_denies_not_500(api, engine, seeded):
-    client, use, start, turn, _ = api
+    _client, use, start, turn, _ = api
     bad_postal = {**NEW_ARGS, "postalCode": "ABCDE", "evidence": {**NEW_ARGS["evidence"], "postalCode": "ABCDE"}}
     use(
         ScriptedModel(
@@ -477,7 +477,7 @@ def test_unknown_tool_extra_property_bad_postal_are_audited_denies_not_500(api, 
 
 
 def test_seven_tool_calls_trip_the_loop_guard_and_the_template(api, engine, seeded):
-    client, use, start, turn, _ = api
+    _client, use, start, turn, _ = api
     model = ScriptedModel(
         [
             call(
@@ -502,7 +502,7 @@ def test_seven_tool_calls_trip_the_loop_guard_and_the_template(api, engine, seed
 
 
 def test_timeout_retries_once_then_degrades_and_two_degraded_turns_stop_calling_the_model(api, engine, seeded):
-    client, use, start, turn, _ = api
+    _client, use, start, turn, _ = api
     sid = start("EN")["id"]
     m1 = ScriptedModel([err("TIMEOUT", True), err("TIMEOUT", True), say("never")], engine)
     use(m1)
@@ -532,7 +532,7 @@ def test_replay_mode_without_the_player_degrades_honestly(api, engine, monkeypat
     from backend.app import main
 
     main.app.dependency_overrides.pop(intake.get_model_factory, None)
-    client, use, start, turn, _ = api
+    _client, _use, start, turn, _ = api
     monkeypatch.setenv("FRONTDESK_AGENT_MODE", "REPLAY")
     sid = start("EN")["id"]
     body = turn(sid, "hi").json()
@@ -545,7 +545,7 @@ def test_replay_mode_without_the_player_degrades_honestly(api, engine, monkeypat
 def test_user_free_text_does_not_land_in_event_payload(api, engine, seeded):
     """ADR-016 §6: payload is validated args, never free text. A model that quotes the whole typed
     line as evidence puts the whole typed line in event_log.payload."""
-    client, use, start, turn, _ = api
+    _client, use, start, turn, _ = api
     typed = "I am Priscilla Oyelaran-Whitcombe, born 1992-11-28, female, phone 555 123 4567, and I hate hospitals"
     args = {**NEW_ARGS, "evidence": {**NEW_ARGS["evidence"], "givenName": typed}}
     use(ScriptedModel([call("propose_new_chart", args), say("ok")], engine))
@@ -581,7 +581,7 @@ def test_registration_reads_new_chart_after_a_release_and_an_allowed_propose(api
 
 def test_adapter_exception_does_not_leave_the_turn_in_progress(api, engine):
     """Adapters must not raise, but if one does the turn must not sit IN_PROGRESS behind a 500."""
-    client, use, start, turn, _ = api
+    _client, use, start, turn, _ = api
     m = ScriptedModel([], engine)
     m.raise_exc = RuntimeError("boom")
     use(m)
