@@ -13,14 +13,21 @@ from backend.chart_store import writes
 from backend.policy.decide import allow_token, decide, handoff_token
 from backend.policy.gate import evaluate
 from backend.policy.tokens import TokenMismatch
-from backend.tests.policy.factories import action, attach_args, candidate, propose_args
+from backend.tests.policy.factories import action, attach_args, candidate, propose_args, session
 from backend.tests.policy.seed import insert_session, near_duplicates
 from backend.tests.policy.test_gate_db import FACTS, PROPOSE_ARGS, USER_TEXT
 from contracts.models.common import Band, DecisionStatus, EventType, PairOrigin, SourceKind
 from contracts.models.intake import EffectStatus
 from contracts.models.policy import HistoryItem, HistoryKind, ToolName
 
-ALLOW = allow_token(decide(action(ToolName.SEARCH_PATIENTS.value), []))
+ALLOW = allow_token(decide(action(), []))  # propose_new_chart ALLOW
+INTAKE_ID = candidate().record_id
+ATTACH = allow_token(
+    decide(
+        action(ToolName.ATTACH_HISTORY.value, session=session(intake_record_id=INTAKE_ID, intake_args_sha256="a")), []
+    )
+)
+SEARCH = allow_token(decide(action(ToolName.SEARCH_PATIENTS.value), []))
 HANDOFF = handoff_token(decide(action(), [candidate(Band.REVIEW)]))
 BARE = decide(action(), [])
 
@@ -136,10 +143,10 @@ def test_mark_new_chart_and_history(conn):
     effect = writes.mark_new_chart(conn, ALLOW, session_id=sid, intake_record_id=rid)
     assert (effect.status, effect.ref) == (EffectStatus.APPLIED, str(rid))
     items = [HistoryItem(kind=HistoryKind.ALLERGY, text="Amoxicillin", evidence_quote="alergia a la amoxicilina")]
-    first = writes.append_intake_history(conn, ALLOW, intake_record_id=rid, items=items)
+    first = writes.append_intake_history(conn, ATTACH, intake_record_id=rid, items=items)
     assert [e.status for e in first] == [EffectStatus.APPLIED]
     replay = writes.append_intake_history(
-        conn, ALLOW, intake_record_id=rid, items=[items[0].model_copy(update={"text": "  AMOXICILLIN "})]
+        conn, ATTACH, intake_record_id=rid, items=[items[0].model_copy(update={"text": "  AMOXICILLIN "})]
     )
     assert [e.status for e in replay] == [EffectStatus.REPLAYED] and replay[0].ref == first[0].ref
     rows = conn.execute(
@@ -179,6 +186,20 @@ def test_every_write_refuses_anything_but_a_token(conn, bad):
         writes.append_intake_history(conn, bad, intake_record_id=sid, items=attach_args().items)
 
 
+def test_tokens_for_the_wrong_tool_are_refused(conn):
+    sid = insert_session(conn)
+    for wrong in (SEARCH, ATTACH):
+        with pytest.raises(TokenMismatch):
+            writes.create_intake_record(
+                conn, wrong, session_id=sid, args=propose_args(), args_sha256="a", scenario_context_id=None
+            )
+        with pytest.raises(TokenMismatch):
+            writes.mark_new_chart(conn, wrong, session_id=sid, intake_record_id=sid)
+    for wrong in (SEARCH, ALLOW):
+        with pytest.raises(TokenMismatch):
+            writes.append_intake_history(conn, wrong, intake_record_id=sid, items=attach_args().items)
+
+
 def test_handoff_writes_refuse_an_allow_token(conn):
     sid = insert_session(conn)
     with pytest.raises(TokenMismatch):
@@ -212,3 +233,55 @@ def test_only_the_executor_imports_chart_store_writes():
             if any(n.startswith("backend.chart_store.writes") or n == "backend.chart_store" for n in names):
                 offenders.append(str(path.relative_to(root)))
     assert offenders == []
+
+
+def test_handoff_reuses_a_match_run_pair_and_attaches_it_to_the_session(conn):
+    """A match run may already hold the (intake, candidate) pair: the unique index forbids a second
+    one, so the handoff reuses it, sets intake_session_id and appends PROPOSED v1 only when it has
+    no decision yet."""
+    from backend.tests.link.seed import insert_decision, insert_pair
+
+    er, clinic = near_duplicates(conn)
+    sid = insert_session(conn)
+    ev = evaluate(
+        conn,
+        session_id=sid,
+        tool_name="propose_new_chart",
+        raw_args=PROPOSE_ARGS,
+        user_texts=(USER_TEXT,),
+        session=FACTS,
+    )
+    token = handoff_token(ev.decision)
+    rid = writes.create_intake_record(
+        conn, token, session_id=sid, args=ev.action.args, args_sha256=ev.action.args_sha256, scenario_context_id=None
+    )
+    bare_pair = insert_pair(conn, rid, er)  # MATCH_RUN, no decision yet
+    decided_pair = insert_pair(conn, rid, clinic)
+    insert_decision(conn, decided_pair, 1, DecisionStatus.PROPOSED, actor="system:scorer", actor_type="SYSTEM")
+    pair_ids = writes.create_handoff_pairs(
+        conn,
+        token,
+        session_id=sid,
+        intake_record_id=rid,
+        candidates=ev.candidates,
+        evidence_snapshot=ev.evidence_snapshot,
+        thresholds_id=ev.thresholds_id,
+        scorer_version=ev.scorer_version,
+    )
+    assert {bare_pair, decided_pair} <= set(pair_ids)
+    rows = {
+        r.id: r
+        for r in conn.execute(
+            text("SELECT * FROM candidate_pair WHERE id IN (:a, :b)"), {"a": bare_pair, "b": decided_pair}
+        )
+    }
+    assert all(r.origin == PairOrigin.MATCH_RUN.value and r.intake_session_id == sid for r in rows.values())
+    versions = conn.execute(
+        text(
+            "SELECT pair_id, count(*) AS n, max(version) AS v FROM match_decision WHERE pair_id IN (:a, :b) GROUP BY pair_id"
+        ),
+        {"a": bare_pair, "b": decided_pair},
+    ).all()
+    by_pair = {r.pair_id: (r.n, r.v) for r in versions}
+    assert by_pair[bare_pair] == (1, 1)  # PROPOSED v1 appended by the gate
+    assert by_pair[decided_pair] == (1, 1)  # the scorer's PROPOSED kept, nothing duplicated

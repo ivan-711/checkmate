@@ -25,7 +25,7 @@ from backend.policy.tokens import PolicyAllow, PolicyHandoff, require_token
 from contracts.models.common import ActorType, Band, DecisionStatus, EventType, PairOrigin, SourceKind
 from contracts.models.events import Versions
 from contracts.models.intake import Effect, EffectStatus
-from contracts.models.policy import HistoryItem, ProposeArgs, ScoredCandidate
+from contracts.models.policy import HistoryItem, ProposeArgs, ScoredCandidate, ToolName
 from contracts.version import POLICY_VERSION
 
 INTAKE_SOURCE_SYSTEM = "FRONTDESK_INTAKE"
@@ -66,10 +66,12 @@ _INSERT_BLOCK_KEY = text(
 _SET_INTAKE = text(
     "UPDATE intake_session SET intake_record_id = :record_id, intake_args_sha256 = :sha WHERE id = :session_id"
 )
+# A pair a match run already created keeps its origin but is attached to the session, so the
+# registrar's later decision on it is found by the gate and the board alike.
 _UPSERT_PAIR = text(
     "INSERT INTO candidate_pair (id, record_a_id, record_b_id, block_keys, origin, intake_session_id) "
     "VALUES (:id, :a, :b, '{}', :origin, :session_id) "
-    "ON CONFLICT (record_a_id, record_b_id) DO UPDATE SET origin = candidate_pair.origin RETURNING id"
+    "ON CONFLICT (record_a_id, record_b_id) DO UPDATE SET intake_session_id = EXCLUDED.intake_session_id RETURNING id"
 )
 _CURRENT_DECISION = text(
     "SELECT version, status FROM match_decision WHERE pair_id = :pair_id ORDER BY version DESC LIMIT 1 FOR UPDATE"
@@ -122,7 +124,7 @@ def create_intake_record(
 ) -> UUID:
     """Source record (kind FRONTDESK_INTAKE), normalized row and block keys for this session's intake;
     idempotent: a session that already has an intake record gets the existing id back."""
-    require_token(token, PolicyAllow, PolicyHandoff)
+    require_token(token, PolicyAllow, PolicyHandoff, tool=ToolName.PROPOSE_NEW_CHART)
     session = conn.execute(_SESSION, {"session_id": session_id}).one()
     if session.intake_record_id is not None:
         return session.intake_record_id
@@ -164,7 +166,7 @@ def create_handoff_pairs(
     """One candidate_pair (origin FRONTDESK_HANDOFF) per blocking candidate in the decision's evidence,
     with a PROPOSED decision by the gate carrying the matcher's snapshot, and one INTAKE_HANDOFF_CREATED
     event per pair. A pair that already has a PROPOSED decision keeps it."""
-    require_token(token, PolicyHandoff)
+    require_token(token, PolicyHandoff, tool=ToolName.PROPOSE_NEW_CHART)
     blocking_ids = {ref.id for ref in token.decision.evidence_ids}
     per_candidate = {entry["recordId"]: entry for entry in evidence_snapshot.get("candidates", [])}
     pair_ids: list[UUID] = []
@@ -184,8 +186,8 @@ def create_handoff_pairs(
         ).scalar_one()
         pair_ids.append(pair_id)
         current = conn.execute(_CURRENT_DECISION, {"pair_id": pair_id}).one_or_none()
-        if current is not None and current.status == DecisionStatus.PROPOSED.value:
-            continue
+        if current is not None and current.status in (DecisionStatus.PROPOSED.value, DecisionStatus.LINKED.value):
+            continue  # already in the queue, or already a chart: nothing to re-propose
         entry = per_candidate.get(str(candidate.record_id), {})
         matcher = entry.get("matcher") or {}
         decision_id = uuid.uuid4()
@@ -230,7 +232,7 @@ def mark_new_chart(conn: Connection, token: PolicyAllow, *, session_id: UUID, in
     """The new-chart effect for this session: APPLIED the first time, REPLAYED once the effect key
     ``chart:v1:{session_id}`` has been claimed on an earlier tool call. Registration state is derived
     on read from the intake record and its decisions, so there is nothing else to flip."""
-    require_token(token, PolicyAllow)
+    require_token(token, PolicyAllow, tool=ToolName.PROPOSE_NEW_CHART)
     if conn.execute(_INTAKE_BELONGS, {"session_id": session_id, "record_id": intake_record_id}).one_or_none() is None:
         raise ValueError("intake record does not belong to this session")
     claimed = conn.execute(_EFFECT_CLAIMED, {"key": chart_effect_key(session_id)}).one_or_none()
@@ -244,7 +246,7 @@ def append_intake_history(
 ) -> list[Effect]:
     """Append patient-reported items to this intake record only; an item already present with the same
     kind and folded text is REPLAYED, never duplicated."""
-    require_token(token, PolicyAllow)
+    require_token(token, PolicyAllow, tool=ToolName.ATTACH_HISTORY)
     effects: list[Effect] = []
     for item in items:
         existing = conn.execute(_EXISTING_HISTORY, {"record_id": intake_record_id, "kind": item.kind.value}).all()

@@ -14,6 +14,7 @@ import json
 import re
 import unicodedata
 from collections.abc import Sequence
+from datetime import date
 
 from pydantic import ValidationError
 
@@ -137,28 +138,53 @@ def history_grounded(args: AttachArgs, user_texts: Sequence[str]) -> bool:
     return all(_quote_in_text(item.evidence_quote, folded_texts) for item in args.items)
 
 
-def parse_action(tool_name: str, raw_args: dict, *, user_texts: Sequence[str], session: SessionFacts) -> AgentAction:
-    """Validate camelCase arguments into the tool's model (else ``InvalidArgs``) and ground them."""
+def _invalid(tool_name: str, raw_args: object, errors: list[str], session: SessionFacts) -> AgentAction:
+    raw = raw_args if isinstance(raw_args, dict) else {"_raw": repr(raw_args)}
+    return AgentAction(
+        tool=tool_name,
+        args=InvalidArgs(raw=raw, errors=errors),
+        args_sha256=canonical_sha256(raw),
+        grounding_ok=False,
+        session=session,
+    )
+
+
+def _check_calendar_date(args: SearchArgs | ProposeArgs) -> None:
+    """The frozen pattern only shapes the string; month 13 or 31 February must still be INVALID_ARGUMENTS."""
+    if args.birth_date is not None:
+        try:
+            date.fromisoformat(args.birth_date)
+        except ValueError:
+            raise ValueError("birthDate: not a calendar date") from None
+
+
+def parse_action(tool_name: str, raw_args: object, *, user_texts: Sequence[str], session: SessionFacts) -> AgentAction:
+    """Validate camelCase arguments into the tool's model (else ``InvalidArgs``) and ground them.
+
+    Never raises: the model writes these values, and ADR-016 §4 says a schema failure is DENY
+    INVALID_ARGUMENTS, never an exception that skips the audit row.
+    """
+    try:
+        return _parse_action(tool_name, raw_args, user_texts=user_texts, session=session)
+    except Exception as exc:  # noqa: BLE001 - the model wrote the input; every failure is an invalid argument
+        return _invalid(tool_name, raw_args, [f"{type(exc).__name__}: {exc}"], session)
+
+
+def _parse_action(tool_name: str, raw_args: object, *, user_texts: Sequence[str], session: SessionFacts) -> AgentAction:
+    if not isinstance(raw_args, dict):
+        return _invalid(tool_name, raw_args, ["arguments must be an object"], session)
     model = _ARGS_MODELS.get(tool_name)
     if model is None:
-        return AgentAction(
-            tool=tool_name,
-            args=InvalidArgs(raw=raw_args, errors=["unknown tool"]),
-            args_sha256=canonical_sha256(raw_args),
-            grounding_ok=False,
-            session=session,
-        )
+        return _invalid(tool_name, raw_args, ["unknown tool"], session)
     try:
         args = model.model_validate(raw_args)
+        if isinstance(args, (SearchArgs, ProposeArgs)):
+            _check_calendar_date(args)
     except ValidationError as exc:
         errors = [f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in exc.errors()]
-        return AgentAction(
-            tool=tool_name,
-            args=InvalidArgs(raw=raw_args, errors=errors),
-            args_sha256=canonical_sha256(raw_args),
-            grounding_ok=False,
-            session=session,
-        )
+        return _invalid(tool_name, raw_args, errors, session)
+    except ValueError as exc:
+        return _invalid(tool_name, raw_args, [str(exc)], session)
     if isinstance(args, AttachArgs):
         grounded = history_grounded(args, user_texts)
     else:

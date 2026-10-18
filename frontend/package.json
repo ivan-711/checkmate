@@ -1,0 +1,46 @@
+{
+  "name": "checkmate-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "gen:api": "openapi-typescript ../contracts/openapi.json -o src/api/schema.d.ts",
+    "predev": "npm run gen:api",
+    "dev": "next dev -H 127.0.0.1 -p 3000",
+    "prebuild": "npm run gen:api",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1 -p 3000",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.104.4",
+    "lucide-react": "1.59.0",
+    "next": "15.5.28",
+    "openapi-fetch": "0.17.0",
+    "react": "19.1.10",
+    "react-dom": "19.1.10",
+    "sonner": "2.0.8"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "3.3.7",
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "15.5.28",
+    "openapi-typescript": "7.13.0",
+    "prettier": "3.9.10",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  }
+}

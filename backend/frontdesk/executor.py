@@ -104,6 +104,27 @@ def attach_effect_key(session_id: UUID, kind: str, item_text: str) -> str:
     return f"attach:v1:{session_id}:{_digest(f'{kind}|{fold(item_text)}')}"
 
 
+def event_payload(validated_args: dict | None, grounding_ok: bool) -> dict:
+    """ADR-016 §6: the event payload is the validated args and never free text. The evidence quotes
+    (and attach items' evidenceQuote) are the patient's typed words, so they leave the payload and
+    only their sha256 stays; the full args remain on ``agent_tool_call.args`` (the audit row, not the feed)."""
+    if validated_args is None:
+        return {"groundingOk": grounding_ok}
+    payload = {k: v for k, v in validated_args.items() if k != "evidence"}
+    quotes: dict = {}
+    if "evidence" in validated_args:
+        quotes["evidence"] = validated_args["evidence"]
+    if isinstance(payload.get("items"), list):
+        quotes["items"] = [i.get("evidenceQuote") for i in payload["items"]]
+        payload["items"] = [{k: v for k, v in i.items() if k != "evidenceQuote"} for i in payload["items"]]
+    payload["groundingOk"] = grounding_ok
+    if quotes:
+        payload["evidenceSha256"] = _digest(
+            json.dumps(quotes, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        )
+    return payload
+
+
 def tool_result_sha256(tool_result: dict) -> str:
     canonical = json.dumps(tool_result, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode()).hexdigest()
@@ -242,7 +263,7 @@ def _execute(
         outcome=OUTCOME_LABEL[decision.outcome],
         latency_ms=latency_ms,
         versions=versions,
-        payload=validated_args or {},
+        payload=event_payload(validated_args, action.grounding_ok),
         tool_call_id=tool_call_id,
         tool_name=step.tool_name,
         gate_outcome=decision.outcome.value,
@@ -290,7 +311,7 @@ def _apply_effect(
     none = Effect(status=EffectStatus.NONE)
     tool, outcome, reason = action.tool, decision.outcome, decision.reason_code
     if tool == ToolName.PROPOSE_NEW_CHART and outcome == PolicyOutcome.ALLOW:
-        token = policy_decide.allow_token(decision)
+        token = policy_decide.allow_token(decision, tool)
         intake_record_id = current.intake_record_id or chart_writes.create_intake_record(
             conn,
             token,
@@ -302,7 +323,7 @@ def _apply_effect(
         applied = chart_writes.mark_new_chart(conn, token, session_id=session_id, intake_record_id=intake_record_id)
         return Notice.NEW_CHART_CREATED, applied, chart_effect_key(session_id), [], intake_record_id
     if tool == ToolName.PROPOSE_NEW_CHART and reason == PolicyReason.CANDIDATE_IN_REVIEW_OR_HIGHER:
-        token = policy_decide.handoff_token(decision)
+        token = policy_decide.handoff_token(decision, tool)
         intake_record_id = current.intake_record_id or chart_writes.create_intake_record(
             conn,
             token,
@@ -323,7 +344,7 @@ def _apply_effect(
         )
         return Notice.HANDED_TO_REGISTRAR, none, None, list(pair_ids), intake_record_id
     if tool == ToolName.ATTACH_HISTORY and outcome == PolicyOutcome.ALLOW and isinstance(action.args, AttachArgs):
-        token = policy_decide.allow_token(decision)
+        token = policy_decide.allow_token(decision, tool)
         intake_record_id = current.intake_record_id
         effects = chart_writes.append_intake_history(
             conn, token, intake_record_id=intake_record_id, items=list(action.args.items)

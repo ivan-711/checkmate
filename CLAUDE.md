@@ -77,7 +77,7 @@ Security: 12 approval, split and chart creation only through their endpoints; th
 ## Skills each lane loads (and no more)
 - Builders: `superpowers:test-driven-development`, `superpowers:verification-before-completion`.
 - Reviewers: `code-review` (and Codex in its read-only sandbox).
-- UI lanes add `impeccable` and the accessibility pass only in the 20:45 polish pass, not before.
+- UI lanes load `impeccable`, the accessibility pass and Context7 docs from 19:20 (Ivan, design squad on Alejandro Barojas's machine); every change is still a reviewed PR, and the G16 path and its `data-testid`s stay as they are.
 - Nobody loads brainstorming or planning skills inside a lane; the plan is done.
 
 ## Process rules that save time
