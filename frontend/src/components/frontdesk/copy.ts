@@ -31,6 +31,9 @@ export const COPY = {
     reading: "Reading your message",
     suggestLabel: "Try this check-in",
     suggestUse: "Use this",
+    constructed: "constructed scenario",
+    constructedKiosk:
+      "This check-in matches a synthetic patient built for the demo. All records are synthetic.",
     agentDown: "FrontDesk could not reach the agent service. Your message was not sent.",
     startFailed: "FrontDesk could not reach the agent service.",
     tryAgain: "Try again",
@@ -83,6 +86,9 @@ export const COPY = {
     reading: "Leyendo su mensaje",
     suggestLabel: "Pruebe este registro",
     suggestUse: "Usar este",
+    constructed: "escenario construido",
+    constructedKiosk:
+      "Este registro corresponde a un paciente sintético creado para la demostración. Todos los registros son sintéticos.",
     agentDown: "FrontDesk no pudo conectar con el servicio del agente. Su mensaje no se envió.",
     startFailed: "FrontDesk no pudo conectar con el servicio del agente.",
     tryAgain: "Intentar de nuevo",
