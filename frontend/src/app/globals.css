@@ -58,11 +58,12 @@
 @media (max-width: 1300px), (max-height: 760px) {
   :root {
     --kiosk-w: 400px;
-    --stage-head-h: 118px;
+    --stage-head-h: 126px;
     --stage-title: 44px;
     --organism-w: 516px;
     --organism-h: 447px;
     --organism-scale: 0.86;
+    --decision-w: 264px;
     --strip-h: 52px;
     --desk-gap: 24px;
   }
@@ -182,6 +183,14 @@ kbd {
   margin-left: 10px;
 }
 
+.app-header {
+  display: flex;
+  height: var(--bar-h);
+  align-items: center;
+  gap: 24px;
+  padding-inline: 28px;
+}
+
 /* The Desk (CONCEPT.md §3): top bar, then the kiosk device and the registrar's stage. The window
    never scrolls; the stage body and the kiosk scroll inside themselves when they must. */
 .desk {
@@ -214,7 +223,7 @@ kbd {
 }
 .stage-body {
   display: grid;
-  grid-template-columns: var(--organism-w) minmax(0, 1fr);
+  grid-template-columns: var(--organism-w) minmax(var(--decision-w), 1fr);
   gap: var(--desk-gap);
   min-height: 0;
   overflow: auto;
@@ -269,6 +278,128 @@ kbd {
   }
   .stepper-rule {
     width: 6px;
+  }
+}
+
+/* A tall 1080-wide display still shows the full Desk. The header gets its own story row, while
+   the record and decision column scale together so neither is clipped. */
+@media (min-width: 901px) and (max-width: 1180px) {
+  :root {
+    --bar-h: 112px;
+    --kiosk-w: 360px;
+    --organism-w: 380px;
+    --organism-h: 330px;
+    --organism-scale: 0.6333;
+    --decision-w: 272px;
+    --desk-gap: 16px;
+  }
+  .app-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 60px 52px;
+    gap: 0 16px;
+    padding-inline: 16px;
+  }
+  .header-brand {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .header-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .header-story {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    overflow-x: auto;
+  }
+  .desk {
+    gap: 20px;
+    padding-inline: 16px;
+  }
+}
+
+/* Portrait screens are the patient-facing kiosk surface. The registrar stage stays available on
+   landscape screens, and removing it here prevents an off-screen desktop grid from widening the page. */
+@media (max-width: 900px) {
+  :root {
+    --bar-h: 112px;
+  }
+  .app-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 60px 52px;
+    gap: 0 12px;
+    padding-inline: 12px;
+  }
+  .header-brand {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .header-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .header-story {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    max-width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+  .desk {
+    display: block;
+    padding: 4px 12px 12px;
+  }
+  .desk > .stage {
+    display: none;
+  }
+  .desk > [aria-label="Patient kiosk"] {
+    height: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --bar-h: 156px;
+  }
+  .app-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 52px 52px 52px;
+  }
+  .header-brand {
+    grid-column: 1 / -1;
+  }
+  .header-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    gap: 4px;
+    justify-content: space-between;
+  }
+  .header-story {
+    grid-row: 3;
+  }
+  .header-actions [data-testid="hero-provisional-badge"],
+  .header-actions [data-testid="app-mode-badge"],
+  .header-actions button {
+    height: 32px;
+    padding-inline: 6px;
+    font-size: 12px;
+  }
+  .header-actions kbd {
+    margin-left: 4px;
+    padding: 3px;
+  }
+  .stepper {
+    gap: 0;
+    font-size: 11px;
+  }
+  .stepper > li {
+    gap: 4px;
+  }
+  .stepper-rule {
+    width: 2px;
+    margin-right: 2px;
   }
 }
 
@@ -328,6 +459,8 @@ kbd {
 }
 .cmd-box [cmdk-item] kbd {
   margin-left: auto;
+  color: var(--ink);
+  opacity: 1;
 }
 .cmd-box [cmdk-empty] {
   padding: 14px;

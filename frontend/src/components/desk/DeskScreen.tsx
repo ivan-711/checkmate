@@ -60,9 +60,9 @@ function StageHead() {
           {suffix}
         </span>
       </p>
-      <h1 data-testid="stage-title" className="stage-title">
+      <h2 data-testid="stage-title" className="stage-title">
         {head.title}
-      </h1>
+      </h2>
       <p data-testid="stage-subtitle" className="mt-3 max-w-[760px] text-[18px] text-ink-2">
         {head.subtitle}
       </p>
@@ -127,6 +127,7 @@ export function DeskScreen() {
 
   return (
     <div className="desk">
+      <h1 className="sr-only">CheckMate identity desk</h1>
       <section
         aria-label="Patient kiosk"
         className="desk-region overflow-y-auto rounded-device bg-paper shadow-[0_0_0_1px_var(--hair),0_24px_60px_-30px_rgba(60,20,55,0.18)]"
