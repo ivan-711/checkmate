@@ -13,7 +13,7 @@ At build time:
 - A paired adversarial reviewer agent reviewed every lane: it ran the app and the acceptance script, wrote tests meant to fail, and posted PASS or BLOCK on the pull request.
 - Codex (read-only sandbox) and GitHub Copilot code review ran on every pull request.
 - The evaluation harness ran on every merge to `main` and posts per-band precision and recall with n.
-- A human clicked every merge. No agent merges.
+- Merges: a human clicked every merge until 17:15 CT on Saturday. From then on, under the owner's standing authorization, the lead orchestration session merged a pull request only when every gate was green: CI, the paired reviewer's PASS and a second independent review. Either of us could still click merge.
 
 At runtime, separately: Gemini runs the intake conversation, language handling and tool arguments. Matching, the policy gate, the allergy rule and the approval are deterministic code or a human decision. No language model sits on the decision path.
 
@@ -29,6 +29,17 @@ make up
 
 `make up` builds and starts the database and the API (`Makefile`, `docker-compose.yml`); the API container applies the migrations before it starts (`backend/Dockerfile`), so the API can take a few seconds to answer after `make up` returns. Then open http://127.0.0.1:8000/api/v1/health and expect `"db":"UP"` (`backend/app/main.py`, `contracts/models/health.py`).
 
+`POST /api/v1/sessions` with `{"scenarioId": "hero"}` starts a demo session (`backend/api/sessions.py`). Under `make up` it loads the placeholder fixture hero from `contracts/fixtures/scenario.json`: `CHECKMATE_HERO_SOURCE` defaults to `fixture` and `docker-compose.yml` does not set it (`backend/scenarios/loader.py`). The `corpus` source (`CHECKMATE_HERO_SOURCE=corpus`) rebuilds the corpus from the Synthea sample in `data/raw` and takes the hero from W5's export in `data/scenarios/hero/`: `hero.json` names the hero's two corpus records, and the constructed allergy and order overlay is applied to those two records.
+
+To load the synthetic corpus into the compose database (requires `uv`):
+
+```sh
+uv run python data/download.py
+uv run python -m backend.ingest.cli load --seed 20261017
+```
+
+`data/download.py` fetches the Synthea November 2021 sample into the gitignored `data/raw` and stops if a file's SHA-256 differs from `data/HASHES.json`. The loader parses that sample, runs the corruption generator for the seed, and writes the records to the database at `DATABASE_URL` (default `127.0.0.1:5432`); loading the same seed again adds nothing (`backend/ingest/cli.py`).
+
 To drop the synthetic database and start over:
 
 ```sh
@@ -36,9 +47,9 @@ make down-v
 make up
 ```
 
-`make down-v` removes the database volume (`Makefile`); the next `make up` recreates it and reapplies the migrations (`backend/Dockerfile`). The seed loader is not on `main` yet, so the tables start empty.
+`make down-v` removes the database volume (`Makefile`); the next `make up` recreates it and reapplies the migrations (`backend/Dockerfile`). The tables then hold only what the migrations seed until a session is reset (`backend/api/sessions.py`) or the loader runs again.
 
-Compose publishes both ports on 127.0.0.1 only (`docker-compose.yml`). Routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the contract's error envelope (`contracts/api_spec.py`).
+Compose publishes both ports on 127.0.0.1 only (`docker-compose.yml`). Routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the contract's error envelope (`contracts/api_spec.py`); the implemented ones are listed in `IMPLEMENTED` in `backend/app/main.py`.
 
 ## Architecture
 
@@ -46,35 +57,43 @@ What exists on `main` today. Components are added to this diagram only when thei
 
 ```mermaid
 flowchart LR
-    contracts["contracts/<br/>Pydantic models, openapi.json,<br/>migration 0001, fixtures"]
-    api["API process<br/>FastAPI, port 8000<br/>backend/app/main.py"]
+    contracts["contracts/<br/>Pydantic models, openapi.json,<br/>migrations, fixtures"]
+    api["API process<br/>FastAPI, port 8000<br/>backend/app, backend/api"]
+    engine["Matching and linking<br/>backend/core, backend/match,<br/>backend/link, backend/golden,<br/>backend/rule"]
+    ingest["Loader CLI<br/>backend/ingest"]
+    raw[("Synthea sample<br/>data/raw, gitignored")]
     db[("TimescaleDB<br/>event_log hypertable")]
     aggs["Continuous aggregates, real-time<br/>band_flow_1m<br/>review_outcomes_5m<br/>agent_gate_5m"]
     contracts -- "routes and models" --> api
-    contracts -- "migration 0001" --> db
+    contracts -- "migrations" --> db
+    api -- "match, link, rule" --> engine
     api -- "SQL over one pool" --> db
+    raw --> ingest
+    ingest -- "records" --> db
     db --> aggs
 ```
 
 | Node | Files |
 |---|---|
-| contracts | `contracts/README.md`, `contracts/api_spec.py`, `contracts/openapi.json`, `contracts/models/`, `contracts/fixtures/` |
-| API process | `backend/app/main.py`, `backend/app/db.py`, `backend/app/config.py` |
-| TimescaleDB | `docker-compose.yml`, `contracts/migrations/0001_initial.sql` |
+| contracts | `contracts/README.md`, `contracts/api_spec.py`, `contracts/openapi.json`, `contracts/models/`, `contracts/migrations/`, `contracts/fixtures/` |
+| API process | `backend/app/main.py`, `backend/app/db.py`, `backend/app/config.py`, `backend/api/`, `backend/events/writer.py` |
+| Matching and linking | `backend/core/` (normalize, block, features, score, band), `backend/match/seam.py`, `backend/link/` (union-find links), `backend/golden/` (golden record and timeline), `backend/rule/bl_amox_01.py` |
+| Loader CLI | `backend/ingest/cli.py`, `data/download.py`, `data/HASHES.json` |
+| TimescaleDB | `docker-compose.yml`, `contracts/migrations/0001_initial.sql`, `contracts/migrations/0002_provisional_thresholds.sql` |
 | Continuous aggregates | `contracts/migrations/0001_initial.sql` (`materialized_only = false` on all three) |
 
 ## Repository layout
 
-| Directory | Owner lanes (`CLAUDE.md`) | Contents |
+| Directory | Owner lanes (`CLAUDE.md`) | Contents on `main` |
 |---|---|---|
-| `contracts/` | lead session | The frozen contract, tag `contracts-v1` (`contracts/README.md`) |
-| `backend/` | W1, W2, W3a, W3b and wave 2 | `backend/app/`: health route, error envelope, request id and log line, one database pool |
+| `contracts/` | lead session | The frozen contract, tag `contracts-v1`, plus additive routes (`contracts/README.md`) |
+| `backend/` | W1, W2, W3a, W3b and wave 2 | API routes (`backend/api/`), matching core (`backend/core/`), links, golden record, timeline and rule (`backend/link/`, `backend/golden/`, `backend/rule/`), event writer (`backend/events/`), loader (`backend/ingest/`), scenario loading (`backend/scenarios/`), tests (`backend/tests/`) |
 | `frontend/` | W4 and wave 2 UI lanes | Empty until W4 merges |
-| `eval/` | W5, Q2, Q5 | Empty until W5 merges |
-| `data/` | W1, W5 | Empty until W1 merges |
+| `eval/` | W5, Q2, Q5 | Evaluation harness (`eval/harness/`), protected expectations (`eval/expectations/`), the G16 acceptance script (`eval/acceptance/`), tests (`eval/tests/`, `eval/tests_r5/`) |
+| `data/` | W1, W5 | `data/download.py` and `data/HASHES.json`; hero selector and export (`data/hero_select.py`, `data/hero_export.py`, `data/hero_overlay.py`), `data/fixture_check.py`, and the exported hero in `data/scenarios/hero/`; raw data stays gitignored |
 | `docs/` | D1, D2, D3 | `docs/LICENSES.md`, `docs/devpost-outline.md` |
 | `tools/` | Q15 | Empty |
-| `.github/` | W5 | Empty until W5 merges |
+| `.github/` | W5 | CI workflow `.github/workflows/ci.yml`: lint and tests, protected paths, contract test, fixture check, frontend build, secret scan, acceptance run, harness on `main` |
 
 ## Data provenance
 
@@ -95,7 +114,7 @@ The contract's default flag footer, `CARD_FOOTER` in `contracts/models/alerts.py
 
 - **Synthetic data only.** The database holds only synthetic records and is dropped with one command (`docker-compose.yml`, `Makefile`); source datasets are never committed (`.gitignore`).
 - **Two sources at the core path:** an ER FHIR record and a clinic CSV row (`contracts/fixtures/scenario.json`).
-- **Thresholds are evaluation thresholds, not clinical ones.** Today the only threshold set is the hand-set placeholder `provisional-0`, with no source run (`contracts/migrations/0001_initial.sql`). The scorer lanes replace it with thresholds fit on the synthetic labeled set, reported with n. Auto-link defaults to off (`contracts/models/thresholds.py`).
+- **Thresholds are evaluation thresholds, not clinical ones.** The current threshold set on `main` is the hand-set `provisional-1`, with no source run; it replaced the placeholder `provisional-0` (`contracts/migrations/0002_provisional_thresholds.sql`). Thresholds fit on the synthetic labeled set, reported with n, replace it as a new row. Auto-link stays off (`contracts/models/thresholds.py`).
 - **No authentication.** A registrar name is a recorded label, not an authenticated identity (`contracts/models/reviews.py`).
 - **One process on one laptop, bound to localhost** (`docker-compose.yml`, `Makefile`).
 - **The live agent depends on the Gemini API,** with a labeled REPLAY fallback; the API starts in REPLAY (`FRONTDESK_AGENT_MODE` in `docker-compose.yml`, `backend/app/config.py`, `contracts/models/health.py`).
