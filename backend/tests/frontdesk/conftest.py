@@ -118,6 +118,10 @@ def purge_session(conn, session_id: str) -> None:
     conn.execute(
         text("DELETE FROM event_log WHERE intake_session_id = :s OR pair_id = ANY(:p)"), {"s": sid, "p": pairs}
     )
+    conn.execute(
+        text("DELETE FROM not_a_match WHERE decision_id IN (SELECT id FROM match_decision WHERE pair_id = ANY(:p))"),
+        {"p": pairs},
+    )
     conn.execute(text("DELETE FROM match_decision WHERE pair_id = ANY(:p)"), {"p": pairs})
     conn.execute(text("DELETE FROM candidate_pair WHERE id = ANY(:p)"), {"p": pairs})
     conn.execute(text("DELETE FROM intake_session WHERE id = :s"), {"s": sid})

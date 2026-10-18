@@ -2,9 +2,9 @@
 
 Sibling of ``backend.events.writer.write_event`` with its own bound INSERT, because the intake
 columns (``intake_session_id`` ... ``effect_status``) are not in that writer's statement. Same
-rule on ``payload``: validated tool arguments or enums and ids, never free text. The string cap
-is the longest field the tool schemas allow (``attach_history`` text, 200 chars), so a validated
-argument always passes and a transcript line never does.
+rule on ``payload``: validated tool arguments (with the evidence quotes replaced by their sha256,
+``executor.event_payload``) or enums and ids, never free text. The string cap is the longest
+quote-free field the tool schemas allow (``attach_history`` item text, 200 chars).
 """
 
 from __future__ import annotations

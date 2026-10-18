@@ -1,7 +1,9 @@
 """Registration state derived on read from the database, never toggled (ADR-016 §4 notice vs state).
 
-NONE: no intake record. NEW_CHART: the chart effect exists. LINKED: a handoff pair of this session is
-LINKED. PENDING_REGISTRAR: a handoff pair is PROPOSED. RELEASED: every handoff pair is REJECTED.
+Order, first match wins: LINKED (a handoff pair of this session is LINKED); NEW_CHART (the chart
+effect ``chart:v1:{session}`` exists: after a DIFFERENT_PERSON release the allowed propose wins over
+RELEASED); PENDING_REGISTRAR (a pair is PROPOSED); RELEASED (pairs exist and all are REJECTED or
+REVOKED); NONE.
 """
 
 from __future__ import annotations
@@ -34,12 +36,12 @@ def derive(conn: Connection, session_id: UUID) -> Registration:
     entity_id = next((r.entity_id for r in rows if r.entity_id is not None), None)
     if DecisionStatus.LINKED in statuses:
         state = RegistrationState.LINKED
+    elif store.has_effect_key(conn, chart_effect_key(session_id)):
+        state = RegistrationState.NEW_CHART
     elif DecisionStatus.PROPOSED in statuses:
         state = RegistrationState.PENDING_REGISTRAR
     elif rows and statuses <= {DecisionStatus.REJECTED, DecisionStatus.REVOKED}:
         state = RegistrationState.RELEASED
-    elif store.has_effect_key(conn, chart_effect_key(session_id)):
-        state = RegistrationState.NEW_CHART
     else:
         state = RegistrationState.NONE
     return Registration(

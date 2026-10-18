@@ -83,7 +83,16 @@ def test_near_duplicate_is_held_handed_off_and_audited(client, fake, db_conn, cl
     versions = ev["versions"]
     for k in ("scorerVersion", "thresholdSetId", "policyVersion", "promptVersion", "toolSchemaVersion"):
         assert versions.get(k), k
-    assert ev["payload"]["givenName"] == "Maria Jose"  # validated args, never free text
+    # Validated args, never free text: the evidence quotes (the patient's typed words) are gone,
+    # their sha256 and the grounding verdict stay; the full args remain on agent_tool_call.args.
+    payload = ev["payload"]
+    assert payload["givenName"] == "Maria Jose" and payload["groundingOk"] is True
+    assert "evidence" not in payload and payload["evidenceSha256"]
+    assert "3 de julio" not in str(payload) and "mujer" not in str(payload)
+    stored_args = db_conn.execute(
+        text("SELECT args FROM agent_tool_call WHERE id = :id"), {"id": uuid.UUID(call["id"])}
+    ).scalar_one()
+    assert stored_args["evidence"]["birthDate"] == "3 de julio de 1985"
     assert ev["pair_id"] is not None
     handoffs = db_conn.execute(
         text("SELECT count(*) FROM event_log WHERE event_type = 'INTAKE_HANDOFF_CREATED' AND pair_id = ANY(:p)"),
@@ -129,6 +138,64 @@ def test_new_patient_is_allowed_once_and_replayed_after(client, fake, db_conn, c
         .all()
     )
     assert keys == [f"chart:v1:{session['id']}", None]
+
+
+def test_whole_typed_line_as_evidence_never_lands_in_the_event_payload(client, fake, db_conn, cleanup):
+    line = "I am Priscilla Oyelaran-Whitcombe, born 1992-11-28, female, phone 555 123 4567, and I hate hospitals"
+    args = {
+        "givenName": "Priscilla",
+        "familyName": "Oyelaran-Whitcombe",
+        "birthDate": "1992-11-28",
+        "sex": "FEMALE",
+        "phone": "5551234567",
+        "preferredLanguage": "EN",
+        "evidence": {"givenName": line, "familyName": line, "birthDate": line, "sex": line, "phone": line},
+    }
+    session = create_session(client, "EN")
+    cleanup[0].append(session["id"])
+    fake.steps = [tool_call("propose_new_chart", args)]
+    body = turn(client, session["id"], line).json()
+    assert body["toolCalls"][0]["gate"]["outcome"] in {"ALLOW", "DENY"}
+    for ev in events(db_conn, session["id"], "AGENT_TOOL_CALLED"):
+        assert "hate hospitals" not in str(ev._mapping["payload"])
+
+
+def test_attach_payload_drops_the_evidence_quote(client, fake, db_conn, cleanup):
+    session = create_session(client, "EN")
+    cleanup[0].append(session["id"])
+    fake.steps = [tool_call("propose_new_chart", UNRELATED_ARGS)]
+    turn(client, session["id"], UNRELATED_TEXT)
+    attach = {"items": [{"kind": "ALLERGY", "text": "penicillin", "evidenceQuote": "allergic to penicillin"}]}
+    fake.steps = [tool_call("attach_history", attach)]
+    turn(client, session["id"], "I am allergic to penicillin")
+    rows = events(db_conn, session["id"], "AGENT_TOOL_CALLED")
+    payload = rows[-1]._mapping["payload"]
+    assert payload["items"] == [{"kind": "ALLERGY", "text": "penicillin"}] and payload["evidenceSha256"]
+
+
+def test_registration_reads_new_chart_after_a_release_and_an_allowed_propose(client, fake, db_conn, cleanup):
+    """ADR-016 §3 row 11: a DIFFERENT_PERSON reject releases the candidates; the next identical propose
+    is ALLOWED and the derived state must agree with the chart effect (NEW_CHART, not RELEASED)."""
+    seed_near_duplicates(db_conn, cleanup)
+    session = create_session(client, "ES")
+    cleanup[0].append(session["id"])
+    fake.steps = [tool_call("propose_new_chart", PROPOSE_ARGS)]
+    held = turn(client, session["id"], USER_TEXT).json()
+    assert held["registration"]["state"] == "PENDING_REGISTRAR"
+    for pair_id in held["registration"]["handoffPairIds"]:
+        r = client.post(
+            f"{API}/candidate-pairs/{pair_id}/reviews",
+            json={"action": "REJECT", "actor": "Registrar A", "reasonCode": "DIFFERENT_PERSON"},
+            headers={"Idempotency-Key": new_key()},
+        )
+        assert r.status_code == 201, r.text
+    assert client.get(f"{API}/intake-sessions/{session['id']}").json()["registration"]["state"] == "RELEASED"
+    fake.steps = [tool_call("propose_new_chart", PROPOSE_ARGS)]
+    allowed = turn(client, session["id"], USER_TEXT).json()
+    call = allowed["toolCalls"][0]
+    assert call["gate"]["outcome"] == "ALLOW" and call["effect"]["status"] == "APPLIED"
+    assert allowed["registration"]["state"] == "NEW_CHART"
+    assert client.get(f"{API}/intake-sessions/{session['id']}").json()["registration"]["state"] == "NEW_CHART"
 
 
 def test_attach_history_before_intake_is_denied(client, fake, cleanup):
