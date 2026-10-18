@@ -3,17 +3,20 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Tile } from "@/api/types";
 import { useDataSource } from "@/data/DataSourceProvider";
-import { formatCt } from "@/lib/display";
+import { bucketWindowCt } from "@/lib/buckets";
 
 const TILE_POLL_MS = 2_000; // UX spec 3.13: the FrontDesk tile refreshes every 2 s
 
+/** One row per bucket instant: "...03:10:00Z" and "...03:10:00+00:00" are the same bucket. */
 function countsByBucket(tile: Tile) {
   const rows = new Map<string, { allowed: number; denied: number }>();
   for (const b of tile.buckets) {
-    const row = rows.get(b.bucket) ?? { allowed: 0, denied: 0 };
+    const at = Date.parse(b.bucket);
+    const key = Number.isNaN(at) ? b.bucket : new Date(at).toISOString();
+    const row = rows.get(key) ?? { allowed: 0, denied: 0 };
     if (b.series === "ALLOW") row.allowed += b.count;
     if (b.series === "DENY") row.denied += b.count;
-    rows.set(b.bucket, row);
+    rows.set(key, row);
   }
   return [...rows.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
@@ -56,7 +59,7 @@ export function AuditTile() {
           <table className="mt-2 text-[16px] tabular-nums">
             <thead>
               <tr className="text-left text-ink-3">
-                <th className="pr-4 font-normal">Bucket start (CT)</th>
+                <th className="pr-4 font-normal">Time (CT)</th>
                 <th className="pr-4 font-normal">Allowed</th>
                 <th className="font-normal">Denied</th>
               </tr>
@@ -64,7 +67,7 @@ export function AuditTile() {
             <tbody>
               {rows.map(([bucket, r]) => (
                 <tr key={bucket}>
-                  <td className="pr-4">{formatCt(bucket)}</td>
+                  <td className="pr-4">{bucketWindowCt(bucket)}</td>
                   <td className="pr-4">{r.allowed}</td>
                   <td>{r.denied}</td>
                 </tr>

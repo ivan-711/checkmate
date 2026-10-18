@@ -8,6 +8,7 @@ import type {
   IntakeTurn,
   Language,
   MatchDecision,
+  PairOrigin,
   ReviewRequest,
   ReviewResponse,
   SafetyAlert,
@@ -15,6 +16,7 @@ import type {
   TilesResponse,
   TimelineEvent,
 } from "@/api/types";
+import { GATE_BUCKET_MS } from "@/lib/buckets";
 import { FixtureIntake } from "./fixtureIntake";
 import type { ScenarioFixture } from "./scenario";
 import { DataError, EVENT_FEED_ROWS, type CaseData, type DataSource, type SuggestedCheckIn } from "./source";
@@ -27,6 +29,9 @@ interface SessionState {
   /** Append-only, oldest first: what the API's event_log would hold for this session. */
   events: EventLogRow[];
   resolved: boolean;
+  /** How the fixture pair was first stored (Resolve or a FrontDesk hand-off); null until then.
+   * Like the API's pair upsert, a later match run or hand-off keeps the first origin. */
+  origin: PairOrigin | null;
 }
 
 interface KeyedReview {
@@ -70,15 +75,15 @@ export class FixtureSource implements DataSource {
   /** The fixture is already scored; Resolve only re-queues the pair and logs the run. It has no
    * match-run receipt to return, so the work queue shows no funnel in REPLAY. */
   async resolve(): Promise<null> {
-    this.current = { ...this.current, resolved: true };
+    this.current = { ...this.current, resolved: true, origin: this.current.origin ?? "MATCH_RUN" };
     this.log("MATCH_RUN_COMPLETED", { pairId: this.fixture.pair.pair.id });
     return null;
   }
 
-  /** The fixture's one pair, with this session's decision, once Resolve has queued it (as Case
-   * shows it); filtered the way the API filters, on one page. */
+  /** The fixture's one pair, with this session's decision, once Resolve or a FrontDesk hand-off
+   * has stored it (as the API would); filtered the way the API filters, on one page. */
   async getCandidatePairs(query: CandidatePairQuery): Promise<CandidatePairPage> {
-    if (!this.current.resolved) return { items: [], nextCursor: null };
+    if (!this.current.origin) return { items: [], nextCursor: null };
     const { pair } = this.currentDetail();
     const matches =
       (!query.band || pair.decision.band === query.band) &&
@@ -129,14 +134,27 @@ export class FixtureSource implements DataSource {
    * AGENT_GATE counting every gate outcome so far (agent actions are not undone by a reset). */
   async getTiles(): Promise<TilesResponse> {
     const reviews = this.current.history.filter((d) => d.actorType === "REGISTRAR").length;
-    const gate = this.intake.gateCounts;
+    // Each outcome in the 5-minute bucket it happened in, never in the fixture's 18:00 snapshot
+    // bucket; like the API, only series with a count get a row.
+    const gate = [...this.intake.gateCounts].flatMap(([bucket, counts]) =>
+      (["ALLOW", "DENY"] as const)
+        .filter((series) => counts[series] > 0)
+        .map((series) => ({
+          bucket,
+          series,
+          count: counts[series],
+          meanLatencyMs: null,
+          maxLatencyMs: null,
+        })),
+    );
     const tiles = this.fixture.tiles.tiles.map((tile) => {
       if (tile.id === "HUMAN_REVIEW") return { ...tile, total: tile.total + reviews };
       if (tile.id !== "AGENT_GATE") return tile;
-      const added = (series: string) => (series === "ALLOW" || series === "DENY" ? gate[series] : 0);
-      // The fixture has one bucket per series (its 18:00 snapshot); new outcomes are added there.
-      const buckets = tile.buckets.map((b) => ({ ...b, count: b.count + added(b.series) }));
-      return { ...tile, buckets, total: tile.total + gate.ALLOW + gate.DENY };
+      // Like the API, the tile holds the last windowMinutes only.
+      const since = this.now().getTime() - tile.windowMinutes * 60_000;
+      const recent = gate.filter((b) => Date.parse(b.bucket) + GATE_BUCKET_MS > since);
+      const buckets = [...tile.buckets.filter((b) => b.count > 0), ...recent];
+      return { ...tile, buckets, total: tile.total + recent.reduce((n, b) => n + b.count, 0) };
     });
     return { ...this.fixture.tiles, tiles };
   }
@@ -164,6 +182,7 @@ export class FixtureSource implements DataSource {
       for (const pairId of turn.registration.handoffPairIds ?? []) {
         this.log("INTAKE_HANDOFF_CREATED", { intakeSessionId: sessionId, pairId });
       }
+      this.current = { ...this.current, origin: this.current.origin ?? "FRONTDESK_HANDOFF" };
     }
     if (turn.degraded)
       this.log("AGENT_TURN_DEGRADED", { intakeSessionId: sessionId, degraded: turn.degraded });
@@ -188,7 +207,8 @@ export class FixtureSource implements DataSource {
   private currentDetail(): CandidatePairDetail {
     const { history } = this.current;
     const base = this.fixture.pair;
-    return { ...base, pair: { ...base.pair, decision: history[history.length - 1] }, history };
+    const origin = this.current.origin ?? base.pair.origin;
+    return { ...base, pair: { ...base.pair, origin, decision: history[history.length - 1] }, history };
   }
 
   private decide(body: ReviewRequest): ReviewResponse {
@@ -268,6 +288,7 @@ export class FixtureSource implements DataSource {
       outcome: null,
       events: [],
       resolved: false,
+      origin: null,
     };
   }
 }

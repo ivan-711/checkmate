@@ -60,9 +60,7 @@ test("REPLAY: a queue row opens Case for that pair", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("candidate-pair")).toHaveCount(0);
   await tab(page, "Work queue").click();
-  await expect(
-    page.getByText("No candidate pairs yet. Resolve identity on Case scores the loaded records."),
-  ).toBeVisible();
+  await expect(page.getByText("Nothing is waiting for review.")).toBeVisible();
 
   await tab(page, "Case").click();
   await page.getByTestId("resolve-button").click();
@@ -74,5 +72,25 @@ test("REPLAY: a queue row opens Case for that pair", async ({ page }) => {
   await expect(page.getByRole("article", { name: "ER FHIR record" })).toBeVisible();
   await expect(page.getByTestId("approve-button")).toBeVisible();
   await expect(page.getByTestId("reject-button")).toBeVisible();
+  expect(api).toEqual([]);
+});
+
+test("REPLAY: a check-in the registrar approved on FrontDesk is listed in the queue as linked", async ({
+  page,
+}) => {
+  const api = apiRequests(page);
+  await page.goto("/frontdesk");
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  const held = page.getByTestId("registrar-held");
+  await held.getByTestId("approve-button").click();
+  await held.getByTestId("review-submit-button").click();
+  await expect(held.getByText(/Approved by /)).toBeVisible();
+
+  await tab(page, "Work queue").click();
+  await expect(page.getByText("Nothing is waiting for review.")).toHaveCount(0);
+  const row = page.getByTestId("work-queue-row");
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText("Linked");
   expect(api).toEqual([]);
 });
