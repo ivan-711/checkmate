@@ -74,6 +74,12 @@ describe("flagHeadline", () => {
     );
   });
 
+  it("reads an RxNorm pack order by the drug inside it", () => {
+    expect(
+      headline(cardText({ order: "{21 (amoxicillin 500 MG / clavulanate 125 MG Oral Tablet) } Pack" })),
+    ).toBe("Penicillin V allergy (anaphylaxis) · active amoxicillin/clavulanate order");
+  });
+
   it("keeps an order the rule could only name by its RxNorm code", () => {
     expect(headline(cardText({ order: "RxNorm 723" }))).toBe(
       "Penicillin V allergy (anaphylaxis) · active RxNorm 723 order",

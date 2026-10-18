@@ -9,6 +9,7 @@ const ORDER = /has an active order for (.+?), RxNorm \d+\./;
 const NOT_RECORDED = /not recorded$/;
 const NUMBER = /^\d/;
 const RXNORM_ONLY = /^RxNorm \d+$/;
+const PACK = /^\{\d+ \((.+?)\)/; // "{21 (amoxicillin 500 MG ... Tablet) } Pack": the first drug inside
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -29,7 +30,7 @@ function reactionName(reaction: string): string | null {
  * ingredient is the words before its strength, after any leading quantity ("1 ML ..."). */
 function drugName(display: string): string {
   if (RXNORM_ONLY.test(display)) return display; // the rule's fallback when the order has no display
-  const names = display.split(" / ").map((part) => {
+  const names = (PACK.exec(display)?.[1] ?? display).split(" / ").map((part) => {
     const words = part.split(" ");
     const start = NUMBER.test(words[0]) ? 2 : 0;
     const end = words.findIndex((word, i) => i >= start && NUMBER.test(word));
