@@ -46,6 +46,22 @@ describe("Joined", () => {
     );
   });
 
+  it("shows an attached check-in's id by its first 8 characters, the full id in the tooltip", () => {
+    const intakeId = "intake:0226ab4e-766e-49ea-9cb0-1d8ffbcc3758";
+    const withIntake: Entity = {
+      ...entity,
+      members: [
+        ...entity.members,
+        { ...entity.members[0], sourceSystem: "FRONTDESK_INTAKE", sourceRecordId: intakeId },
+      ],
+    };
+    const html = render({ entity: withIntake });
+    const tab = html.match(/<span[^>]*data-source-system="FRONTDESK_INTAKE"[\s\S]*?<\/code>/)![0];
+    expect(tab).toContain(`title="Source record ${intakeId}"`);
+    expect(tab).toContain("Kiosk check-in");
+    expect(tab).toMatch(/<code>0226ab4e<\/code>/);
+  });
+
   it("counts what the record holds when the golden fields carry clinical rows, and says nothing otherwise", () => {
     expect(render()).not.toContain("Holds");
     const clinical: GoldenField[] = [

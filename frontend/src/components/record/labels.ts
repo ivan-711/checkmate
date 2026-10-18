@@ -24,6 +24,15 @@ export function sourceNameFrom(sourceSystem: string, cards: SourceCard[]): strin
   return sourceName(sourceSystem, card?.displayLabel ?? sourceSystem);
 }
 
+// A kiosk intake record is keyed by a UUID; its first 8 characters tell check-ins apart on a tab.
+const INTAKE_ID_CHARS = 8;
+
+/** The record id a crosswalk tab shows: an intake's short id, any other source's id as stored. */
+export function recordIdLabel(sourceSystem: string, id: string): string {
+  if (sourceSystem !== "FRONTDESK_INTAKE") return id;
+  return id.replace(/^intake:/, "").slice(0, INTAKE_ID_CHARS);
+}
+
 export function sourceFormat(kind: string): string {
   return FORMATS[kind] ?? kind;
 }

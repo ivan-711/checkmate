@@ -55,13 +55,14 @@
   --desk-gap: 32px;
 }
 
-@media (max-width: 1300px), (max-height: 760px) {
+@media (max-width: 1400px), (max-height: 760px) {
   :root {
     --kiosk-w: 400px;
     --stage-head-h: 126px;
     --stage-title: 44px;
     --organism-w: 516px;
-    --organism-h: 447px;
+    /* 520 x 0.86 is 447.2; 446 keeps the row inside the stage at 720 high (Reject fully shown). */
+    --organism-h: 446px;
     --organism-scale: 0.86;
     --decision-w: 264px;
     --strip-h: 52px;
@@ -266,7 +267,7 @@ kbd {
 }
 
 /* The compact layer hides the Commands label; the keycap stands alone. */
-@media (max-width: 1300px), (max-height: 760px) {
+@media (max-width: 1400px), (max-height: 760px) {
   .compact-hidden {
     display: none;
   }

@@ -64,19 +64,21 @@
   font: 650 20px/1 var(--f-display);
   letter-spacing: -0.01em;
 }
+/* Under the FrontDesk name, in the head's bottom margin: centred over the head it covered the
+   language toggle in the kiosk's narrow column, and a line of its own pushed the gate card down. */
 .k-mode {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  top: calc(100% - 10px);
+  left: 36px;
   flex: none;
   white-space: nowrap;
   border: 1px dashed var(--ink-3);
   border-radius: 6px;
-  padding: 3px 7px;
+  padding: 1px 7px;
   color: var(--ink-2);
   font-size: 18px;
   font-weight: 650;
-  line-height: 1.3;
+  line-height: 1.1;
 }
 
 @media (max-width: 600px) {
