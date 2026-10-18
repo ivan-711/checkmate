@@ -69,7 +69,8 @@ function Turn({
       {calls.map((call) => {
         const candidate = gateDenial(call);
         return (
-          <li key={call.id} className="space-y-2">
+          // scroll-my-4: a gate card scrolled into view keeps 16 px from the pane's edge.
+          <li key={call.id} className="scroll-my-4 space-y-2">
             <ToolCallChip call={call} t={t} hasGateCard={!!candidate} />
             {candidate && <GateCard ref={gateRef} call={call} candidate={candidate} t={t} />}
           </li>
@@ -184,26 +185,32 @@ export function KioskPane() {
   const pending = send.isPending ? send.variables?.text : null;
   const failedText = failed && failed.sessionId === session.data?.id ? failed.text : null;
 
-  // New lines come into view. A new gate card always ends fully in view (it is the moment the demo
-  // is about) and the line under it comes along when both fit; its list row is the target, as the
-  // card's entrance transform would cut the card's foot off. Side by side only the kiosk pane
-  // scrolls (globals.css, .pane). Stacked, only a new gate card moves the page, so a registrar's
+  // New lines come into view. A new gate card comes first: its row is scrolled into view top
+  // included (it is the moment the demo is about; the row, as the card's entrance transform would
+  // skew the card), and a line under it may stay below. Otherwise the newest line scrolls into
+  // view when a turn, a decision, a "reading" row or a failure is added; the "reading" row going
+  // away is not an addition, so it never pulls the gate card off. Side by side only the kiosk pane
+  // scrolls (globals.css, .pane); stacked, only a new gate card moves the page, so a registrar's
   // decision never pulls the page away from the staff pane.
   const transcript = useRef<HTMLOListElement>(null);
-  const gatesShown = useRef(0);
+  const shown = useRef({ turns: 0, gates: 0, decided: null as string | null, pending: false, failed: false });
   useEffect(() => {
-    const newGate = gateCount > gatesShown.current;
-    gatesShown.current = gateCount;
-    const last = transcript.current?.lastElementChild;
-    if (!last || (!newGate && !inScrollPane(last))) return;
+    const was = shown.current;
+    const now = { turns: turns.length, gates: gateCount, decided, pending: !!pending, failed: !!failedText };
+    shown.current = now;
     const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-    if (newGate) {
-      last.scrollIntoView({ block: "nearest" }); // at once, so the gate row is placed from there
+    if (now.gates > was.gates) {
       gateCard.current?.parentElement?.scrollIntoView({ block: "nearest", behavior });
-    } else {
-      last.scrollIntoView({ block: "nearest", behavior });
+      return;
     }
-  }, [gateCount, turns.length, pending, failedText, decided]);
+    const added =
+      now.turns > was.turns ||
+      (now.decided !== null && now.decided !== was.decided) ||
+      (now.pending && !was.pending) ||
+      (now.failed && !was.failed);
+    const last = transcript.current?.lastElementChild;
+    if (added && last && inScrollPane(last)) last.scrollIntoView({ block: "nearest", behavior });
+  }, [turns.length, gateCount, decided, pending, failedText]);
 
   return (
     <section lang={language} aria-labelledby="kiosk-label" className="flex min-w-0 flex-col gap-4">

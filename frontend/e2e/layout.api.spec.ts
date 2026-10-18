@@ -69,14 +69,35 @@ async function resolvedCase(page: Page) {
 }
 
 /** Reset, then send the demo line: the gate denies the new chart and hands it to a registrar. */
-async function checkIn(page: Page) {
+async function checkIn(page: Page, language: "EN" | "ES" = "EN") {
   await page.goto("/frontdesk");
   await expect(page.getByTestId("agent-mode-badge")).toBeVisible({ timeout: 30_000 });
   await reset(page);
-  await page.getByRole("button", { name: "Use this" }).click();
+  if (language === "ES") {
+    // The toggle starts a new check-in in Spanish; the demo line goes in once it exists.
+    const started = page.waitForResponse(
+      (r) =>
+        r.request().method() === "POST" &&
+        new URL(r.url()).pathname === "/api/v1/intake-sessions" &&
+        r.request().postDataJSON()?.language === "ES",
+      { timeout: 30_000 },
+    );
+    await page.getByRole("button", { name: "Español" }).click();
+    await started;
+  }
+  await page.getByRole("button", { name: language === "ES" ? "Usar este" : "Use this" }).click();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("gate-card")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("registrar-held")).toHaveCount(1, { timeout: 30_000 });
+}
+
+// Long enough for a smooth scroll to finish, so a check sees where a pane comes to rest.
+const SCROLL_SETTLE_MS = 1_000;
+
+/** The turn is over (no "reading" row) and every pane has finished scrolling. */
+async function settled(page: Page) {
+  await expect(page.locator('li[aria-busy="true"]')).toHaveCount(0);
+  await page.waitForTimeout(SCROLL_SETTLE_MS);
 }
 
 for (const size of PORTRAIT) {
@@ -127,34 +148,47 @@ for (const size of LANDSCAPE) {
       expect(await pageScroll(page)).toEqual({ x: 0, y: 0, scrollY: 0 });
     });
 
-    test("FrontDesk: a held check-in comes into view in the staff pane, and the kiosk shows the registrar's answer", async ({
-      page,
-    }) => {
+    for (const language of ["EN", "ES"] as const) {
+      test(`FrontDesk (${language}): once the gate fires, the gate card and the registrar's Approve are both in view, each in its pane`, async ({
+        page,
+      }) => {
+        await checkIn(page, language);
+        await settled(page);
+        // The kiosk pane rests with the whole gate card in view, its top included.
+        await expect.poll(() => shownInPane(page.getByTestId("gate-card"))).toBe(true);
+        // The staff pane rests with the first held pair's Approve in view, and the kiosk keeps focus.
+        const staff = page.getByRole("region", { name: /Registrar workspace/ });
+        const approve = staff.getByTestId("approve-button").first();
+        await expect.poll(() => shownInPane(approve)).toBe(true);
+        await expect(page.getByTestId("kiosk-composer")).toBeFocused();
+        expect(await pageScroll(page)).toEqual({ x: 0, y: 0, scrollY: 0 });
+      });
+    }
+
+    test("FrontDesk: a later reply scrolls into view in the kiosk pane", async ({ page }) => {
       await checkIn(page);
-      // The first held pair's heading is brought to the top of the staff pane (or the pane is at its
-      // end), and the kiosk keeps the focus.
+      await settled(page);
+      // Held open for a moment, so the "reading" row shows before the reply replaces it.
+      await page.route(
+        (url) => /\/intake-sessions\/[^/]+\/turns$/.test(url.pathname),
+        async (route) => {
+          await new Promise((resolve) => setTimeout(resolve, SCROLL_SETTLE_MS));
+          await route.continue();
+        },
+      );
+      await page.getByTestId("kiosk-composer").fill("I have an appointment at three.");
+      await page.keyboard.press("Enter");
+      await settled(page);
+      const transcript = page.getByRole("region", { name: "Check-in conversation" }).getByRole("listitem");
+      await expect(transcript.last()).not.toHaveAttribute("aria-busy", "true");
+      await expect.poll(() => shownInPane(transcript.last())).toBe(true);
+    });
+
+    test("FrontDesk: the registrar's answer scrolls into view in the kiosk pane", async ({ page }) => {
+      await checkIn(page);
+      await settled(page);
       const staff = page.getByRole("region", { name: /Registrar workspace/ });
-      // The id RegistrarPane gives the first held pair's heading.
-      const heading = staff.locator("#held-heading-0");
-      await expect
-        .poll(() =>
-          heading.evaluate((el) => {
-            const pane = el.closest(".pane")!;
-            const atTop = Math.abs(el.getBoundingClientRect().top - pane.getBoundingClientRect().top) <= 1;
-            const atEnd = pane.scrollTop >= pane.scrollHeight - pane.clientHeight - 1;
-            return atTop || atEnd;
-          }),
-        )
-        .toBe(true);
-      await expect(page.getByTestId("kiosk-composer")).toBeFocused();
-
-      // Approve is reachable inside the staff pane's visible area.
-      const approve = staff.getByTestId("approve-button").first();
-      await approve.scrollIntoViewIfNeeded();
-      await expect.poll(() => shownInPane(approve)).toBe(true);
-
-      // The registrar's decision reaches the kiosk, and its line scrolls into view in the kiosk pane.
-      await approve.click();
+      await staff.getByTestId("approve-button").first().click();
       await staff.getByTestId("review-submit-button").click();
       const confirmed = page
         .getByRole("region", { name: "Check-in conversation" })
@@ -166,28 +200,64 @@ for (const size of LANDSCAPE) {
   });
 }
 
-// Lane B owns the constructed-scenario chip and is fixing its tooltip, which is laid out while
-// hidden and widens the page. Un-fixme once that fix is on main.
-test.describe("constructed-scenario tooltip", () => {
-  test.fixme(true, "needs lane B's ConstructedChip fix (UI audit #9)");
+/** How far the page or any pane scrolls sideways: 0 when nothing does. */
+function sideways(page: Page) {
+  return page.evaluate(() => {
+    const root = document.documentElement;
+    const panes = [...document.querySelectorAll(".pane")].map((pane) => pane.scrollWidth - pane.clientWidth);
+    return Math.max(root.scrollWidth - root.clientWidth, ...panes);
+  });
+}
 
-  for (const size of [...PORTRAIT, ...LANDSCAPE]) {
-    test(`never scrolls FrontDesk sideways at ${size.width}x${size.height}`, async ({ page }) => {
-      await page.setViewportSize(size);
+/** Opens each chip tooltip on screen in turn; none may make the page or a pane scroll sideways. */
+async function openEachTooltip(page: Page) {
+  for (const chip of await page.getByTestId("constructed-scenario-chip").all()) {
+    if (!(await chip.isVisible())) continue; // in a pane this size does not show
+    await chip.hover();
+    await expect(chip.locator('[role="tooltip"]')).toBeVisible();
+    expect(await sideways(page)).toBe(0);
+  }
+}
+
+// The constructed-scenario chip's tooltip is not laid out while closed and opens inside the pane
+// that scrolls it (UI audit #9; the chip fix came with #38).
+for (const size of [...PORTRAIT, ...LANDSCAPE]) {
+  test.describe(`${size.width}x${size.height}`, () => {
+    test.use({ viewport: size });
+
+    test("FrontDesk: no sideways scroll on the page or in a pane, closed or open, before and after a turn", async ({
+      page,
+    }) => {
       await page.goto("/frontdesk");
       await expect(page.getByTestId("agent-mode-badge")).toBeVisible({ timeout: 30_000 });
       // Before the first turn the kiosk's suggestion row carries a chip.
-      expect((await pageScroll(page)).x).toBe(0);
-      if (size.width < size.height) return;
+      expect(await sideways(page)).toBe(0);
+      await openEachTooltip(page);
       await checkIn(page);
-      const staff = page.getByRole("region", { name: /Registrar workspace/ });
-      await staff.getByTestId("constructed-scenario-chip").first().hover();
-      await expect(staff.getByRole("tooltip").first()).toBeVisible();
-      expect(await staff.evaluate((pane) => pane.scrollWidth - pane.clientWidth)).toBe(0);
-      expect((await pageScroll(page)).x).toBe(0);
+      expect(await sideways(page)).toBe(0);
+      await openEachTooltip(page);
     });
-  }
-});
+  });
+}
+
+for (const size of LANDSCAPE) {
+  test.describe(`${size.width}x${size.height}`, () => {
+    test.use({ viewport: size });
+
+    test("Case: no sideways scroll on the page or in a pane, closed or open, before and after Approve", async ({
+      page,
+    }) => {
+      await resolvedCase(page);
+      expect(await sideways(page)).toBe(0);
+      await openEachTooltip(page);
+      await page.getByTestId("approve-button").click();
+      await page.getByTestId("review-submit-button").click();
+      await expect(page.getByTestId("flag-card")).toBeVisible({ timeout: 30_000 });
+      expect(await sideways(page)).toBe(0);
+      await openEachTooltip(page);
+    });
+  });
+}
 
 // Last, so the file leaves the API as the Case path does (the next spec presses Reset again).
 for (const size of LANDSCAPE) {

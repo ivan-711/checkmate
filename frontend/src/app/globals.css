@@ -257,8 +257,11 @@ body {
     min-height: 0;
     grid-template-rows: minmax(0, 1fr);
   }
-  /* The padding, undone by the margin, keeps focus rings at a pane's edge inside its scrollport. */
+  /* The padding, undone by the margin, keeps focus rings at a pane's edge inside its scrollport.
+     Relative, so absolutely placed descendants (sr-only text, tooltips) scroll and clip with the
+     pane instead of reaching past it and making the page itself scroll. */
   .pane {
+    position: relative;
     min-height: 0;
     overflow-y: auto;
     padding: 4px;

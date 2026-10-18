@@ -6,8 +6,12 @@ import { useHandoffPairs, useIntakeSession } from "./intake";
 import { RegistrarPane } from "./RegistrarPane";
 
 /** The registrar's side of FrontDesk. Side by side it is its own scroll pane (globals.css, .pane):
- * a new held check-in brings its first pair's heading to the top of the pane, and focus stays in
- * the kiosk. Stacked and portrait it is not displayed: that screen is the patient-facing kiosk. */
+ * a new held check-in scrolls it so the first pair's Approve is in view, with the pair's heading at
+ * the top when both fit, and focus stays in the kiosk. Stacked and portrait it is not displayed:
+ * that screen is the patient-facing kiosk. */
+// The room kept under Approve, so its focus ring is not cut by the pane's edge.
+const EDGE_GAP_PX = 16;
+
 export function StaffPane() {
   const pane = useRef<HTMLElement>(null);
   const first = useIntakeSession()?.registration.handoffPairIds?.[0];
@@ -17,10 +21,15 @@ export function StaffPane() {
     // The id RegistrarPane gives the first held pair's heading, rendered once that pair has loaded.
     const heading = box?.querySelector<HTMLElement>("#held-heading-0");
     if (!box || !first || !firstLoaded || !heading) return;
+    const approve = heading.closest("article")?.querySelector<HTMLElement>('[data-testid="approve-button"]');
+    const view = box.getBoundingClientRect();
+    const headingAtTop = box.scrollTop + heading.getBoundingClientRect().top - view.top;
+    const approveAtBottom = approve
+      ? box.scrollTop + approve.getBoundingClientRect().bottom - view.bottom + EDGE_GAP_PX
+      : 0;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // The pane itself scrolls, not scrollIntoView: stacked, that would move the page off the kiosk.
-    const top = box.scrollTop + heading.getBoundingClientRect().top - box.getBoundingClientRect().top;
-    box.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
+    box.scrollTo({ top: Math.max(headingAtTop, approveAtBottom), behavior: reduce ? "auto" : "smooth" });
   }, [first, firstLoaded]);
 
   return (
