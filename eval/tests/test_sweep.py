@@ -6,6 +6,7 @@ Everything here runs locally on the in-repo fixture tier; nothing touches Modal'
 from __future__ import annotations
 
 import dataclasses
+import importlib
 import json
 import math
 import statistics
@@ -267,6 +268,21 @@ def test_modal_app_defines_the_remote_function_without_touching_the_cloud():
     assert modal_app.app.name == modal_app.APP_NAME == "checkmate-eval-sweep"
     assert callable(modal_app.remote_map) and modal_app.evaluate_manifest_remote is not None
     assert modal_app.FUNCTION_TIMEOUT_SECONDS >= 600  # a fast pass is ~93 s; a development pass can take 10 min
+
+
+def test_modal_image_installs_the_lock_without_image_uv_sync(monkeypatch: pytest.MonkeyPatch):
+    # Image.uv_sync parses pyproject.toml with the legacy `toml` package at app start, which raises IndexError on
+    # the dev group's `{ include-group = "train" }`; the first real Modal run failed there before any container.
+    modal = pytest.importorskip("modal")
+    modal_app = pytest.importorskip("eval.sweep.modal_app")
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("Image.uv_sync cannot parse this pyproject.toml")
+
+    monkeypatch.setattr(modal.Image, "uv_sync", refuse)
+    modal_app = importlib.reload(modal_app)
+    assert "--frozen" in modal_app.UV_SYNC_COMMAND and "--no-install-workspace" in modal_app.UV_SYNC_COMMAND
+    assert all((modal_app.REPO_ROOT / name).is_file() for name in modal_app.UV_PROJECT_FILES)
 
 
 # --- command line -----------------------------------------------------------------------------------

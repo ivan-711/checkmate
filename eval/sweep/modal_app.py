@@ -38,6 +38,10 @@ ZIPS_SUBDIR = "zips"  # where data/download.py keeps the archives locally, mirro
 REMOTE_RUNS_DIR = Path("/tmp/eval-runs")  # container scratch; the result record is the output, not the directory
 REMOTE_RAW_DIR = Path("/tmp/raw")  # container scratch for the extracted sample
 PACKAGES = ("contracts", "backend", "eval", "data")
+UV_ROOT = "/.uv"
+UV_IMAGE = "ghcr.io/astral-sh/uv:latest"
+UV_PROJECT_FILES = ("pyproject.toml", "uv.lock")
+UV_SYNC_COMMAND = f"{UV_ROOT}/uv sync --project={UV_ROOT} --no-install-workspace --compile-bytecode --frozen"
 IGNORED_DIRS = frozenset(
     {
         "node_modules",
@@ -89,10 +93,18 @@ def _recorded_hashes() -> dict[str, str]:
     return {name: hashes[name]["sha256"] for name in FILES}
 
 
-image = (
-    modal.Image.debian_slim(python_version=PYTHON_VERSION)
-    .uv_sync(uv_project_dir=str(REPO_ROOT), frozen=True)
-    .add_local_python_source(*PACKAGES, ignore=_ignore)
+def _with_locked_dependencies(base: modal.Image) -> modal.Image:
+    """The same layers ``Image.uv_sync`` builds (uv binary, the project files, ``uv sync --frozen`` without the
+    project, the venv first on PATH), minus its pre-build ``pyproject.toml`` check: that check uses the legacy
+    ``toml`` package, which cannot parse the dev group's ``{ include-group = "train" }`` and raises IndexError."""
+    image = base.dockerfile_commands(f"COPY --from={UV_IMAGE} /uv {UV_ROOT}/uv")
+    for name in UV_PROJECT_FILES:
+        image = image.add_local_file(REPO_ROOT / name, f"{UV_ROOT}/{name}", copy=True)
+    return image.dockerfile_commands(f"RUN {UV_SYNC_COMMAND}", f"ENV PATH={UV_ROOT}/.venv/bin:$PATH")
+
+
+image = _with_locked_dependencies(modal.Image.debian_slim(python_version=PYTHON_VERSION)).add_local_python_source(
+    *PACKAGES, ignore=_ignore
 )
 raw_volume = modal.Volume.from_name(RAW_VOLUME_NAME, create_if_missing=True)
 app = modal.App(APP_NAME, image=image)
