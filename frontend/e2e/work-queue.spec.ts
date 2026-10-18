@@ -80,13 +80,15 @@ test("REPLAY: a check-in the registrar approved on FrontDesk is listed in the qu
   page,
 }) => {
   const api = apiRequests(page);
-  await page.goto("/frontdesk");
+  await page.goto("/");
   await page.getByRole("button", { name: "Use this" }).click();
   await page.keyboard.press("Enter");
-  const held = page.getByTestId("registrar-held");
-  await held.getByTestId("approve-button").click();
-  await held.getByTestId("review-submit-button").click();
-  await expect(held.getByText(/Approved by /)).toBeVisible();
+  await expect(page.locator('[data-pane="held"]')).toBeVisible();
+  // In REPLAY the hand-off pair is the hero pair: approving it on the Desk decides the check-in.
+  await page.getByTestId("resolve-button").click();
+  await page.getByTestId("approve-button").click();
+  await page.getByTestId("review-submit-button").click();
+  await expect(page.getByTestId("kiosk")).toHaveAttribute("data-k", "done");
 
   await tab(page, "Work queue");
   await expect(page.getByText("Nothing is waiting for review.")).toHaveCount(0);
