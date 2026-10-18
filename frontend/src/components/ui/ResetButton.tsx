@@ -16,8 +16,8 @@ export const LATEST_MATCH_RUN_KEY = ["latest-match-run"] as const;
 /** Every work-queue read (pages and row details); GETs only. */
 export const WORK_QUEUE_KEY = ["work-queue"] as const;
 
-/** One click, no confirmation; a 5 s "Undo reset" toast covers a stray click. */
-export function ResetButton() {
+/** The one Reset: the button, the ⇧R key and the command bar all call this. */
+export function useResetDemo() {
   const source = useDataSource();
   const queryClient = useQueryClient();
   const resolving = useIsMutating({ mutationKey: RESOLVE_KEY }) > 0;
@@ -65,15 +65,29 @@ export function ResetButton() {
     onError: (error) => toast(`Reset failed: ${error.message}`),
   });
 
+  const disabled = sessionChanging || resolving;
+  return {
+    reset: () => {
+      if (!disabled) reset.mutate();
+    },
+    isPending: reset.isPending,
+    disabled,
+  };
+}
+
+/** One click, no confirmation; a 5 s "Undo reset" toast covers a stray click. */
+export function ResetButton() {
+  const { reset, isPending, disabled } = useResetDemo();
   return (
     <button
       type="button"
       data-testid="reset-button"
-      onClick={() => reset.mutate()}
-      disabled={sessionChanging || resolving}
-      className="h-11 rounded-md border border-border-strong bg-surface px-4 text-[16px] font-semibold text-ink-1 hover:bg-sunken disabled:text-ink-3"
+      onClick={reset}
+      disabled={disabled}
+      className="inline-flex h-9 items-center rounded-[10px] border border-hair-strong px-3.5 text-[14px] font-semibold text-ink hover:bg-ink/5 disabled:text-ink-3"
     >
-      {reset.isPending ? "Resetting..." : "Reset demo"}
+      {isPending ? "Resetting…" : "Reset demo"}
+      <kbd aria-hidden="true">⇧R</kbd>
     </button>
   );
 }

@@ -1,51 +1,81 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { CommandBar } from "@/components/desk/CommandBar";
+import { useDesk } from "@/components/desk/DeskContext";
+import { StoryStepper } from "@/components/desk/StoryStepper";
 import { useDataSource } from "@/data/DataSourceProvider";
+import { Mark } from "./Mark";
 import { ModeBadge } from "./ModeBadge";
 import { ProvisionalBadge } from "./ProvisionalBadge";
-import { ResetButton } from "./ResetButton";
+import { ResetButton, useResetDemo } from "./ResetButton";
 
-const TABS = [
-  { href: "/frontdesk", label: "FrontDesk" },
-  { href: "/", label: "Case" },
-  { href: "/queue", label: "Work queue" },
-] as const;
+/** True while the key press belongs to a text control, so single-letter shortcuts stay out of it. */
+export function typingInField(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  return ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable;
+}
 
+/** The top bar (CONCEPT.md §3): the mark and wordmark, the synthetic-data line, the story
+ * stepper, then the mode badge, Commands ⌘K and Reset demo ⇧R. No tabs: the queue opens from ⌘K. */
 export function Header() {
-  const pathname = usePathname();
   const { mode } = useDataSource();
+  const { desk, commandsOpen, setCommandsOpen } = useDesk();
+  const { reset } = useResetDemo();
+
+  // ⌘K and ⇧R work on every route; the Desk adds its own keys (DeskScreen).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandsOpen(!commandsOpen);
+        return;
+      }
+      if (commandsOpen || typingInField(e.target)) return;
+      if (e.shiftKey && e.key === "R" && !e.metaKey && !e.ctrlKey && !e.altKey) reset();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [commandsOpen, setCommandsOpen, reset]);
+
   return (
-    <header className="flex min-h-14 flex-wrap items-center gap-x-6 gap-y-2 border-b border-border-subtle bg-surface px-4 max-[640px]:gap-x-2 max-[640px]:py-2">
-      <span className="text-[24px] font-semibold tracking-tight">CheckMate</span>
-      <nav aria-label="Main" className="max-[640px]:order-3 max-[640px]:w-full">
-        <ul className="flex gap-1 max-[640px]:grid max-[640px]:grid-cols-3">
-          {TABS.map(({ href, label }) => {
-            const current = href === "/queue" ? pathname.startsWith(href) : pathname === href;
-            return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  aria-current={current ? "page" : undefined}
-                  className={`inline-flex h-11 items-center border-b-2 px-3 text-[18px] max-[640px]:justify-center max-[640px]:px-1 max-[640px]:text-[16px] ${
-                    current ? "border-accent font-semibold text-ink-1" : "border-transparent text-ink-2"
-                  }`}
-                >
-                  {label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-      <div className="ml-auto flex items-center gap-3 max-[640px]:gap-2">
-        <span className="max-[640px]:hidden">
-          <ProvisionalBadge />
+    <header className="flex h-[var(--bar-h)] items-center gap-6 px-7">
+      <Link
+        href="/"
+        className="flex items-center gap-2.5 font-display text-[22px] font-[650] tracking-[-0.02em] text-ink"
+      >
+        <span className="text-mulberry">
+          <Mark joined={desk === "linked"} />
         </span>
+        CheckMate
+      </Link>
+      <p className="flex items-center gap-2 text-[14px] text-ink-2">
+        <span aria-hidden="true" className="block h-[7px] w-[7px] rounded-full border-[1.5px] border-ink-2" />
+        Synthetic data. Not for clinical use.
+      </p>
+      <div className="flex min-w-0 flex-1 justify-center">
+        <StoryStepper />
+      </div>
+      <div className="flex items-center gap-2.5">
+        <ProvisionalBadge />
         <ModeBadge mode={mode} />
+        <button
+          type="button"
+          onClick={() => setCommandsOpen(true)}
+          aria-label="Commands"
+          aria-haspopup="dialog"
+          className="inline-flex h-9 items-center rounded-[10px] border border-hair px-3 text-[14px] text-ink-2 hover:bg-ink/5"
+        >
+          <span className="compact-hidden">Commands</span>
+          <kbd aria-hidden="true" className="compact-nomargin">
+            ⌘K
+          </kbd>
+        </button>
         <ResetButton />
       </div>
+      <CommandBar />
     </header>
   );
 }
