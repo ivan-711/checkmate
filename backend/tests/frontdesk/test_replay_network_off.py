@@ -74,7 +74,7 @@ def test_health_agent_is_replay_without_network_or_key(client, network_off):
 
 @pytest.mark.parametrize("language", ["ES", "EN"])
 def test_returning_patient_is_denied_and_handed_to_a_registrar(
-    client, network_off, hero_clinic_record, intake_sessions, language
+    client, network_off, hero_records, intake_sessions, language
 ):
     script = SCRIPTS[(language, PolicyOutcome.DENY)]
     session = _start_session(client, intake_sessions, language)
@@ -90,7 +90,8 @@ def test_returning_patient_is_denied_and_handed_to_a_registrar(
     assert call.gate.outcome == PolicyOutcome.DENY
     assert call.gate.reason_code == PolicyReason.CANDIDATE_IN_REVIEW_OR_HIGHER
     assert call.gate.handoff_required is True
-    assert hero_clinic_record in {c.record_id for c in call.candidates}
+    # both hero records, as a demo reset loads them: the recorded ToolResult hash is computed over both
+    assert set(hero_records.values()) <= {c.record_id for c in call.candidates}
     assert turn.registration.state == RegistrationState.PENDING_REGISTRAR
     assert turn.registration.handoff_pair_ids, "the handoff pair is what the registrar's board shows"
 

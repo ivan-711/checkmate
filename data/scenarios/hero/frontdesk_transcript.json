@@ -1,7 +1,7 @@
 {
   "transcriptVersion": 1,
   "kind": "AUTHORED",
-  "recordedAt": "2026-10-18T01:02:46Z",
+  "recordedAt": "2026-10-18T01:22:36Z",
   "modelId": "authored (not a recorded model run)",
   "promptVersion": "fd-prompt/1",
   "toolSchemaVersion": "fd-tools/1",
@@ -14,7 +14,7 @@
     "note": "authored from the spike's verified call shapes; not a recorded model run",
     "heroEntityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
     "heroRecordId": "d2b173e2-0e9a-5021-a674-d1b4f730ce3d",
-    "toolResultHashesFilledAt": "2026-10-18T01:02:46+00:00"
+    "toolResultHashesFilledAt": "2026-10-18T01:22:36+00:00"
   },
   "turns": [
     {
@@ -49,7 +49,7 @@
           "expect": {
             "gateOutcome": "DENY",
             "reasonCode": "CANDIDATE_IN_REVIEW_OR_HIGHER",
-            "toolResultSha256": "a4cd6b7006381d2aeca921b2ca57628f9b7bdeffadd38c958326c57bb96adba0"
+            "toolResultSha256": "da0b4a96fab4ffdefb8771c7028c512bce7e007e71cdd1c95587d6f3e0648546"
           }
         },
         {
@@ -95,7 +95,7 @@
           "expect": {
             "gateOutcome": "DENY",
             "reasonCode": "CANDIDATE_IN_REVIEW_OR_HIGHER",
-            "toolResultSha256": "7b4759ebeb614dc6ea9aceba844331c6db1f78dda085fc147b02fc0adba0fcc7"
+            "toolResultSha256": "d6692c7a532995a168875908b52d6a89c7ab5cebe42e323e273f521c4b864c23"
           }
         },
         {

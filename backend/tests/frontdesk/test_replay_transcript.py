@@ -135,7 +135,7 @@ def test_authoring_script_reproduces_the_committed_file(tmp_path: Path):
     assert load_transcript(out).turns == committed.turns
 
 
-def test_fill_hashes_records_real_result_hashes_that_then_replay_cleanly(hero_clinic_record, intake_sessions):
+def test_fill_hashes_records_real_result_hashes_that_then_replay_cleanly(hero_records, intake_sessions):
     """The recorder around the replay adapter learns each ToolResult hash from the engine; the filled
     transcript then plays through the loop with the divergence check active and never diverges."""
     import uuid
@@ -164,6 +164,12 @@ def test_fill_hashes_records_real_result_hashes_that_then_replay_cleanly(hero_cl
             hashes.add(step.expect.tool_result_sha256)
         assert all(s.expect is None for s in turn.steps if isinstance(s.model, TextModelStep))
     assert len(hashes) == len(filled.turns), "ES and EN results differ by message, so every script has its own hash"
+    # The committed hashes are the ones a demo reset's state produces; this state seeds the same records
+    # (hero.json's ER and Clinic), so a drift between them fails here, not on stage.
+    committed = load_transcript(TRANSCRIPT)
+    assert [[s.expect and s.expect.tool_result_sha256 for s in t.steps] for t in filled.turns] == [
+        [s.expect and s.expect.tool_result_sha256 for s in t.steps] for t in committed.turns
+    ], "the committed toolResultSha256 values no longer match the reset state; re-run --fill-hashes"
 
     # Replay from the same clean state the fill used: an intake record is a candidate for the next
     # session with the same demographics, so every session is purged right after its turn.

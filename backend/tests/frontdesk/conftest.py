@@ -173,24 +173,28 @@ def cleanup(db_conn):
     purge_records(db_conn, records)
 
 
-# Q1.4 (replay): the real adapter factory, the hero's Clinic record, and no pacing in tests.
+# Q1.4 (replay): the real adapter factory, the hero's two records, and no pacing in tests.
 
 os.environ["FRONTDESK_REPLAY_PACING"] = "0"  # transcript latencies are cosmetic; never sleep in tests
+
+import json
+from pathlib import Path
 
 from backend.frontdesk import adapters
 from backend.tests.policy.seed import insert_record
 from contracts.models.common import SourceKind
 
-# The hero's Clinic record exactly as hero.json on origin/main renders it (ISO date for the seeder).
-HERO_CLINIC_DEMOGRAPHICS = {
-    "given_name": "Sofia",
-    "family_name": "MesaLópez",
-    "birth_date": "1964-05-16",
-    "sex": "F",
-    "phone": None,
-    "address_line": "899 Sawayn Trafficway",
-    "zip": "01915",
-}
+HERO_JSON = Path(__file__).resolve().parents[3] / "data" / "scenarios" / "hero" / "hero.json"
+HERO_SOURCE_KIND = {"ER_FHIR": SourceKind.FHIR_PATIENT, "CLINIC_CSV": SourceKind.CSV_ROW}
+HERO_DEMOGRAPHIC_FIELDS = ("given_name", "family_name", "birth_date", "sex", "phone", "address_line", "zip5")
+
+
+def hero_demographics() -> dict[str, dict]:
+    """The hero's ER and Clinic records exactly as hero.json renders them: the two records a real
+    ``POST /sessions {"scenarioId":"hero"}`` loads for the hero, so the gate sees the candidates (and the
+    ToolResult hashes) a demo reset produces. Read from the file, so a hero change reaches the tests."""
+    records = json.loads(HERO_JSON.read_text(encoding="utf-8"))["records"]
+    return {system: {k: records[system][k] for k in HERO_DEMOGRAPHIC_FIELDS} for system in HERO_SOURCE_KIND}
 
 
 @pytest.fixture
@@ -211,18 +215,27 @@ def real_model_factory(model_factory_override):
 
 
 @pytest.fixture
-def hero_clinic_record(cleanup) -> uuid.UUID:
-    """Commit the hero's Clinic record so the gate finds it by block key; purged with the test."""
+def hero_records(cleanup) -> dict[str, uuid.UUID]:
+    """Commit the hero's ER and Clinic records (the hero's state after a demo reset) so the gate finds
+    both by block key; purged with the test. Returns ``{source_system: record_id}``."""
+    ids = {}
     with engine.begin() as conn:
-        rid = insert_record(
-            conn,
-            system="CLINIC_CSV",
-            local_id=f"hero-clinic-q1-4-{uuid.uuid4()}",
-            kind=SourceKind.CSV_ROW,
-            demographics=HERO_CLINIC_DEMOGRAPHICS,
-        )
-    cleanup[1].append(rid)
-    return rid
+        for system, demographics in hero_demographics().items():
+            ids[system] = insert_record(
+                conn,
+                system=system,
+                local_id=f"hero-{system.lower()}-q1-4-{uuid.uuid4()}",
+                kind=HERO_SOURCE_KIND[system],
+                demographics=demographics,
+            )
+    cleanup[1].extend(ids.values())
+    return ids
+
+
+@pytest.fixture
+def hero_clinic_record(hero_records) -> uuid.UUID:
+    """The hero's Clinic record id; the ER record is seeded beside it, as a reset does."""
+    return hero_records["CLINIC_CSV"]
 
 
 @pytest.fixture
