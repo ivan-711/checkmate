@@ -26,12 +26,22 @@ const LANGUAGES: { value: KioskLanguage; label: string }[] = [
   { value: "es", label: "Español" },
 ];
 
-/** Side by side the kiosk is its own scroll pane (globals.css, .pane); stacked, the page scrolls. */
-function inScrollPane(el: Element): boolean {
+/** The pane the kiosk scrolls in when the panes sit side by side (globals.css, .pane); null when
+ * they stack and the page scrolls. */
+function scrollPane(el: Element): HTMLElement | null {
   for (let box = el.parentElement; box; box = box.parentElement) {
-    if (/auto|scroll/.test(getComputedStyle(box).overflowY)) return true;
+    if (/auto|scroll/.test(getComputedStyle(box).overflowY)) return box;
   }
-  return false;
+  return null;
+}
+
+/** How a new gate card's row (the tool chip, then the card) scrolls into view: the whole row when
+ * it fits; else its foot, which shows the whole card; else its top, so the card's top shows. */
+function gateRowBlock(row: HTMLElement, card: HTMLElement): ScrollLogicalPosition {
+  const margin = parseFloat(getComputedStyle(row).scrollMarginTop) || 0;
+  const room = (scrollPane(row)?.clientHeight ?? window.innerHeight) - 2 * margin;
+  if (row.offsetHeight <= room) return "nearest";
+  return card.offsetHeight <= room ? "end" : "start";
 }
 
 /** The denied new chart that a registrar now holds: the card the demo is about. */
@@ -237,9 +247,9 @@ export function KioskPane() {
   const pending = send.isPending ? send.variables?.text : null;
   const failedText = failed && failed.sessionId === session.data?.id ? failed.text : null;
 
-  // New lines come into view. A new gate card comes first: its row is scrolled into view top
-  // included (it is the moment the demo is about; the row, as the card's entrance transform would
-  // skew the card), and a line under it may stay below. Otherwise the newest line scrolls into
+  // New lines come into view. A new gate card comes first: its row is scrolled into view, the whole
+  // card at least (it is the moment the demo is about; the row, as the card's entrance transform
+  // would skew the card), and lines under it may stay below. Otherwise the newest line scrolls into
   // view when a turn, a decision, a "reading" row or a failure is added; the "reading" row going
   // away is not an addition, so it never pulls the gate card off. Side by side only the kiosk pane
   // scrolls (globals.css, .pane); stacked, only a new gate card moves the page, so a registrar's
@@ -251,8 +261,10 @@ export function KioskPane() {
     const now = { turns: turns.length, gates: gateCount, decided, pending: !!pending, failed: !!failedText };
     shown.current = now;
     const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-    if (now.gates > was.gates) {
-      gateCard.current?.parentElement?.scrollIntoView({ block: "nearest", behavior });
+    const card = gateCard.current;
+    const row = card?.parentElement;
+    if (now.gates > was.gates && card && row) {
+      row.scrollIntoView({ block: gateRowBlock(row, card), behavior });
       return;
     }
     const added =
@@ -261,7 +273,7 @@ export function KioskPane() {
       (now.pending && !was.pending) ||
       (now.failed && !was.failed);
     const last = transcript.current?.lastElementChild;
-    if (added && last && inScrollPane(last)) last.scrollIntoView({ block: "nearest", behavior });
+    if (added && last && scrollPane(last)) last.scrollIntoView({ block: "nearest", behavior });
   }, [turns.length, gateCount, decided, pending, failedText]);
 
   return (
