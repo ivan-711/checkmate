@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { scenario } from "@/data/scenario";
 import {
   actorName,
+  footerWithoutRule,
   differingFields,
   formatCt,
   compactLane,
@@ -104,5 +105,18 @@ describe("compactLane", () => {
 
   it("shows everything when the lane fits", () => {
     expect(compactLane([ev(2), ev(1)], 5)).toEqual({ shown: [ev(1), ev(2)], hidden: 0 });
+  });
+});
+
+describe("footerWithoutRule", () => {
+  it("drops the rule prefix the header already shows", () => {
+    expect(footerWithoutRule("Rule BL-AMOX-01 v1. Not checked: dose.", "BL-AMOX-01", "v1")).toBe(
+      "Not checked: dose.",
+    );
+  });
+
+  it("leaves any other footer unchanged", () => {
+    expect(footerWithoutRule("Not checked: dose.", "BL-AMOX-01", "v1")).toBe("Not checked: dose.");
+    expect(footerWithoutRule("Rule BL-AMOX-02 v1. x", "BL-AMOX-01", "v1")).toBe("Rule BL-AMOX-02 v1. x");
   });
 });

@@ -1,5 +1,6 @@
 import { Flag } from "lucide-react";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
+import { footerWithoutRule } from "@/lib/display";
 import type { FlagState } from "@/lib/flagState";
 
 const QUIET_LINES = {
@@ -16,8 +17,9 @@ export function FlagCard({ state }: { state: FlagState }) {
     return (
       <p
         data-testid="flag-quiet"
-        className="rounded-lg border border-border-strong bg-surface p-4 text-ink-2"
+        className="flex items-start gap-2 rounded-lg border border-border-subtle bg-sunken p-4 text-[16px] text-ink-2"
       >
+        <Flag aria-hidden size={16} className="mt-1 shrink-0 text-ink-3" />
         {QUIET_LINES[state.kind]}
       </p>
     );
@@ -35,8 +37,12 @@ export function FlagCard({ state }: { state: FlagState }) {
           Flagged for clinician review
         </h2>
         {alert.constructedScenario && <ConstructedChip />}
+        {/* The rule id sits once, in the header; the footer below carries the rule's limits. */}
+        <span className="ml-auto font-mono text-[14px] text-ink-3">
+          Rule <span data-testid="flag-card-rule-id">{alert.ruleId}</span> {alert.ruleVersion}
+        </span>
       </header>
-      <p className="mb-2">{alert.cardText}</p>
+      <p className="mb-2 max-w-[68ch]">{alert.cardText}</p>
       {alert.citation && (
         <p className="mb-2 text-[16px] text-ink-2">
           Source:{" "}
@@ -45,10 +51,9 @@ export function FlagCard({ state }: { state: FlagState }) {
           </a>
         </p>
       )}
-      <p className="text-[14px] text-ink-3">
-        Rule <span data-testid="flag-card-rule-id">{alert.ruleId}</span> {alert.ruleVersion}
+      <p className="max-w-[68ch] text-[14px] text-ink-3">
+        {footerWithoutRule(alert.cardFooter, alert.ruleId, alert.ruleVersion)}
       </p>
-      <p className="text-[14px] text-ink-3">{alert.cardFooter}</p>
     </article>
   );
 }
