@@ -2,33 +2,12 @@
 
 import { ArrowRight, ShieldAlert } from "lucide-react";
 import { forwardRef } from "react";
-import type { Contribution, ToolCallCandidate, ToolCallRecord } from "@/api/types";
+import type { ToolCallCandidate, ToolCallRecord } from "@/api/types";
 import { BandChip } from "@/components/ui/BandChip";
-import { kioskField, sourceSystemLabel, type KioskCopy } from "./copy";
+import { rankContributions } from "@/lib/display";
+import { sourceSystemLabel, type KioskCopy } from "./copy";
 
 const EVIDENCE_ROWS = 5; // UX 3.11: up to 5 rows, by absolute weight
-
-interface FieldRow {
-  label: string;
-  logit: number;
-  missing: boolean;
-}
-
-/** One row per field the patient would recognise. Contributions are log-odds, so a field's
- * features add up; a field is "no evidence" only when none of its features had a value. */
-function fieldRows(contributions: Contribution[], t: KioskCopy): FieldRow[] {
-  const rows = new Map<string, FieldRow>();
-  for (const c of contributions) {
-    const field = kioskField(c.feature);
-    const label = field ? t.field[field] : c.feature;
-    const row = rows.get(label) ?? { label, logit: 0, missing: true };
-    if (c.value != null) rows.set(label, { label, logit: row.logit + c.logit, missing: false });
-    else rows.set(label, row);
-  }
-  return [...rows.values()].sort(
-    (a, b) => Number(a.missing) - Number(b.missing) || Math.abs(b.logit) - Math.abs(a.logit),
-  );
-}
 
 function signed(logit: number): string {
   return `${logit >= 0 ? "+" : "-"}${Math.abs(logit).toFixed(2)}`;
@@ -41,7 +20,9 @@ export const GateCard = forwardRef<
   { call: ToolCallRecord; candidate: ToolCallCandidate; t: KioskCopy }
 >(function GateCard({ call, candidate, t }, ref) {
   const score = candidate.p.toFixed(2);
-  const rows = fieldRows(candidate.topContributions ?? [], t).slice(0, EVIDENCE_ROWS);
+  // The registrar rail's rows for the same pair, feature by feature: the gate sends only its top
+  // features, so a sum per field would neither be the field's total nor match the rail.
+  const rows = rankContributions(candidate.topContributions ?? [], t.feature).slice(0, EVIDENCE_ROWS);
   return (
     <div
       ref={ref}
@@ -69,7 +50,7 @@ export const GateCard = forwardRef<
         </p>
         <ul className="mt-2 space-y-0.5">
           {rows.map((c) => (
-            <li key={c.label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <li key={c.feature} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
               <span>{c.label}</span>
               {c.missing ? (
                 <span className="text-right text-ink-3">{t.noEvidence}</span>
@@ -79,7 +60,7 @@ export const GateCard = forwardRef<
             </li>
           ))}
         </ul>
-        <p className="mt-2 text-[14px] text-ink-3">{t.gateHidden}</p>
+        <p className="mt-2 text-ink-3">{t.gateHidden}</p>
       </div>
       <p className="mt-3 flex items-center gap-2 font-semibold">
         <ArrowRight aria-hidden size={20} />
