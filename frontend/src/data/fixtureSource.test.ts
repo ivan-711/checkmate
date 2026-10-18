@@ -181,6 +181,32 @@ describe("FixtureSource work queue", () => {
     expect((await s.getCandidatePairs({})).items).toEqual([]);
   });
 
+  it("keeps the pair's first origin in the list and the detail, through a later Resolve", async () => {
+    const s = source();
+    const origins = async () => [
+      (await s.getCandidatePairs({})).items[0]?.origin,
+      (await s.getCandidatePair(pairId)).pair.origin,
+      (await s.getCase()).detail!.pair.origin,
+    ];
+    const { id } = await s.startIntake("EN");
+    await s.sendTurn(id, scenario.frontdeskIntake.utteranceEn, "k1");
+    expect(await origins()).toEqual(["FRONTDESK_HANDOFF", "FRONTDESK_HANDOFF", "FRONTDESK_HANDOFF"]);
+    await s.resolve(); // a match run upserts the stored pair and keeps its origin (_UPSERT_PAIR)
+    expect(await origins()).toEqual(["FRONTDESK_HANDOFF", "FRONTDESK_HANDOFF", "FRONTDESK_HANDOFF"]);
+    expect((await s.getCandidatePairs({ origin: "FRONTDESK_HANDOFF" })).items).toHaveLength(1);
+  });
+
+  it("a pair Resolve stored first stays a match-run pair after a FrontDesk hand-off", async () => {
+    const s = source();
+    await s.resolve();
+    const { id } = await s.startIntake("EN");
+    await s.sendTurn(id, scenario.frontdeskIntake.utteranceEn, "k1");
+    expect((await s.getCandidatePairs({})).items[0].origin).toBe("MATCH_RUN");
+    expect((await s.getCandidatePair(pairId)).pair.origin).toBe("MATCH_RUN");
+    await s.reset();
+    expect((await s.getCandidatePairs({})).items).toEqual([]);
+  });
+
   it("filters by band and status the way the API does", async () => {
     const s = source();
     await s.resolve();

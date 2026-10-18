@@ -8,6 +8,7 @@ import type {
   IntakeTurn,
   Language,
   MatchDecision,
+  PairOrigin,
   ReviewRequest,
   ReviewResponse,
   SafetyAlert,
@@ -28,8 +29,9 @@ interface SessionState {
   /** Append-only, oldest first: what the API's event_log would hold for this session. */
   events: EventLogRow[];
   resolved: boolean;
-  /** A FrontDesk check-in handed the fixture pair to a registrar; the API stores that pair. */
-  handedOff: boolean;
+  /** How the fixture pair was first stored (Resolve or a FrontDesk hand-off); null until then.
+   * Like the API's pair upsert, a later match run or hand-off keeps the first origin. */
+  origin: PairOrigin | null;
 }
 
 interface KeyedReview {
@@ -73,7 +75,7 @@ export class FixtureSource implements DataSource {
   /** The fixture is already scored; Resolve only re-queues the pair and logs the run. It has no
    * match-run receipt to return, so the work queue shows no funnel in REPLAY. */
   async resolve(): Promise<null> {
-    this.current = { ...this.current, resolved: true };
+    this.current = { ...this.current, resolved: true, origin: this.current.origin ?? "MATCH_RUN" };
     this.log("MATCH_RUN_COMPLETED", { pairId: this.fixture.pair.pair.id });
     return null;
   }
@@ -81,10 +83,8 @@ export class FixtureSource implements DataSource {
   /** The fixture's one pair, with this session's decision, once Resolve or a FrontDesk hand-off
    * has stored it (as the API would); filtered the way the API filters, on one page. */
   async getCandidatePairs(query: CandidatePairQuery): Promise<CandidatePairPage> {
-    if (!this.current.resolved && !this.current.handedOff) return { items: [], nextCursor: null };
-    const { pair: stored } = this.currentDetail();
-    // Stored only by the kiosk's hand-off, it reads as the API stores that pair.
-    const pair = this.current.resolved ? stored : { ...stored, origin: "FRONTDESK_HANDOFF" as const };
+    if (!this.current.origin) return { items: [], nextCursor: null };
+    const { pair } = this.currentDetail();
     const matches =
       (!query.band || pair.decision.band === query.band) &&
       (!query.status || pair.decision.status === query.status) &&
@@ -182,7 +182,7 @@ export class FixtureSource implements DataSource {
       for (const pairId of turn.registration.handoffPairIds ?? []) {
         this.log("INTAKE_HANDOFF_CREATED", { intakeSessionId: sessionId, pairId });
       }
-      this.current = { ...this.current, handedOff: true };
+      this.current = { ...this.current, origin: this.current.origin ?? "FRONTDESK_HANDOFF" };
     }
     if (turn.degraded)
       this.log("AGENT_TURN_DEGRADED", { intakeSessionId: sessionId, degraded: turn.degraded });
@@ -207,7 +207,8 @@ export class FixtureSource implements DataSource {
   private currentDetail(): CandidatePairDetail {
     const { history } = this.current;
     const base = this.fixture.pair;
-    return { ...base, pair: { ...base.pair, decision: history[history.length - 1] }, history };
+    const origin = this.current.origin ?? base.pair.origin;
+    return { ...base, pair: { ...base.pair, origin, decision: history[history.length - 1] }, history };
   }
 
   private decide(body: ReviewRequest): ReviewResponse {
@@ -287,7 +288,7 @@ export class FixtureSource implements DataSource {
       outcome: null,
       events: [],
       resolved: false,
-      handedOff: false,
+      origin: null,
     };
   }
 }
