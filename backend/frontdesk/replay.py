@@ -402,13 +402,46 @@ def maybe_record(inner: AgentModel, model_id: str, env: dict[str, str] | None = 
     return RecordingAgentModel(inner, Path(out), pins)
 
 
-def agent_status(mode: str, live_configured: bool, env: dict[str, str] | None = None) -> AgentStatus:
+# The transcript pins /health compares with the running engine (Transcript field names).
+ENGINE_PIN_FIELDS = ("scorer_version", "threshold_set_id", "hero_scenario_sha256")
+
+
+def hero_scenario_sha256(hero_dir: Path) -> str | None:
+    """sha256 of the hero ``scenario.json`` the engine loads, or None when it cannot be read."""
+    try:
+        return hashlib.sha256((Path(hero_dir) / "scenario.json").read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def engine_pin_mismatches(transcript: Transcript, running_pins: dict[str, str | None]) -> list[str]:
+    """The transcript pins that differ from the running engine's. A pin the engine cannot report
+    (None: database down, file unreadable) is not compared; it is not evidence of a mismatch."""
+    return [
+        name
+        for name in ENGINE_PIN_FIELDS
+        if running_pins.get(name) is not None and getattr(transcript, name) != running_pins[name]
+    ]
+
+
+def agent_status(
+    mode: str,
+    live_configured: bool,
+    env: dict[str, str] | None = None,
+    running_pins: dict[str, str | None] | None = None,
+) -> AgentStatus:
     """/health ``agent``: LIVE when LIVE mode has a key and a model id; REPLAY when the transcript
-    loads and validates (REPLAY and AUTO both play it when live is not available); DOWN otherwise."""
+    loads, validates and its pins match the running engine (REPLAY and AUTO both play it when live is
+    not available); DOWN otherwise. A pin mismatch is DOWN because playback would diverge on every
+    step: the recorded ToolResult hashes belong to another scorer, threshold set or hero."""
     if (mode or "").upper() == AgentMode.LIVE.value:
         return AgentStatus.LIVE if live_configured else AgentStatus.DOWN
     try:
-        load_transcript(transcript_path(env))
+        transcript = load_transcript(transcript_path(env))
     except TranscriptError:
+        return AgentStatus.DOWN
+    mismatched = engine_pin_mismatches(transcript, running_pins or {})
+    if mismatched:
+        log.warning("replay transcript pins differ from the running engine: %s", ",".join(mismatched))
         return AgentStatus.DOWN
     return AgentStatus.REPLAY

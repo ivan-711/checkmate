@@ -118,3 +118,38 @@ def test_maybe_record_degrades_to_the_bare_adapter_when_the_hero_pins_are_unavai
     monkeypatch.setattr(replay, "HERO_DIR", tmp_path / "no-hero-dir")
     inner = _Inner()
     assert maybe_record(inner, "model-x", {RECORD_TO_ENV: str(tmp_path / "rec.json")}) is inner
+
+
+def _committed_pins() -> dict[str, str]:
+    from backend.frontdesk.replay import DEFAULT_TRANSCRIPT_PATH, load_transcript
+
+    t = load_transcript(DEFAULT_TRANSCRIPT_PATH)
+    return {
+        "scorer_version": t.scorer_version,
+        "threshold_set_id": t.threshold_set_id,
+        "hero_scenario_sha256": t.hero_scenario_sha256,
+    }
+
+
+def test_agent_status_is_down_when_a_transcript_pin_differs_from_the_running_engine():
+    pins = _committed_pins()
+    assert agent_status("REPLAY", False, {}, running_pins=pins) == AgentStatus.REPLAY
+    for name in pins:
+        assert agent_status("REPLAY", False, {}, running_pins={**pins, name: "other"}) == AgentStatus.DOWN, name
+        assert agent_status("AUTO", False, {}, running_pins={**pins, name: "other"}) == AgentStatus.DOWN, name
+    # a pin the engine cannot report (database down, no reset yet) is not compared
+    assert agent_status("REPLAY", False, {}, running_pins={**pins, "threshold_set_id": None}) == AgentStatus.REPLAY
+
+
+def test_health_reports_the_running_engine_pins_and_a_hero_mismatch(client, monkeypatch, tmp_path: Path):
+    from backend.tests.frontdesk.conftest import API
+
+    pins = _committed_pins()
+    body = client.get(f"{API}/health").json()
+    assert body["agent"] == "REPLAY"
+    assert body["versions"]["scorerVersion"] == pins["scorer_version"]
+    assert body["versions"]["thresholdSetId"] == pins["threshold_set_id"]
+    # a different hero on disk than the one the transcript was filled for: /health says so
+    (tmp_path / "scenario.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("CHECKMATE_HERO_OVERLAY_DIR", str(tmp_path))
+    assert client.get(f"{API}/health").json()["agent"] == "DOWN"
