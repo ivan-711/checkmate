@@ -8,7 +8,14 @@ test("Approve, Reject and Resolve are disabled while a match run is in flight", 
   // Fails, never skips, if the build is not in API mode.
   await expect(page.getByTestId("app-mode-badge")).toHaveText(/LOCAL/);
 
+  // Wait for the reset itself: right after the click the button can still read enabled for a
+  // frame, and a Resolve clicked in that frame lands on a button that is turning disabled.
+  const reset = page.waitForResponse(
+    (r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/api/v1/sessions",
+    { timeout: 30_000 },
+  );
   await page.getByTestId("reset-button").click();
+  await reset;
   await expect(page.getByTestId("reset-button")).toBeEnabled({ timeout: 30_000 });
   await page.getByTestId("resolve-button").click();
   await expect(page.getByTestId("candidate-pair")).toBeVisible({ timeout: 30_000 });
