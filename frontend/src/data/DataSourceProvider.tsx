@@ -7,6 +7,8 @@ import { scenario } from "./scenario";
 import type { DataSource } from "./source";
 
 // "api" serves the FastAPI app through the /api/v1 rewrite; anything else plays the fixture.
+// One source for the whole build and the whole visit: every screen, the work queue included,
+// reads the same one, so moving between screens keeps the session's state.
 function createDataSource(): DataSource {
   return process.env.NEXT_PUBLIC_CHECKMATE_SOURCE === "api" ? new ApiSource() : new FixtureSource(scenario);
 }

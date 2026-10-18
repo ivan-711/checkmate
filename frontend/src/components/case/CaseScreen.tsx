@@ -4,7 +4,12 @@ import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/
 import { useState } from "react";
 import type { ReviewResponse } from "@/api/types";
 import { useAnnounce } from "@/components/ui/LiveRegion";
-import { RESOLVE_KEY, SESSION_CHANGE_KEY } from "@/components/ui/ResetButton";
+import {
+  LATEST_MATCH_RUN_KEY,
+  RESOLVE_KEY,
+  SESSION_CHANGE_KEY,
+  WORK_QUEUE_KEY,
+} from "@/components/ui/ResetButton";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { DataError } from "@/data/source";
 import { differingFields, type CardField } from "@/lib/display";
@@ -26,7 +31,7 @@ function announcement(response: ReviewResponse): string {
     : "Link approved. Records linked into one golden record with a crosswalk on every value. The rule did not flag this record.";
 }
 
-export function CaseScreen() {
+export function CaseScreen({ pairId }: { pairId?: string }) {
   const source = useDataSource();
   const announce = useAnnounce();
   const queryClient = useQueryClient();
@@ -34,8 +39,8 @@ export function CaseScreen() {
   // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
   const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
   const caseQuery = useQuery({
-    queryKey: ["case"],
-    queryFn: () => source.getCase(),
+    queryKey: ["case", pairId],
+    queryFn: () => source.getCase(pairId),
     // Paused while Reset or Undo runs: reads against the half-reset session only race the reset.
     enabled: !sessionChanging,
     // "No session" is an answer, not a failure: show the reset prompt at once instead of retrying.
@@ -51,7 +56,10 @@ export function CaseScreen() {
   const resolve = useMutation({
     mutationKey: RESOLVE_KEY,
     mutationFn: () => source.resolve(),
-    onSuccess: async () => {
+    onSuccess: async (run) => {
+      // Kept for the work queue's funnel, so the queue never has to start a run of its own.
+      if (run) queryClient.setQueryData(LATEST_MATCH_RUN_KEY, run);
+      await queryClient.invalidateQueries({ queryKey: WORK_QUEUE_KEY });
       await queryClient.invalidateQueries({ queryKey: ["case"] });
       await queryClient.invalidateQueries({ queryKey: ["events"] });
       announce("Identity resolved. The candidate pair is ready for review.");
