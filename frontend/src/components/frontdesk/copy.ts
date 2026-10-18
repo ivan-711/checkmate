@@ -1,4 +1,6 @@
-// UX spec 10.9, the FrontDesk copy deck. Strings with braces are functions filled from the API.
+// The FrontDesk copy deck (UX spec 10.9, redesigned with critiques/copy.md). Strings with
+// parameters are functions filled from the API. Nothing here names a tool, a policy id, a source
+// system code or an agent mode: the patient reads plain words, and the ids stay in data attributes.
 import type { Band, PolicyReason } from "@/api/types";
 import { FAMILY_FEATURES, FEATURE_LABELS, GIVEN_FEATURES, type NameFeature } from "@/lib/display";
 
@@ -6,7 +8,7 @@ export type KioskLanguage = "en" | "es";
 
 const BAND_LABEL: Record<KioskLanguage, Record<Band, string>> = {
   en: { AUTO_LINK: "AUTO-LINK", REVIEW: "REVIEW", KEEP_SEPARATE: "KEEP SEPARATE" },
-  es: { AUTO_LINK: "VINCULACIÓN AUTOMÁTICA", REVIEW: "REVISIÓN", KEEP_SEPARATE: "MANTENER SEPARADOS" },
+  es: { AUTO_LINK: "VÍNCULO AUTOMÁTICO", REVIEW: "REVISIÓN", KEEP_SEPARATE: "MANTENER SEPARADOS" },
 } as const;
 
 // The registrar rail's evidence labels (lib/display FEATURE_LABELS), in Spanish. The gate card
@@ -18,7 +20,7 @@ const NAME_PART_ES: Record<NameFeature, string> = {
   dmeta: ", pronunciación",
   nickname: ", diminutivo",
   initial: ", inicial",
-  token_overlap: ", partes",
+  token_overlap: ", palabras en común",
 };
 
 function nameLabelsEs(prefix: "given" | "family", name: string, features: readonly NameFeature[]) {
@@ -49,28 +51,52 @@ const FEATURE_LABELS_ES: Record<string, string> = {
   family_metaphone: "Apellido, pronunciación",
 };
 
+/** The kiosk's names for the systems a chart can come from, keyed on the stored value (the
+ * staff screens keep `sourceSystemLabel`, which the e2e tests read). */
+const KIOSK_SOURCE: Record<KioskLanguage, Record<string, string>> = {
+  en: { ER_FHIR: "Emergency room", CLINIC_CSV: "Clinic", FRONTDESK_INTAKE: "Kiosk check-in" },
+  es: { ER_FHIR: "Urgencias", CLINIC_CSV: "Clínica", FRONTDESK_INTAKE: "Registro en el quiosco" },
+};
+
 export const COPY = {
   en: {
-    title: "Welcome. Let's get you checked in.",
-    sub: "Type your full name and date of birth. You can write in English or Spanish.",
-    disclosure:
-      "FrontDesk uses Gemini to read your check-in. A registrar confirms any match to an existing chart.",
-    transcript: "TRANSCRIPT",
-    agentMode: (mode: string) => `Agent: ${mode}`,
-    region: "Check-in conversation",
-    empty: "Your conversation will appear here.",
-    language: "Language",
     pane: "Patient kiosk",
+    language: "Language",
     switched: "Language set to English",
-    startOver: "Start over",
-    speaker: "FrontDesk",
-    automatic: "automatic message",
-    placeholder: "Type your name and date of birth",
+    region: "Check-in conversation",
+    title: "Welcome. Let’s get you checked in.",
+    sub: "Type your full name and date of birth, in English or Spanish.",
+    demoLabel: "Demo line",
+    suggestUse: "Use this",
+    constructed: "constructed scenario",
+    constructedKiosk:
+      "This check-in matches a synthetic patient built for the demo. All records are synthetic.",
+    you: "You",
+    placeholder: "Your name and date of birth",
+    reply: "Type a reply",
+    send: "Send",
     counter: (n: number) => `${n} of 280`,
-    helper: "This demo uses synthetic patients. Please don't type your own details.",
-    promise: "Nothing is linked to your chart until a staff member approves.",
-    heldFinish: "Held for review. No records were linked.",
-    ruleResult: "Rule result",
+    promise: ["FrontDesk gets it ready.", "A registrar confirms."],
+    foot: "This demo uses synthetic patients. Please don’t type your own details.",
+    wait: "Wait for FrontDesk to finish",
+    reading: "Reading your message",
+    startOver: "Start over",
+    working: "Working on it",
+    ready: "Ready",
+    stepsLabel: "What FrontDesk did",
+    stepRead: "Read your check-in",
+    step: {
+      search_patients: (k: number) =>
+        k === 0
+          ? "Searched for an existing chart"
+          : k === 1
+            ? "Found a chart that may be yours"
+            : "Found charts that may be yours",
+      propose_new_chart: () => "Asked to open a new chart",
+      attach_history: () => "Attached history from the linked chart",
+    } as Record<string, (k: number) => string>,
+    stepOther: "Tried another step",
+    gateStep: { HELD: "Checked with the identity gate: held", PASSED: "Checked with the identity gate: allowed" },
     // The gate's reason codes in words a patient can read; the code itself is for staff screens.
     reason: {
       CANDIDATE_IN_REVIEW_OR_HIGHER: "An existing chart may be yours",
@@ -85,76 +111,84 @@ export const COPY = {
       NO_INTAKE_RECORD: "There is no check-in record yet",
     } satisfies Record<PolicyReason, string> as Record<string, string>,
     reasonFallback: "A staff member will review this",
-    stepsLabel: "What FrontDesk did",
-    stepRead: "Read your check-in",
-    step: {
-      search_patients: "Searched for an existing chart",
-      propose_new_chart: "Asked to create a new chart",
-      attach_history: "Attached history from the linked chart",
-    } as Record<string, string>,
-    stepOther: (tool: string) => `Called ${tool}`,
-    gateName: "Identity gate",
-    factLabel: { HELD: "HELD", PASSED: "PASSED" },
-    wait: "Wait for FrontDesk to finish",
-    send: "Send",
-    reading: "Reading your message",
-    suggestLabel: "Try this check-in",
-    suggestUse: "Use this",
-    constructed: "constructed scenario",
-    constructedKiosk:
-      "This check-in matches a synthetic patient built for the demo. All records are synthetic.",
-    agentDown: "FrontDesk could not reach the agent service. Your message was not sent.",
-    startFailed: "FrontDesk could not reach the agent service.",
-    tryAgain: "Try again",
-    approved: "Your chart is confirmed. Please wait to be called.",
-    rejected: "A registrar is creating a new chart for you. Please wait to be called.",
-    handoff:
-      "I found a chart that may already be yours. A registrar will confirm it with you. Please have a seat.",
-    tool: {
-      search_patients: (k: number) => `Search existing charts · ${k} ${k === 1 ? "candidate" : "candidates"}`,
-      propose_new_chart: () => "Create a new chart",
-      attach_history: () => "Attach history from linked chart",
-    },
-    allowed: "Allowed",
-    denied: "Denied by identity gate",
+    // The expanded detail of a step: the ids live here, never in a headline.
+    detailTool: "Tool",
     detailDecision: "Gate decision",
     detailLatency: "Latency",
-    gateTitle: "Blocked by identity gate",
-    gateDenied: "propose_new_chart was denied.",
-    gateReason: (score: string, band: string) => `Reason: an existing chart scored ${score} (${band}).`,
-    // Around the policy id, which the card keeps on one line.
-    gatePolicy: ["Policy ", ": no new chart when a match scores REVIEW or higher."],
+    details: "Details",
+    gateLabel: "Identity gate · denied",
+    gateTitle: "A chart may already be yours",
+    gateBody: (score: string) => [
+      "FrontDesk asked to open a new chart. The gate denied it because an existing chart matches ",
+      score,
+      ".",
+    ],
+    gateHeld: "Held for a registrar. Please have a seat; they’ll confirm it with you.",
+    gateReview: "A registrar is looking at it now. Please stay close.",
     gateCandidate: "Possible existing chart",
     gateChart: (last2: string, source: string) => `Chart ••••${last2} · ${source}`,
+    gateAutoLinkOff: "Auto-link is off here. A staff member decides.",
     gateHidden: "Values hidden on this screen. A registrar reviews them.",
-    gateHandoff: "Sent to a registrar",
     gateAnnounce: (score: string, band: string) =>
       `New chart request denied by the identity gate. An existing chart scored ${score}, ${band} band. Sent to a registrar.`,
     noEvidence: "no evidence",
+    speaker: "FrontDesk",
+    aiAgent: "AI agent",
+    automatic: "automatic message",
+    agentDown: "FrontDesk could not reach the agent service. Your message was not sent.",
+    startFailed: "FrontDesk could not reach the agent service.",
+    tryAgain: "Try again",
+    doneTitle: (name: string | null) => (name ? `You’re checked in, ${name}.` : "You’re checked in."),
+    doneSub: "A registrar linked your check-in to your chart. Please have a seat; someone will call your name.",
+    doneSteps: ["Read your check-in", "Held for a registrar, not a new chart", "A registrar confirmed your chart"],
+    rejectedTitle: (name: string | null) => (name ? `Thank you, ${name}.` : "Thank you."),
+    rejected: "A registrar is creating a new chart for you. Please wait to be called.",
     band: BAND_LABEL.en,
+    source: KIOSK_SOURCE.en,
+    sourceOther: "Another record",
     feature: FEATURE_LABELS,
   },
   es: {
-    title: "Le damos la bienvenida. Registremos su llegada.",
-    sub: "Escriba su nombre completo y su fecha de nacimiento. Puede escribir en español o en inglés.",
-    disclosure:
-      "FrontDesk usa Gemini para leer su registro. El personal de admisión confirma cualquier coincidencia con un expediente existente.",
-    transcript: "CONVERSACIÓN",
-    agentMode: (mode: string) => `Agente: ${mode}`,
-    region: "Conversación de registro",
-    empty: "Su conversación aparecerá aquí.",
+    pane: "Quiosco de pacientes",
     language: "Idioma",
-    pane: "QUIOSCO DE PACIENTES",
     switched: "Idioma cambiado a español",
-    startOver: "Empezar de nuevo",
-    speaker: "FrontDesk",
-    automatic: "mensaje automático",
-    placeholder: "Escriba su nombre y fecha de nacimiento",
+    region: "Conversación de registro",
+    title: "Le damos la bienvenida. Registremos su llegada.",
+    sub: "Escriba su nombre completo y su fecha de nacimiento, en español o en inglés.",
+    demoLabel: "Mensaje de demostración",
+    suggestUse: "Usar este",
+    constructed: "caso de demostración",
+    constructedKiosk:
+      "Este registro corresponde a un paciente sintético creado para la demostración. Todos los registros son sintéticos.",
+    you: "Usted",
+    placeholder: "Su nombre y fecha de nacimiento",
+    reply: "Escriba una respuesta",
+    send: "Enviar",
     counter: (n: number) => `${n} de 280`,
-    helper: "Esta demostración usa pacientes sintéticos. Por favor, no escriba sus datos personales.",
-    promise: "No se vincula nada a su expediente hasta que un miembro del personal lo apruebe.",
-    heldFinish: "En espera de revisión. No se vinculó ningún expediente.",
-    ruleResult: "Resultado de regla",
+    promise: ["FrontDesk lo prepara.", "Admisión lo confirma."],
+    foot: "Esta demostración usa pacientes sintéticos. No escriba sus propios datos.",
+    wait: "Espere a que FrontDesk termine",
+    reading: "Leyendo su mensaje",
+    startOver: "Empezar de nuevo",
+    working: "Trabajando en ello",
+    ready: "Listo",
+    stepsLabel: "Lo que hizo FrontDesk",
+    stepRead: "Leyó su mensaje",
+    step: {
+      search_patients: (k: number) =>
+        k === 0
+          ? "Buscó un expediente existente"
+          : k === 1
+            ? "Encontró un expediente que podría ser suyo"
+            : "Encontró expedientes que podrían ser suyos",
+      propose_new_chart: () => "Pidió abrir un expediente nuevo",
+      attach_history: () => "Adjuntó el historial del expediente vinculado",
+    } as Record<string, (k: number) => string>,
+    stepOther: "Intentó otro paso",
+    gateStep: {
+      HELD: "Consultó el control de identidad: en espera",
+      PASSED: "Consultó el control de identidad: permitido",
+    },
     reason: {
       CANDIDATE_IN_REVIEW_OR_HIGHER: "Un expediente existente podría ser suyo",
       INCOMPLETE_DEMOGRAPHICS: "Primero se necesitan más datos",
@@ -168,56 +202,41 @@ export const COPY = {
       NO_INTAKE_RECORD: "Todavía no hay un registro de llegada",
     } satisfies Record<PolicyReason, string> as Record<string, string>,
     reasonFallback: "Un miembro del personal lo revisará",
-    stepsLabel: "Lo que hizo FrontDesk",
-    stepRead: "Se leyó su registro",
-    step: {
-      search_patients: "Se buscó un expediente existente",
-      propose_new_chart: "Se pidió crear un expediente nuevo",
-      attach_history: "Se adjuntó el historial del expediente vinculado",
-    } as Record<string, string>,
-    stepOther: (tool: string) => `Se llamó a ${tool}`,
-    gateName: "Control de identidad",
-    factLabel: { HELD: "EN ESPERA", PASSED: "PERMITIDO" },
-    wait: "Espere a que FrontDesk termine",
-    send: "Enviar",
-    reading: "Leyendo su mensaje",
-    suggestLabel: "Pruebe este registro",
-    suggestUse: "Usar este",
-    constructed: "escenario construido",
-    constructedKiosk:
-      "Este registro corresponde a un paciente sintético creado para la demostración. Todos los registros son sintéticos.",
-    agentDown: "FrontDesk no pudo conectar con el servicio del agente. Su mensaje no se envió.",
-    startFailed: "FrontDesk no pudo conectar con el servicio del agente.",
-    tryAgain: "Intentar de nuevo",
-    approved: "Su expediente está confirmado. Espere a que lo llamen.",
-    rejected: "El personal de admisión está creando un expediente nuevo para usted. Espere a que lo llamen.",
-    handoff:
-      "Encontré un expediente que podría ser suyo. El personal de admisión lo confirmará con usted. Por favor, tome asiento.",
-    tool: {
-      search_patients: (k: number) =>
-        `Buscar expedientes existentes · ${k} ${k === 1 ? "candidato" : "candidatos"}`,
-      propose_new_chart: () => "Crear un expediente nuevo",
-      attach_history: () => "Adjuntar historial del expediente vinculado",
-    },
-    allowed: "Permitido",
-    denied: "Denegado por el control de identidad",
+    detailTool: "Herramienta",
     detailDecision: "Decisión del control",
     detailLatency: "Latencia",
-    gateTitle: "Bloqueado por el control de identidad",
-    gateDenied: "Se denegó propose_new_chart.",
-    gateReason: (score: string, band: string) => `Motivo: un expediente existente obtuvo ${score} (${band}).`,
-    gatePolicy: [
-      "Política ",
-      ": no se crea un expediente nuevo cuando una coincidencia llega a REVISIÓN o más.",
+    details: "Detalles",
+    gateLabel: "Control de identidad · denegado",
+    gateTitle: "Puede que ya tenga un expediente",
+    gateBody: (score: string) => [
+      "FrontDesk pidió abrir un expediente nuevo. El control lo denegó porque un expediente existente coincide en ",
+      score,
+      ".",
     ],
+    gateHeld: "En espera de admisión. Tome asiento; confirmarán sus datos con usted.",
+    gateReview: "Admisión lo está revisando ahora. Por favor, quédese cerca.",
     gateCandidate: "Posible expediente existente",
     gateChart: (last2: string, source: string) => `Expediente ••••${last2} · ${source}`,
+    gateAutoLinkOff: "El vínculo automático está desactivado. Decide un miembro del personal.",
     gateHidden: "Los datos están ocultos en esta pantalla. El personal de admisión los revisa.",
-    gateHandoff: "Enviado al personal de admisión",
     gateAnnounce: (score: string, band: string) =>
       `El control de identidad denegó un expediente nuevo. Un expediente existente obtuvo ${score}, franja ${band}. Enviado al personal de admisión.`,
     noEvidence: "sin evidencia",
+    speaker: "FrontDesk",
+    aiAgent: "agente de IA",
+    automatic: "mensaje automático",
+    agentDown: "FrontDesk no pudo conectar con el servicio del agente. Su mensaje no se envió.",
+    startFailed: "FrontDesk no pudo conectar con el servicio del agente.",
+    tryAgain: "Intentar de nuevo",
+    doneTitle: (name: string | null) =>
+      name ? `Su llegada está registrada, ${name}.` : "Su llegada está registrada.",
+    doneSub: "Admisión vinculó su registro a su expediente. Tome asiento; le llamarán por su nombre.",
+    doneSteps: ["Leyó su mensaje", "En espera de admisión, sin expediente nuevo", "Admisión confirmó su expediente"],
+    rejectedTitle: (name: string | null) => (name ? `Gracias, ${name}.` : "Gracias."),
+    rejected: "El personal de admisión está creando un expediente nuevo para usted. Espere a que le llamen.",
     band: BAND_LABEL.es,
+    source: KIOSK_SOURCE.es,
+    sourceOther: "Otro registro",
     feature: FEATURE_LABELS_ES,
   },
 };
@@ -230,4 +249,9 @@ export function sourceSystemLabel(sourceSystem: string): string {
     .split("_")
     .map((w) => (w.length <= 4 ? w : w[0] + w.slice(1).toLowerCase()))
     .join(" ");
+}
+
+/** The patient's name for a chart's source: a place, never a system code. */
+export function kioskSourceLabel(sourceSystem: string, t: KioskCopy): string {
+  return t.source[sourceSystem] ?? t.sourceOther;
 }
