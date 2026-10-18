@@ -1,19 +1,23 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CandidatePairDetail, IntakeSession, IntakeTurn } from "@/api/types";
+import { SESSION_CHANGE_KEY } from "@/components/ui/demoReset";
 import { DataSourceProvider } from "@/data/DataSourceProvider";
 import { FixtureSource } from "@/data/fixtureSource";
 import { scenario } from "@/data/scenario";
 import { COPY } from "./copy";
-import { handoffPairKey, INTAKE_KEY } from "./intake";
-import { KioskPane } from "./KioskPane";
+import { handoffPairKey, INTAKE_KEY, SEND_TURN_KEY } from "./intake";
+import { KioskPane, runStartOver } from "./KioskPane";
 
 /** The kiosk with one check-in already in the cache, rendered for real. A decided hand-off pair
  * goes in the cache too, as the registrar pane's approval leaves it. */
-function renderKiosk(session: IntakeSession, decided?: CandidatePairDetail): string {
-  const queryClient = new QueryClient();
+function renderKiosk(
+  session: IntakeSession,
+  decided?: CandidatePairDetail,
+  queryClient = new QueryClient(),
+): string {
   queryClient.setQueryData(INTAKE_KEY, session);
   if (decided) queryClient.setQueryData(handoffPairKey(decided.pair.id), decided);
   return renderToStaticMarkup(
@@ -76,6 +80,13 @@ describe("KioskPane states", () => {
     expect(html).not.toContain("Start over");
   });
 
+  it("keeps the kiosk's own agent mode badge in both replay and live sessions", () => {
+    expect(renderKiosk(fresh)).toMatch(/data-testid="agent-mode-badge"[^>]*>REPLAY<\/span>/);
+    expect(renderKiosk({ ...fresh, agentMode: "LIVE" })).toMatch(
+      /data-testid="agent-mode-badge"[^>]*>LIVE<\/span>/,
+    );
+  });
+
   it("holds: a past-tense checklist ends on the gate step, then the gate card, then a reply box", async () => {
     const { session, turn } = await checkIn(scenario.frontdeskIntake.utteranceEn);
     const html = renderKiosk(session);
@@ -104,6 +115,7 @@ describe("KioskPane states", () => {
     expect(html).toContain(COPY.en.gateTitle);
     expect(html).toContain(turn.toolCalls![1].candidates![0].p.toFixed(2));
     expect(html).toContain(COPY.en.gateHeld);
+    expect(html).toMatch(/data-testid="kiosk-finish-held"[^>]*>Held for a registrar/);
     expect(html).toMatch(/data-testid="gate-card"[^>]*data-policy="frontdesk-gate\/1"/);
     expect(html).toMatch(/data-testid="gate-card"[^>]*data-tool="propose_new_chart"/);
     // The composer shrinks to a reply box; the demo line is gone; Start over is offered.
@@ -114,7 +126,14 @@ describe("KioskPane states", () => {
     expect(html).not.toContain(turn.assistantText);
   });
 
-  it("shows the patient no machine names: tool ids, policy ids, reason codes, system codes or modes", async () => {
+  it("uses an h2 for the gate title while held", async () => {
+    const { session } = await checkIn(scenario.frontdeskIntake.utteranceEn);
+    const html = renderKiosk(session);
+    expect(html).toMatch(/<h2 class="k-gate-title">/);
+    expect(html).not.toMatch(/<h3 class="k-gate-title">/);
+  });
+
+  it("shows the patient no machine names beyond the required agent-mode badge", async () => {
     const { session } = await checkIn(scenario.frontdeskIntake.utteranceEn);
     const text = visibleText(renderKiosk(session));
     for (const raw of [
@@ -124,7 +143,6 @@ describe("KioskPane states", () => {
       "CANDIDATE_IN_REVIEW_OR_HIGHER",
       "ER_FHIR",
       "CLINIC_CSV",
-      "REPLAY",
     ])
       expect(text, raw).not.toContain(raw);
   });
@@ -182,5 +200,51 @@ describe("KioskPane states", () => {
 
   it("marks the kiosk with its language, so the crossfade swaps a labelled region", () => {
     expect(renderKiosk(fresh)).toMatch(/data-testid="kiosk"[^>]*lang="en"/);
+  });
+});
+
+describe("KioskPane Start over", () => {
+  it("runs the full demo reset in LOCAL real-API mode", () => {
+    const resetDemo = vi.fn();
+    runStartOver("LOCAL", resetDemo);
+    expect(resetDemo).toHaveBeenCalledOnce();
+  });
+
+  it("runs the same full demo reset in REPLAY fixture mode", () => {
+    const resetDemo = vi.fn();
+    runStartOver("REPLAY", resetDemo);
+    expect(resetDemo).toHaveBeenCalledOnce();
+  });
+});
+
+/** A client whose cache holds a mutation that never settles: useIsMutating sees the same state
+ * the kiosk sees while a turn or reset is in flight. */
+function inFlight(mutationKey: readonly unknown[]): QueryClient {
+  const queryClient = new QueryClient();
+  const mutation = queryClient
+    .getMutationCache()
+    .build(queryClient, { mutationKey: [...mutationKey], mutationFn: () => new Promise<never>(() => {}) });
+  void mutation.execute(undefined);
+  return queryClient;
+}
+
+function isDisabled(html: string, label: string): boolean {
+  const end = html.indexOf(`>${label}</button>`);
+  expect(end, `a "${label}" button`).toBeGreaterThan(-1);
+  return html.slice(html.lastIndexOf("<button", end), end + 1).includes(' disabled=""');
+}
+
+describe("KioskPane while work is in flight", () => {
+  it("locks Use this while the first turn is being read", () => {
+    expect(isDisabled(renderKiosk(fresh), COPY.en.suggestUse)).toBe(false);
+    expect(isDisabled(renderKiosk(fresh, undefined, inFlight(SEND_TURN_KEY)), COPY.en.suggestUse)).toBe(true);
+  });
+
+  it("locks Start over while the demo resets", async () => {
+    const { session } = await checkIn(scenario.frontdeskIntake.utteranceEn);
+    expect(isDisabled(renderKiosk(session), COPY.en.startOver)).toBe(false);
+    expect(isDisabled(renderKiosk(session, undefined, inFlight(SESSION_CHANGE_KEY)), COPY.en.startOver)).toBe(
+      true,
+    );
   });
 });
