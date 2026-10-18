@@ -71,7 +71,11 @@ export const GateCard = forwardRef<
             {rows.map((c) => (
               <li key={c.feature}>
                 <span>{c.label}</span>
-                {c.missing ? <span className="k-gate-none">{t.noEvidence}</span> : <span className="num">{signed(c.logit)}</span>}
+                {c.missing ? (
+                  <span className="k-gate-none">{t.noEvidence}</span>
+                ) : (
+                  <span className="num">{signed(c.logit)}</span>
+                )}
               </li>
             ))}
           </ul>

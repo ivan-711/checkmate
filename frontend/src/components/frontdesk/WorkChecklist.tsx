@@ -8,7 +8,17 @@ import type { TurnStep, TurnSteps } from "./turnSteps";
 
 /** One tool step. The patient reads the past-tense line; the tool's id, the gate's code and the
  * latency sit in an expanded detail (CONCEPT.md §8: the id stays in data-tool and the detail). */
-function ToolStep({ step, call, index, t }: { step: TurnStep; call: ToolCallRecord; index: number; t: KioskCopy }) {
+function ToolStep({
+  step,
+  call,
+  index,
+  t,
+}: {
+  step: TurnStep;
+  call: ToolCallRecord;
+  index: number;
+  t: KioskCopy;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <li

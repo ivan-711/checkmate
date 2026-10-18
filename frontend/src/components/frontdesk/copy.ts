@@ -96,7 +96,10 @@ export const COPY = {
       attach_history: () => "Attached history from the linked chart",
     } as Record<string, (k: number) => string>,
     stepOther: "Tried another step",
-    gateStep: { HELD: "Checked with the identity gate: held", PASSED: "Checked with the identity gate: allowed" },
+    gateStep: {
+      HELD: "Checked with the identity gate: held",
+      PASSED: "Checked with the identity gate: allowed",
+    },
     // The gate's reason codes in words a patient can read; the code itself is for staff screens.
     reason: {
       CANDIDATE_IN_REVIEW_OR_HIGHER: "An existing chart may be yours",
@@ -139,8 +142,13 @@ export const COPY = {
     startFailed: "FrontDesk could not reach the agent service.",
     tryAgain: "Try again",
     doneTitle: (name: string | null) => (name ? `You’re checked in, ${name}.` : "You’re checked in."),
-    doneSub: "A registrar linked your check-in to your chart. Please have a seat; someone will call your name.",
-    doneSteps: ["Read your check-in", "Held for a registrar, not a new chart", "A registrar confirmed your chart"],
+    doneSub:
+      "A registrar linked your check-in to your chart. Please have a seat; someone will call your name.",
+    doneSteps: [
+      "Read your check-in",
+      "Held for a registrar, not a new chart",
+      "A registrar confirmed your chart",
+    ],
     rejectedTitle: (name: string | null) => (name ? `Thank you, ${name}.` : "Thank you."),
     rejected: "A registrar is creating a new chart for you. Please wait to be called.",
     band: BAND_LABEL.en,
@@ -231,7 +239,11 @@ export const COPY = {
     doneTitle: (name: string | null) =>
       name ? `Su llegada está registrada, ${name}.` : "Su llegada está registrada.",
     doneSub: "Admisión vinculó su registro a su expediente. Tome asiento; le llamarán por su nombre.",
-    doneSteps: ["Leyó su mensaje", "En espera de admisión, sin expediente nuevo", "Admisión confirmó su expediente"],
+    doneSteps: [
+      "Leyó su mensaje",
+      "En espera de admisión, sin expediente nuevo",
+      "Admisión confirmó su expediente",
+    ],
     rejectedTitle: (name: string | null) => (name ? `Gracias, ${name}.` : "Gracias."),
     rejected: "El personal de admisión está creando un expediente nuevo para usted. Espere a que le llamen.",
     band: BAND_LABEL.es,

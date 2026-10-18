@@ -117,7 +117,15 @@ describe("KioskPane states", () => {
   it("shows the patient no machine names: tool ids, policy ids, reason codes, system codes or modes", async () => {
     const { session } = await checkIn(scenario.frontdeskIntake.utteranceEn);
     const text = visibleText(renderKiosk(session));
-    for (const raw of ["propose_new_chart", "search_patients", "frontdesk-gate", "CANDIDATE_IN_REVIEW_OR_HIGHER", "ER_FHIR", "CLINIC_CSV", "REPLAY"])
+    for (const raw of [
+      "propose_new_chart",
+      "search_patients",
+      "frontdesk-gate",
+      "CANDIDATE_IN_REVIEW_OR_HIGHER",
+      "ER_FHIR",
+      "CLINIC_CSV",
+      "REPLAY",
+    ])
       expect(text, raw).not.toContain(raw);
   });
 
@@ -162,7 +170,11 @@ describe("KioskPane states", () => {
     expect(html).toMatch(new RegExp(`data-voice="system"[^>]*>${turn.assistantText}<`));
     expect(html).toContain(COPY.en.automatic);
     expect(html).not.toContain('data-testid="turn-steps"');
-    const model = { ...turn, assistantText: "Thank you, I am checking that now.", assistantTextSource: "MODEL" as const };
+    const model = {
+      ...turn,
+      assistantText: "Thank you, I am checking that now.",
+      assistantTextSource: "MODEL" as const,
+    };
     const agentHtml = renderKiosk({ ...session, turns: [model] });
     expect(agentHtml).toMatch(/data-voice="agent"[^>]*>Thank you, I am checking that now\.</);
     expect(agentHtml).toContain(COPY.en.aiAgent);

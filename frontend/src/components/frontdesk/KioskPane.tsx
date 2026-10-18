@@ -78,13 +78,26 @@ function PatientLine({ text, settled, t }: { text: string; settled: boolean; t: 
 
 /** Words the model wrote are labelled as the AI agent's and set in the gray agent tone; text the
  * system wrote (templates, the registrar's outcome) is a fact and stays near-black. */
-function AgentLine({ text, automatic, t, children }: { text: string; automatic: boolean; t: KioskCopy; children?: React.ReactNode }) {
+function AgentLine({
+  text,
+  automatic,
+  t,
+  children,
+}: {
+  text: string;
+  automatic: boolean;
+  t: KioskCopy;
+  children?: React.ReactNode;
+}) {
   return (
     <li className="k-agent">
       <p className="k-who">
         {t.speaker} · {automatic ? t.automatic : t.aiAgent}
       </p>
-      <p data-voice={automatic ? "system" : "agent"} className={automatic ? "k-agent-system" : "k-agent-model"}>
+      <p
+        data-voice={automatic ? "system" : "agent"}
+        className={automatic ? "k-agent-system" : "k-agent-model"}
+      >
         {text}
       </p>
       {children}
@@ -106,7 +119,9 @@ function Turn({
   gateRef: (el: HTMLDivElement | null) => void;
 }) {
   const steps = turnSteps(turn, t);
-  const denied = (turn.toolCalls ?? []).map((call) => ({ call, candidate: gateDenial(call) })).find((d) => d.candidate);
+  const denied = (turn.toolCalls ?? [])
+    .map((call) => ({ call, candidate: gateDenial(call) }))
+    .find((d) => d.candidate);
   return (
     <>
       <PatientLine text={turn.userText} settled={settled} t={t} />
@@ -127,7 +142,9 @@ function Turn({
       )}
       {/* A hand-off closes the turn with the gate card's held line (UX 3.11). The agent's reply
           would say the same thing again, and the model never speaks for the gate. */}
-      {!denied && <AgentLine text={turn.assistantText} automatic={turn.assistantTextSource === "TEMPLATE"} t={t} />}
+      {!denied && (
+        <AgentLine text={turn.assistantText} automatic={turn.assistantTextSource === "TEMPLATE"} t={t} />
+      )}
     </>
   );
 }
@@ -232,12 +249,18 @@ export function KioskPane({
 
   const pending = send.isPending ? send.variables?.text : null;
   const failedText = failed && failed.sessionId === session.data?.id ? failed.text : null;
-  const state: KioskState = kioskState({ session: session.data, pending: send.isPending, failed: !!failedText, decided });
+  const state: KioskState = kioskState({
+    session: session.data,
+    pending: send.isPending,
+    failed: !!failedText,
+    decided,
+  });
   const name = patientGivenName(session.data);
   const gateCount = turns.filter((turn) => (turn.toolCalls ?? []).some((c) => gateDenial(c))).length;
 
   // The Desk follows four of the kiosk's stills; a reply or a rejection reads as idle there.
-  const deskState: DeskKioskState = state === "working" || state === "held" || state === "done" ? state : "idle";
+  const deskState: DeskKioskState =
+    state === "working" || state === "held" || state === "done" ? state : "idle";
   useEffect(() => {
     onStateChange?.(deskState);
   }, [deskState, onStateChange]);
@@ -442,7 +465,14 @@ export function KioskPane({
             <button type="submit" data-testid="kiosk-send" disabled={sendDisabled} className="k-send">
               {t.send}
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-                <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M9 6l6 6-6 6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </button>
           </div>

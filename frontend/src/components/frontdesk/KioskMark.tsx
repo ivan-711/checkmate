@@ -15,7 +15,11 @@ export function Tick({ kind = "done" }: { kind?: "done" | "pending" | "hold" }) 
   return (
     <svg viewBox="0 0 22 22" aria-hidden className={`k-tick k-tick-${kind}`}>
       <circle cx="11" cy="11" r="9.5" />
-      {kind === "hold" ? <path d="M9 7v8M13 7v8" /> : kind === "done" ? <path d="M6.5 11.2l3 3 6-6.2" /> : null}
+      {kind === "hold" ? (
+        <path d="M9 7v8M13 7v8" />
+      ) : kind === "done" ? (
+        <path d="M6.5 11.2l3 3 6-6.2" />
+      ) : null}
     </svg>
   );
 }

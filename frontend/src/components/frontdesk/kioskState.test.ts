@@ -49,7 +49,9 @@ describe("kioskState", () => {
   it("is done once a registrar linked the check-in, and rejected once every pair was rejected", async () => {
     const held = await checkIn(scenario.frontdeskIntake.utteranceEn);
     expect(kioskState({ session: held, pending: false, failed: false, decided: "LINKED" })).toBe("done");
-    expect(kioskState({ session: held, pending: false, failed: false, decided: "REJECTED" })).toBe("rejected");
+    expect(kioskState({ session: held, pending: false, failed: false, decided: "REJECTED" })).toBe(
+      "rejected",
+    );
   });
 });
 
@@ -64,7 +66,10 @@ describe("patientGivenName", () => {
   it("is null when no tool carried a name", async () => {
     expect(patientGivenName(fresh)).toBeNull();
     expect(patientGivenName(await checkIn("I have an appointment at three."))).toBeNull();
-    const blank = { ...fresh, turns: [{ toolCalls: [{ args: { givenName: "  " } }] } as unknown as IntakeTurn] };
+    const blank = {
+      ...fresh,
+      turns: [{ toolCalls: [{ args: { givenName: "  " } }] } as unknown as IntakeTurn],
+    };
     expect(patientGivenName(blank)).toBeNull();
   });
 });

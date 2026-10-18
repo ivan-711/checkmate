@@ -16,7 +16,16 @@ function call(
   gate: ToolCallRecord["gate"],
   candidates: ToolCallRecord["candidates"] = [],
 ): ToolCallRecord {
-  return { id: toolName, stepIndex: 0, toolName, args: {}, gate, effect: { status: "NONE" }, latencyMs: 0, candidates };
+  return {
+    id: toolName,
+    stepIndex: 0,
+    toolName,
+    args: {},
+    gate,
+    effect: { status: "NONE" },
+    latencyMs: 0,
+    candidates,
+  };
 }
 
 describe("turnSteps", () => {
@@ -29,7 +38,11 @@ describe("turnSteps", () => {
       "Asked to open a new chart",
     ]);
     // Each tool step carries its call, so the screen can keep the tool's id in a data attribute.
-    expect(steps.done.map((s) => s.call?.toolName ?? null)).toEqual([null, "search_patients", "propose_new_chart"]);
+    expect(steps.done.map((s) => s.call?.toolName ?? null)).toEqual([
+      null,
+      "search_patients",
+      "propose_new_chart",
+    ]);
     expect(steps.gate).toEqual({
       outcome: "HELD",
       label: "Checked with the identity gate: held",

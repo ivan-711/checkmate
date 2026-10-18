@@ -52,7 +52,10 @@ describe("FrontDesk copy", () => {
 
   it("puts no machine name in front of the patient: no snake_case ids, policy ids or mode codes", () => {
     for (const lang of ["en", "es"] as const) {
-      const { feature: _feature, band: _band, ...deck } = COPY[lang];
+      // feature and band label the registrar's evidence rows (data words), not patient copy.
+      const deck = Object.fromEntries(
+        Object.entries(COPY[lang]).filter(([key]) => key !== "feature" && key !== "band"),
+      );
       for (const text of strings(deck)) {
         expect(text, text).not.toMatch(/\b[a-z]+_[a-z_]+\b|frontdesk-gate|\bREPLAY\b|\bLIVE\b|\bLOCAL\b/);
         expect(text, text).not.toMatch(/—|!/); // UX §5: no em dashes, no exclamation points
