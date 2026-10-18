@@ -93,6 +93,8 @@ Global `:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px }`
 
 Max content 1440 px, `p-4` gutter. Case: `grid-cols-[1fr_28rem]`, one column at `max-[1100px]`. FrontDesk: `grid-cols-[600px_1fr]`, one column at `max-[1100px]`. Phone (`max-[640px]`): the target is no horizontal scroll at 390 px. Today the header does not wrap and Case keeps two source cards side by side (audit #11, pending), so a new screen must not add width: let its own rows wrap and give grid children `min-w-0`. Short laptop (`max-height:700px`): `.short-screen-hidden` / `.short-screen-only` keep decision buttons above the fold.
 
+Side by side (1100 px and wider), Case and FrontDesk do not scroll the page: each column scrolls on its own (`.pane-layout` on the grid, `.pane` on each column, in `globals.css`), so Approve, the flag card after Approve and the kiosk's newest message stay in view. Scroll a moment into view with `scrollIntoView({ block: "nearest" })` on an element without an entrance transform. FrontDesk stacked and portrait is the patient-facing kiosk: the staff pane is not displayed (`max-[1100px]:portrait:hidden`); stacked and landscape keeps both panes.
+
 ## Do / don't
 
 - Do use tokens via Tailwind names; do add a NEW token to both dark blocks at once.

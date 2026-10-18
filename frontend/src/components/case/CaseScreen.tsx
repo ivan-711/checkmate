@@ -1,7 +1,7 @@
 "use client";
 
 import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReviewResponse } from "@/api/types";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import {
@@ -36,6 +36,9 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
   const announce = useAnnounce();
   const queryClient = useQueryClient();
   const [justApproved, setJustApproved] = useState(false);
+  // Set by an approve: the flag card under the new record scrolls into view once, inside its pane.
+  const [revealFlag, setRevealFlag] = useState(false);
+  const flagRef = useRef<HTMLDivElement>(null);
   // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
   const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
   const caseQuery = useQuery({
@@ -65,6 +68,15 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
       announce("Identity resolved. The candidate pair is ready for review.");
     },
   });
+
+  // Runs after GoldenRecord has focused its heading (child effects run first), so the heading
+  // keeps focus while the pane brings the flag card into view.
+  useEffect(() => {
+    if (!revealFlag || !linked) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    flagRef.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+    setRevealFlag(false);
+  }, [revealFlag, linked]);
 
   const resolveButton = (
     <button
@@ -101,14 +113,15 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
 
   function onDecided(response: ReviewResponse) {
     setJustApproved(response.decision.status === "LINKED");
+    setRevealFlag(response.decision.status === "LINKED");
     announce(announcement(response));
   }
 
   return (
     <div className="space-y-4">
       <h1 className="sr-only">Case</h1>
-      <div className="grid grid-cols-[1fr_28rem] gap-4 max-[1100px]:grid-cols-1">
-        <div className="space-y-4">
+      <div className="pane-layout grid grid-cols-[1fr_28rem] gap-4 max-[1100px]:grid-cols-1">
+        <div className="pane space-y-4">
           {linked && entity ? (
             <>
               <GoldenRecord
@@ -117,8 +130,11 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
                 focusOnMount={justApproved}
                 onFocused={() => setJustApproved(false)}
               />
-              {/* The flag sits right under the combined record so it is on screen after Approve. */}
-              <FlagCard state={flagState(caseQuery.data)} />
+              {/* The flag sits right under the combined record so it is on screen after Approve.
+                  The wrapper is the scroll target: the card's entrance transform would skew it. */}
+              <div ref={flagRef}>
+                <FlagCard state={flagState(caseQuery.data)} />
+              </div>
               <Timeline events={timeline.data} cards={cards} />
             </>
           ) : (
@@ -147,7 +163,7 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
           )}
           <EventFeed />
         </div>
-        <aside className="space-y-4">
+        <aside className="pane space-y-4">
           {detail && (resolved || linked) ? (
             <div
               data-testid="candidate-pair"

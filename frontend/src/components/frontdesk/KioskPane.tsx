@@ -160,7 +160,12 @@ export function KioskPane() {
     // A new gate card always scrolls fully into view: it is the moment the demo is about.
     if (gateCount === 0) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    gateCard.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+    // Its list row is the target: the card's entrance transform would leave the card's foot cut off.
+    // Side by side, only the kiosk pane scrolls (globals.css, .pane), never the page.
+    gateCard.current?.parentElement?.scrollIntoView({
+      block: "nearest",
+      behavior: reduce ? "auto" : "smooth",
+    });
   }, [gateCount]);
 
   function submit() {

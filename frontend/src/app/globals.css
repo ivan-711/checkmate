@@ -214,6 +214,40 @@ body {
   }
 }
 
+/* Side-by-side panes (Case, FrontDesk; UI audit #5). When the two columns sit side by side the
+   page stops scrolling and each pane scrolls on its own, so Approve, the flag card and the kiosk's
+   latest message stay in view whatever the other pane holds. A screen opts in with .pane-layout
+   on its two-column grid and .pane on each column; every element between main and that grid
+   fills the height left under the header. Below 1100 px wide (200% zoom on a laptop included)
+   the columns stack and the page scrolls as before. */
+@media (min-width: 1100px) {
+  body:has(.pane-layout) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+  }
+  body:has(.pane-layout) > main,
+  main :has(.pane-layout) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+  }
+  .pane-layout {
+    flex: 1;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  /* The padding, undone by the margin, keeps focus rings at a pane's edge inside its scrollport. */
+  .pane {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 4px;
+    margin: -4px;
+  }
+}
+
 /* FrontDesk status row: a turn is running. The only keyframes on the site (DESIGN.md, Motion). */
 .indeterminate {
   background: linear-gradient(90deg, transparent 0%, var(--info) 40%, var(--info) 60%, transparent 100%);
