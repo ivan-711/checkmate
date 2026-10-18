@@ -41,10 +41,10 @@ export function Header() {
   }, [commandsOpen, setCommandsOpen, reset]);
 
   return (
-    <header className="flex h-[var(--bar-h)] items-center gap-6 px-7">
+    <header className="app-header">
       {/* The wordmark with the synthetic-data sentence under it: always visible, never clipped,
           so the stepper keeps its room at 1280 wide. */}
-      <div className="flex shrink-0 items-center gap-2.5">
+      <div className="header-brand flex shrink-0 items-center gap-2.5">
         <span className="text-mulberry">
           <Mark size={26} state={desk === "linked" ? "closed" : "open"} />
         </span>
@@ -67,16 +67,20 @@ export function Header() {
           </p>
         </div>
       </div>
-      <div className="flex min-w-0 flex-1 justify-center">
+      <div className="header-story flex min-w-0 flex-1 justify-center">
         <StoryStepper />
       </div>
-      <div className="flex shrink-0 items-center gap-2.5">
-        <ProvisionalBadge />
-        <ModeBadge mode={mode} />
+      <div className="header-actions flex shrink-0 items-center gap-2.5">
+        <span className="header-provisional contents">
+          <ProvisionalBadge />
+        </span>
+        <span className="header-mode contents">
+          <ModeBadge mode={mode} />
+        </span>
         <button
           type="button"
           onClick={() => setCommandsOpen(true)}
-          aria-label="Commands"
+          aria-label="Commands, shortcut ⌘K"
           aria-haspopup="dialog"
           className="inline-flex h-9 items-center rounded-[10px] border border-hair px-3 text-[14px] text-ink-2 hover:bg-ink/5"
         >
