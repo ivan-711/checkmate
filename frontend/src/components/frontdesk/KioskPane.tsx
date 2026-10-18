@@ -4,10 +4,10 @@ import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/
 import { useEffect, useRef, useState } from "react";
 import type { IntakeSession, IntakeTurn } from "@/api/types";
 import { useAnnounce } from "@/components/ui/LiveRegion";
-import { SESSION_CHANGE_KEY, useDemoReset } from "@/components/ui/demoReset";
+import { RESOLVE_KEY, SESSION_CHANGE_KEY, useDemoReset } from "@/components/ui/demoReset";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { scenario } from "@/data/scenario";
-import { DataError, type Mode } from "@/data/source";
+import { DataError } from "@/data/source";
 import type { KioskState as DeskKioskState } from "@/lib/desk";
 import { COPY, type KioskCopy, type KioskLanguage } from "./copy";
 import { needsNewCheckIn } from "./checkIn";
@@ -33,10 +33,23 @@ const LANGUAGES: { value: KioskLanguage; label: string }[] = [
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Start over is a demo-wide reset in API and fixture modes. Fixture state includes the Desk's
- * decision, so clearing only the intake cache can leave the next check-in past the gate. */
-export function runStartOver(_mode: Mode, resetDemo: () => void): void {
+/** Start over is the full demo reset in every mode: fixture state includes the Desk's decision, so
+ * clearing only the intake cache can leave the next check-in past the gate. It waits for what the
+ * header's Reset demo waits for (useResetDemo), because a reset that overlaps a match run gets a 503
+ * and leaves no candidate pair, and for a turn still being read. */
+export function startOverBlocked(work: {
+  sending: boolean;
+  resetting: boolean;
+  resolving: boolean;
+}): boolean {
+  return work.sending || work.resetting || work.resolving;
+}
+
+/** Runs the reset unless Start over is blocked; true when it ran. */
+export function runStartOver(blocked: boolean, resetDemo: () => void): boolean {
+  if (blocked) return false;
   resetDemo();
+  return true;
 }
 
 /** Scrolls the kiosk's own scroll area so `el` is fully in view: the whole element when it fits,
@@ -185,6 +198,8 @@ export function KioskPane({
   // meanwhile, and the shared reset starts the new check-in once it has finished.
   const resetting = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
   const sending = useIsMutating({ mutationKey: SEND_TURN_KEY }) > 0;
+  const resolving = useIsMutating({ mutationKey: RESOLVE_KEY }) > 0;
+  const startOverDisabled = startOverBlocked({ sending, resetting, resolving });
   const demoReset = useDemoReset();
   const session = useQuery({
     queryKey: INTAKE_KEY,
@@ -319,13 +334,15 @@ export function KioskPane({
   }
 
   function startOver() {
-    setFailed(null);
-    setText("");
-    key.current = null;
-    send.reset();
-    runStartOver(source.mode, () =>
-      demoReset.mutate(undefined, { onSettled: () => composer.current?.focus() }),
-    );
+    // Checked here as well as on the button, so a click queued before the button re-renders cannot
+    // start a reset that overlaps the work.
+    runStartOver(startOverDisabled, () => {
+      setFailed(null);
+      setText("");
+      key.current = null;
+      send.reset();
+      demoReset.mutate(undefined, { onSettled: () => composer.current?.focus() });
+    });
   }
 
   const idle = state === "idle";
@@ -491,7 +508,7 @@ export function KioskPane({
         {!idle && state !== "working" && (
           <button
             type="button"
-            disabled={sending || resetting}
+            disabled={startOverDisabled}
             onClick={startOver}
             className={finished ? "k-restart" : "k-link"}
           >
