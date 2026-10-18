@@ -277,7 +277,7 @@ Contract routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the co
 | `eval/` | W5, Q2, Q5 | Evaluation harness (`eval/harness/`), protected expectations (`eval/expectations/`), the G16 acceptance script (`eval/acceptance/`), the parallel seed sweep (`eval/sweep/`), tests (`eval/tests/`, `eval/tests_r5/`) |
 | `data/` | W1, W5 | `data/download.py` and `data/HASHES.json`; hero selector and export (`data/hero_select.py`, `data/hero_export.py`, `data/hero_overlay.py`), `data/fixture_check.py`, and the exported hero with the replay transcript in `data/scenarios/hero/`; raw data stays gitignored |
 | `docs/` | D1, D2, D3 | `docs/LICENSES.md`, `docs/devpost-outline.md`, the committed metrics of the held-out run (`docs/eval/run-1c3f8f96-metrics.json`) |
-| `tools/` | Q15 | Empty |
+| `tools/` | Q15, notify-imessage | The optional registrar notifier (`tools/notify/`, off unless started) |
 | `.github/` | W5 | CI workflow `.github/workflows/ci.yml` |
 
 ## Data provenance
@@ -312,3 +312,4 @@ The contract's default flag footer, `CARD_FOOTER` in `contracts/models/alerts.py
 - **Not on `main`:** the what-if route and the entity history route answer `501` (`backend/app/main.py`, `contracts/api_spec.py`).
 - **No authentication.** A registrar name is a recorded label, not an authenticated identity (`contracts/models/reviews.py`).
 - **One process on one laptop, reachable only from localhost** (`docker-compose.yml`, `Makefile`, `frontend/package.json`).
+- **Optional registrar notifier.** An optional notifier (tools/notify) can send the registrar a generic iMessage when a check-in is held; it carries no patient data and is off unless started.
