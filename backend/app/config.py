@@ -21,6 +21,8 @@ class Settings:
     gemini_api_key_present: bool
     capture_dir: str | None
     git_sha: str | None
+    # REPLAY only: text that matches no scripted line is read by the rules-based reader (offscript.py).
+    frontdesk_offscript_reader: bool = False
 
 
 def load_settings() -> Settings:
@@ -34,4 +36,5 @@ def load_settings() -> Settings:
         gemini_api_key_present=bool(os.environ.get("GEMINI_API_KEY")),
         capture_dir=os.environ.get("CHARTGUARD_CAPTURE_DIR") or None,
         git_sha=os.environ.get("GIT_SHA") or None,
+        frontdesk_offscript_reader=os.environ.get("FRONTDESK_OFFSCRIPT_READER", "off").strip().lower() == "on",
     )
