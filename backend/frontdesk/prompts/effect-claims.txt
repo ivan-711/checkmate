@@ -1,0 +1,20 @@
+# Phrases that claim a chart effect; allowed only when the turn produced NEW_CHART_CREATED. Folded form, one per line.
+created your chart
+created a chart
+created a new chart
+your chart has been created
+your chart is created
+chart was created
+chart has been created
+registered you as a new patient
+you are now registered
+cree su expediente
+cree un expediente
+cree un nuevo expediente
+su expediente fue creado
+su expediente ha sido creado
+se creo su expediente
+se creo un expediente
+ya esta registrado como paciente nuevo
+lo registre como paciente nuevo
+la registre como paciente nuevo
