@@ -247,6 +247,29 @@ test("FrontDesk in Spanish: the gate card, band and evidence fields are in Spani
   await expect(page.getByTestId("kiosk-composer")).toHaveValue("");
 });
 
+test("FrontDesk registrar: the held check-in is decided through the review step and the kiosk says what is next", async ({
+  page,
+}) => {
+  await page.goto("/frontdesk");
+  await expect(page.getByText("No held check-ins.")).toBeVisible();
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  const held = page.getByTestId("registrar-held");
+  await expect(held).toContainText("Held check-ins (1)");
+  await expect(held.getByTestId("source-card")).toHaveCount(2);
+
+  await review(page, "reject", "DIFFERENT_PERSON");
+  await expect(held.getByText(/Rejected by .* Records kept separate\./)).toBeVisible();
+  await expect(page.getByText("A registrar is creating a new chart for you.")).toBeVisible();
+
+  await review(page, "approve");
+  await expect(held.getByText(/Approved by /)).toBeVisible();
+  await expect(page.getByText("Your chart is confirmed. Please wait to be called.")).toBeVisible();
+  await expect(page.getByText("A registrar is creating a new chart for you.")).toHaveCount(0);
+  // The kiosk never shows the allergy or the flag card.
+  await expect(page.getByTestId("flag-card")).toHaveCount(0);
+});
+
 test("FrontDesk: other text gets the template answer and no tool runs", async ({ page }) => {
   await page.goto("/frontdesk");
   await page.getByTestId("kiosk-composer").fill("I have an appointment at three.");

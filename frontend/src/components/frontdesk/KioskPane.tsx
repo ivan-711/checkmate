@@ -10,10 +10,9 @@ import { useDataSource } from "@/data/DataSourceProvider";
 import { scenario } from "@/data/scenario";
 import { COPY, type KioskCopy, type KioskLanguage } from "./copy";
 import { GateCard } from "./GateCard";
+import { INTAKE_KEY, useHandoffPair } from "./intake";
 import { ToolCallChip } from "./ToolCallChip";
 
-/** One check-in per kiosk; the registrar pane reads the same cache entry. */
-export const INTAKE_KEY = ["intake-session"] as const;
 const MAX_CHARS = 280; // UX 3.11 composer limit; the contract allows 500
 const COUNTER_FROM = 240;
 
@@ -94,6 +93,8 @@ export function KioskPane() {
     retry: false,
   });
   const turns = session.data?.turns ?? [];
+  // The registrar's decision, read from the server: the kiosk tells the patient what happens next.
+  const decided = useHandoffPair().data?.pair.decision.status;
 
   const send = useMutation({
     mutationFn: (message: { text: string; key: string }) =>
@@ -221,6 +222,8 @@ export function KioskPane() {
               {turns.map((turn) => (
                 <Turn key={turn.turnIndex} turn={turn} t={t} gateRef={(el) => (gateCard.current = el)} />
               ))}
+              {decided === "LINKED" && <Agent text={t.approved} automatic t={t} />}
+              {decided === "REJECTED" && <Agent text={t.rejected} automatic t={t} />}
               {pending && (
                 <>
                   <li className="ml-auto max-w-[80%] rounded-lg border border-border-subtle bg-surface px-4 py-3 text-[20px]">

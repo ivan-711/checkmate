@@ -37,6 +37,8 @@ export const COPY = {
     agentDown: "FrontDesk could not reach the agent service. Your message was not sent.",
     startFailed: "FrontDesk could not reach the agent service.",
     tryAgain: "Try again",
+    approved: "Your chart is confirmed. Please wait to be called.",
+    rejected: "A registrar is creating a new chart for you. Please wait to be called.",
     handoff:
       "I found a chart that may already be yours. A registrar will confirm it with you. Please have a seat.",
     tool: {
@@ -92,6 +94,8 @@ export const COPY = {
     agentDown: "FrontDesk no pudo conectar con el servicio del agente. Su mensaje no se envió.",
     startFailed: "FrontDesk no pudo conectar con el servicio del agente.",
     tryAgain: "Intentar de nuevo",
+    approved: "Su expediente está confirmado. Espere a que lo llamen.",
+    rejected: "El personal de admisión está creando un expediente nuevo para usted. Espere a que lo llamen.",
     handoff:
       "Encontré un expediente que podría ser suyo. El personal de admisión lo confirmará con usted. Por favor, tome asiento.",
     tool: {
