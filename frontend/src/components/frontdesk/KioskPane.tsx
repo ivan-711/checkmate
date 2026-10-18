@@ -12,7 +12,7 @@ import type { KioskState as DeskKioskState } from "@/lib/desk";
 import { COPY, type KioskCopy, type KioskLanguage } from "./copy";
 import { needsNewCheckIn } from "./checkIn";
 import { GateCard } from "./GateCard";
-import { HANDOFF_KEY, INTAKE_KEY, useHandoffPairs } from "./intake";
+import { HANDOFF_KEY, INTAKE_KEY, refreshHandoffOnMutation, useHandoffPairs } from "./intake";
 import { KioskMark, Tick } from "./KioskMark";
 import { gateDenial, kioskState, patientGivenName, type KioskState } from "./kioskState";
 import { turnSteps } from "./turnSteps";
@@ -189,6 +189,7 @@ export function KioskPane({
   const turns = session.data?.turns ?? [];
   // The registrar's decisions, read from the server: the kiosk tells the patient what happens
   // next. One linked chart confirms the check-in; a new chart only when every pair was rejected.
+  useEffect(() => refreshHandoffOnMutation(queryClient), [queryClient]);
   const statuses = useHandoffPairs().map((pair) => pair.data?.pair.decision.status);
   const decided = statuses.includes("LINKED")
     ? "LINKED"

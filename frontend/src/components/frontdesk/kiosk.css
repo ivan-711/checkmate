@@ -710,6 +710,7 @@
 
 /* ── reduced motion: every state reads as a still (CONCEPT.md §4) ── */
 @media (prefers-reduced-motion: reduce) {
+  .kiosk::after,
   .kiosk *,
   .kiosk *::before,
   .kiosk *::after {

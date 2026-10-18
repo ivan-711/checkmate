@@ -193,27 +193,26 @@ test("keyboard path reaches Approve link and moves focus to the raised flag", as
   await expect(page.getByRole("heading", { name: "Flagged for clinician review" })).toBeFocused();
 });
 
-test("FrontDesk shell: empty chat pane, ES/EN switch and the agent gate tile", async ({ page }) => {
-  await page.goto("/frontdesk");
-  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
+test("FrontDesk shell: the kiosk starts idle and switches ES/EN; the gate tile starts empty", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const kiosk = page.getByTestId("kiosk");
+  await expect(kiosk).toHaveAttribute("data-k", "idle");
   await page.getByRole("button", { name: "Español" }).click();
   await expect(page.getByText("Le damos la bienvenida. Registremos su llegada.")).toBeVisible();
-  await expect(page.getByRole("region", { name: "Conversación de registro" })).toBeVisible();
-  await expect(page.locator('section[lang="es"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="kiosk"][lang="es"]')).toHaveCount(1);
   await page.getByRole("button", { name: "English" }).click();
-  await expect(page.getByText("Welcome. Let's get you checked in.")).toBeVisible();
+  await expect(page.getByText("Welcome. Let’s get you checked in.")).toBeVisible();
+  await expect(page.locator('[data-testid="kiosk"][lang="en"]')).toHaveCount(1);
 
-  const tile = page.getByRole("region", { name: "Agent actions per 5 minutes" });
-  await expect(tile.getByText("No agent actions yet.")).toBeVisible();
-  // The caption names the aggregate only; it never changes with the data source's mode.
-  await expect(tile.getByText("agent_gate_5m · continuous aggregate", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("tile-agent-gate")).toContainText("0 denied · 0 allowed");
 });
 
 test("FrontDesk check-in: the gate denies a new chart at REVIEW and hands it to a registrar", async ({
   page,
 }) => {
-  await page.goto("/frontdesk");
-  await expect(page.getByTestId("agent-mode-badge")).toHaveText("Agent: REPLAY");
+  await page.goto("/");
   await page.getByRole("button", { name: "Use this" }).click();
   await expect(page.getByTestId("kiosk-composer")).toBeFocused();
   await page.keyboard.press("Enter");
@@ -223,32 +222,37 @@ test("FrontDesk check-in: the gate denies a new chart at REVIEW and hands it to 
   await expect(chips.nth(0)).toHaveAttribute("data-outcome", "ALLOW");
   await expect(chips.nth(1)).toHaveAttribute("data-outcome", "DENY");
   const gate = page.getByTestId("gate-card");
-  await expect(gate).toBeInViewport();
-  await expect(gate).toContainText("Blocked by identity gate");
-  await expect(gate).toContainText("Policy frontdesk-gate/1");
-  await expect(gate).toContainText("Values hidden on this screen.");
+  await expect(gate).toBeInViewport({ ratio: 1 });
+  await expect(gate).toContainText("A chart may already be yours");
+  await expect(gate).toHaveAttribute("data-policy", "frontdesk-gate/1");
+  await expect(gate).not.toContainText("frontdesk-gate/1");
   await expect(gate).not.toHaveAttribute("role", "alert");
+  await gate.locator("summary").click();
+  await expect(gate).toContainText("Values hidden on this screen.");
   // The kiosk never shows the other chart's values.
   const masked = scenario.pair.recordB.normalized;
   for (const value of [masked.birthDate, masked.addressLine]) await expect(gate).not.toContainText(value!);
-  await expect(page.getByText("A registrar will confirm it with you.")).toBeVisible();
+  await expect(gate).toContainText("Held for a registrar. Please have a seat");
   await expect(page.getByRole("status")).toContainText("New chart request denied by the identity gate.");
+  // The Desk knows the check-in is held.
+  await expect(page.locator('[data-kiosk="held"]')).toHaveCount(1);
 
-  const tile = page.getByRole("region", { name: "Agent actions per 5 minutes" });
-  await expect(tile.getByText("1 denied · 1 allowed")).toBeVisible();
+  const tile = page.getByTestId("tile-agent-gate");
+  await expect(tile).toContainText("1 denied · 1 allowed");
 
   await page.getByRole("button", { name: "Start over" }).click();
-  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
-  await expect(tile.getByText("1 denied · 1 allowed")).toBeVisible(); // the audit history stays
+  await expect(page.getByTestId("kiosk")).toHaveAttribute("data-k", "idle");
+  await expect(tile).toContainText("1 denied · 1 allowed"); // the audit history stays
 });
 
 test("FrontDesk in Spanish: the gate card, band and evidence fields are in Spanish", async ({ page }) => {
-  await page.goto("/frontdesk");
+  await page.goto("/");
   await page.getByRole("button", { name: "Español" }).click();
   await page.getByRole("button", { name: "Usar este" }).click();
   await page.keyboard.press("Enter");
   const gate = page.getByTestId("gate-card");
-  await expect(gate).toContainText("Bloqueado por el control de identidad");
+  await expect(gate).toContainText("Puede que ya tenga un expediente");
+  await gate.locator("summary").click();
   await expect(gate).toContainText("REVISIÓN");
   await expect(gate).toContainText("Fecha de nacimiento");
   await expect(gate).not.toContainText("REVIEW ");
@@ -381,13 +385,13 @@ test("FrontDesk registrar: with reduced motion the flag summary appears without 
 });
 
 test("FrontDesk Start over: a new check-in starts at once and the next message is sent", async ({ page }) => {
-  await page.goto("/frontdesk");
+  await page.goto("/");
   await page.getByRole("button", { name: "Use this" }).click();
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("registrar-held")).toBeVisible();
+  await expect(page.locator('[data-kiosk="held"]')).toHaveCount(1);
   await page.getByRole("button", { name: "Start over" }).click();
-  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
-  await expect(page.getByText("No held check-ins.")).toBeVisible();
+  await expect(page.getByTestId("kiosk")).toHaveAttribute("data-k", "idle");
+  await expect(page.locator('[data-kiosk="idle"]')).toHaveCount(1);
   await page.getByTestId("kiosk-composer").fill("I have an appointment at three.");
   await expect(page.getByTestId("kiosk-send")).toBeEnabled();
   await page.getByTestId("kiosk-send").click();
@@ -399,25 +403,24 @@ test("FrontDesk Start over: a new check-in starts at once and the next message i
 test("FrontDesk Reset demo: clears the kiosk and the held check-in; the next message starts a new check-in", async ({
   page,
 }) => {
-  await page.goto("/frontdesk");
+  await page.goto("/");
   await page.getByRole("button", { name: "Use this" }).click();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("gate-card")).toBeVisible();
-  await expect(page.getByTestId("registrar-held")).toBeVisible();
+  await expect(page.locator('[data-kiosk="held"]')).toHaveCount(1);
   await page.getByRole("button", { name: "Reset demo" }).click();
-  await expect(page.getByText("Your conversation will appear here.")).toBeVisible();
+  await expect(page.getByTestId("kiosk")).toHaveAttribute("data-k", "idle");
   await expect(page.getByTestId("gate-card")).toHaveCount(0);
-  await expect(page.getByTestId("registrar-held")).toHaveCount(0);
-  await expect(page.getByText("No held check-ins.")).toBeVisible();
+  await expect(page.locator('[data-kiosk="held"]')).toHaveCount(0);
   await page.getByRole("button", { name: "Use this" }).click();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("gate-card")).toBeVisible();
-  await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (1)");
+  await expect(page.locator('[data-kiosk="held"]')).toHaveCount(1);
   await expect(page.getByText("could not reach the agent service")).toHaveCount(0);
 });
 
 test("FrontDesk tool chips carry no mode-specific suffix", async ({ page }) => {
-  await page.goto("/frontdesk");
+  await page.goto("/");
   await page.getByRole("button", { name: "Use this" }).click();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("tool-call-chip")).toHaveCount(2);
@@ -425,7 +428,7 @@ test("FrontDesk tool chips carry no mode-specific suffix", async ({ page }) => {
 });
 
 test("FrontDesk: other text gets the template answer and no tool runs", async ({ page }) => {
-  await page.goto("/frontdesk");
+  await page.goto("/");
   await page.getByTestId("kiosk-composer").fill("I have an appointment at three.");
   await page.getByTestId("kiosk-send").click();
   await expect(page.getByText("automatic message")).toBeVisible();

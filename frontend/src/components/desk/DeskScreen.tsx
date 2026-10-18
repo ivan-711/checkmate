@@ -127,7 +127,9 @@ export function DeskScreen() {
         className="desk-region overflow-y-auto rounded-device bg-paper shadow-[0_0_0_1px_var(--hair),0_24px_60px_-30px_rgba(60,20,55,0.18)]"
         data-kiosk={kiosk}
       >
-        <KioskPane onStateChange={setKiosk} registrarReviewing={desk === "review" || desk === "confirm"} />
+        {/* "Looking at it now" only once the registrar opens the confirm sheet: the hand-off itself
+            already proposes the pair, so "review" starts the moment the check-in is held. */}
+        <KioskPane onStateChange={setKiosk} registrarReviewing={desk === "confirm"} />
       </section>
 
       <section aria-label="Registrar" className="desk-region stage">
