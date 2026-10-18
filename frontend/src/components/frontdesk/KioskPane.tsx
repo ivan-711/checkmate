@@ -1,14 +1,16 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import type { IntakeSession, IntakeTurn, ToolCallRecord } from "@/api/types";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
+import { SESSION_CHANGE_KEY } from "@/components/ui/ResetButton";
 import { useAnnounce } from "@/components/ui/LiveRegion";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { scenario } from "@/data/scenario";
 import { DataError } from "@/data/source";
 import { COPY, type KioskCopy, type KioskLanguage } from "./copy";
+import { needsNewCheckIn } from "./checkIn";
 import { GateCard } from "./GateCard";
 import { HANDOFF_KEY, INTAKE_KEY, useHandoffPairs } from "./intake";
 import { ToolCallChip } from "./ToolCallChip";
@@ -84,9 +86,12 @@ export function KioskPane() {
   const suggested = source.suggestedCheckIn;
   const suggestion = suggested[language];
 
-  // The server picks the agent mode; the session language only seeds the first reply.
-  const startIntake = () =>
-    source.startIntake(language === "es" ? "ES" : "EN", scenario.frontdeskIntake.scenarioContextId);
+  // The server picks the agent mode; the check-in's language picks the recording replay plays.
+  const checkInLanguage = language === "es" ? "ES" : "EN";
+  const startIntake = () => source.startIntake(checkInLanguage, scenario.frontdeskIntake.scenarioContextId);
+  // A reset on the corpus takes seconds and wipes every check-in when it lands: nothing is sent
+  // meanwhile, and ResetButton starts the new check-in once it has finished.
+  const resetting = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
   const session = useQuery({
     queryKey: INTAKE_KEY,
     queryFn: startIntake,
@@ -136,6 +141,20 @@ export function KioskPane() {
 
   const gateCard = useRef<HTMLDivElement | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
+
+  // The toggle changed before the first turn: start over in the new language, so the demo
+  // script line goes into a check-in in its own language.
+  const restart = !resetting && !send.isPending && needsNewCheckIn(session.data, checkInLanguage);
+  useEffect(() => {
+    if (restart) void queryClient.resetQueries({ queryKey: INTAKE_KEY });
+  }, [restart, queryClient]);
+
+  // UX 3.10: after a reset the presenter types straight into the kiosk.
+  const wasResetting = useRef(false);
+  useEffect(() => {
+    if (wasResetting.current && !resetting) composer.current?.focus();
+    wasResetting.current = resetting;
+  }, [resetting]);
   const gateCount = turns.filter((turn) => (turn.toolCalls ?? []).some((c) => gateDenial(c))).length;
   useEffect(() => {
     // A new gate card always scrolls fully into view: it is the moment the demo is about.
@@ -146,7 +165,7 @@ export function KioskPane() {
 
   function submit() {
     const message = text.trim();
-    if (!message || send.isPending || !session.data) return;
+    if (!message || send.isPending || resetting || !session.data) return;
     // One key per typed message, reused when the same message is retried.
     if (key.current?.text !== message) key.current = { text: message, key: crypto.randomUUID() };
     setText("");
@@ -302,7 +321,7 @@ export function KioskPane() {
             <button
               type="submit"
               data-testid="kiosk-send"
-              disabled={!text.trim() || send.isPending || !session.data}
+              disabled={!text.trim() || send.isPending || resetting || !session.data}
               className="h-14 rounded-md bg-accent px-6 font-semibold text-on-accent hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-3"
             >
               {t.send}
@@ -330,11 +349,12 @@ export function KioskPane() {
             <ConstructedChip label={t.constructed} explanation={t.constructedKiosk} />
             <button
               type="button"
+              disabled={resetting}
               onClick={() => {
                 setText(suggestion);
                 composer.current?.focus();
               }}
-              className="font-semibold text-accent underline underline-offset-2"
+              className="font-semibold text-accent underline underline-offset-2 disabled:text-ink-3"
             >
               {t.suggestUse}
             </button>
