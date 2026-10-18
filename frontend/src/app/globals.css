@@ -33,7 +33,17 @@
   --band-keep: #4b5563;
   --on-band-keep: #ffffff;
 
+  /* Gate card, allowed outcomes, info and scrim (ux-spec §10.2; see DESIGN.md). */
+  --gate-bg: #fffbeb;
+  --gate-bar: #b7791f;
+  --allowed-bg: #e4f0ee;
+  --allowed-ink: #0b5d57;
+  --allowed-border: #0b5d57;
+  --info: #1d4e89;
+  --scrim: rgba(17, 24, 39, 0.4);
+
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
   --dur-fast: 150ms;
   --dur-base: 200ms;
   --dur-move: 300ms;
@@ -64,6 +74,13 @@
     --evidence-against: #c47a2a;
     --band-auto: #4fc1b3;
     --on-band-auto: #0b1413;
+    --gate-bg: #211c0e;
+    --gate-bar: #e3b341;
+    --allowed-bg: #12302c;
+    --allowed-ink: #7fd6ca;
+    --allowed-border: #3e9c90;
+    --info: #8ec1f2;
+    --scrim: rgba(0, 0, 0, 0.6);
   }
 }
 
@@ -91,6 +108,13 @@
   --evidence-against: #c47a2a;
   --band-auto: #4fc1b3;
   --on-band-auto: #0b1413;
+  --gate-bg: #211c0e;
+  --gate-bar: #e3b341;
+  --allowed-bg: #12302c;
+  --allowed-ink: #7fd6ca;
+  --allowed-border: #3e9c90;
+  --info: #8ec1f2;
+  --scrim: rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
@@ -123,6 +147,13 @@
   --color-on-band-review: var(--on-band-review);
   --color-band-keep: var(--band-keep);
   --color-on-band-keep: var(--on-band-keep);
+  --color-gate-bg: var(--gate-bg);
+  --color-gate-bar: var(--gate-bar);
+  --color-allowed-bg: var(--allowed-bg);
+  --color-allowed-ink: var(--allowed-ink);
+  --color-allowed-border: var(--allowed-border);
+  --color-info: var(--info);
+  --color-scrim: var(--scrim);
   --font-sans: var(--font-plex-sans), system-ui, "Segoe UI", sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 }
