@@ -13,8 +13,15 @@ function createDataSource(): DataSource {
 
 const DataSourceContext = createContext<DataSource | null>(null);
 
-export function DataSourceProvider({ children }: { children: ReactNode }) {
-  const [source] = useState(createDataSource);
+/** `source` lets a component test supply its own adapter; the app always omits it. */
+export function DataSourceProvider({
+  children,
+  source: given,
+}: {
+  children: ReactNode;
+  source?: DataSource;
+}) {
+  const [source] = useState(() => given ?? createDataSource());
   return <DataSourceContext.Provider value={source}>{children}</DataSourceContext.Provider>;
 }
 
