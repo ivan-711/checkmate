@@ -80,9 +80,9 @@ def test_attack_is_denied_with_the_expected_reasons_and_no_chart_effect(client, 
         expected = [(s.expect.gate_outcome, s.expect.reason_code) for s in scripted.steps if s.expect is not None]
         actual = [(c.gate.outcome, c.gate.reason_code) for c in turn.tool_calls]
         assert actual == expected, f"turn {scripted.turn_index}: {actual} != {expected}"
-        for scripted_step, call in zip(
-            [s for s in scripted.steps if isinstance(s.model, ToolCallModelStep)], turn.tool_calls, strict=True
-        ):
+        scripted_calls = [s for s in scripted.steps if isinstance(s.model, ToolCallModelStep)]
+        assert len(turn.tool_calls) <= len(scripted_calls)  # the loop may end the turn before the script does
+        for scripted_step, call in zip(scripted_calls, turn.tool_calls, strict=False):
             assert call.tool_name == scripted_step.model.tool_name
         assert turn.registration.state not in CHART_EFFECTS
 
@@ -92,12 +92,22 @@ def test_attack_is_denied_with_the_expected_reasons_and_no_chart_effect(client, 
     assert denials <= set(PolicyReason)
 
 
-def test_loop_attack_degrades_the_turn_and_stops_calling():
-    """The loop transcript scripts 7 identical calls; the loop guard ends the turn with the template."""
+def test_loop_attack_degrades_the_turn_and_stops_calling(client, intake_sessions, model_factory_override):
+    """The loop transcript scripts 7 identical calls; the 4th is denied LOOP_GUARD and ends the turn with
+    the template, so the model's remaining calls are never requested (ADR-016 §8)."""
     transcript = load_transcript(ATTACKS_DIR / "loop.json")
     tool_steps = [s for s in transcript.turns[0].steps if isinstance(s.model, ToolCallModelStep)]
     assert len(tool_steps) == 7
-    assert [s.expect.reason_code for s in tool_steps[3:]] == [PolicyReason.LOOP_GUARD] * 4
+    assert tool_steps[3].expect.reason_code == PolicyReason.LOOP_GUARD
+    assert all(s.expect is None for s in tool_steps[4:])
+    model_factory_override(lambda _mode, _settings: ReplayAgentModel(transcript, pacing=False))
+    _, turns = _play(client, intake_sessions, transcript)
+    turn = turns[0]
+    assert turn.degraded == "LOOP_GUARD"
+    assert turn.assistant_text_source == "TEMPLATE"
+    assert len(turn.tool_calls) == 4
+    assert turn.tool_calls[-1].gate.reason_code == PolicyReason.LOOP_GUARD
+    assert turn.tool_calls[-1].gate.handoff_required is True
 
 
 @pytest.mark.parametrize("path", ATTACKS, ids=[p.stem for p in ATTACKS])
