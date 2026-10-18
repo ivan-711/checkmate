@@ -16,6 +16,7 @@ import pytest
 
 from eval.harness import standin
 from eval.sweep import __main__ as cli
+from eval.sweep import results as results_module
 from eval.sweep.evaluate import ScorerVersionMismatch, evaluate_manifest
 from eval.sweep.executors import (
     EXECUTOR_AUTO,
@@ -25,11 +26,12 @@ from eval.sweep.executors import (
     ModalExecutor,
     ModalTokenMissing,
     RemoteRunFailed,
+    executor_ran,
     modal_token_present,
     select_executor,
 )
 from eval.sweep.manifest import TIER_FIXTURE, TIER_SYNTHEA, ManifestEntry, SweepManifest, build_manifest, split_id
-from eval.sweep.results import T_CRITICAL_95, aggregate, interval_95, render_table
+from eval.sweep.results import NOT_REPORTED, aggregate, interval_95, render_table, t_critical_95
 
 TWO_SEEDS = (20261017, 99)
 NO_TOKEN = (False, "no Modal token: run `uvx modal token new`")
@@ -205,9 +207,12 @@ def test_evaluate_manifest_refuses_a_scorer_version_the_engine_does_not_report(t
 # --- results table ---------------------------------------------------------------------------------
 
 
+T_975_DF1 = 12.706204736174694  # the exact two-sided 95% Student t value for one degree of freedom
+
+
 def test_interval_95_is_a_t_interval_across_seeds():
     cell = interval_95([0.5, 0.7])
-    half = T_CRITICAL_95[1] * statistics.stdev([0.5, 0.7]) / math.sqrt(2)
+    half = T_975_DF1 * statistics.stdev([0.5, 0.7]) / math.sqrt(2)
     assert cell["n"] == 2 and cell["mean"] == pytest.approx(0.6)
     assert cell["ci95"] == pytest.approx([0.6 - half, 0.6 + half])
     assert cell["values"] == [0.5, 0.7]
@@ -229,7 +234,159 @@ def test_results_table_has_mean_and_interval_per_metric_across_seeds(two_seed_ru
     assert not any(k.startswith("latency.") for k in cell["metrics"])
     text = render_table(table)
     assert "LENIENT recall" in text and "n seeds" in text and standin.SCORER_VERSION in text
-    assert "not clipped" in text and "not clipped" in table["note"]
+    assert "clipped to [0, 1]" in text and "clipped to [0, 1]" in table["note"]
+
+
+# --- the t critical value -------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("degrees_of_freedom", "published"),
+    [(1, 12.706), (2, 4.303), (4, 2.776), (10, 2.228), (30, 2.042), (60, 2.000)],
+)
+def test_t_critical_95_matches_the_published_table_to_three_decimals(degrees_of_freedom: int, published: float):
+    assert t_critical_95(degrees_of_freedom) == pytest.approx(published, abs=5e-4)
+    with pytest.raises(ValueError, match="degree"):
+        t_critical_95(0)
+
+
+def test_the_hand_typed_t_table_is_gone_and_scipy_supplies_the_value():
+    assert not hasattr(results_module, "T_CRITICAL_95")
+    from scipy.stats import t
+
+    assert t_critical_95(7) == pytest.approx(float(t.ppf(0.975, 7)), abs=0)
+
+
+# --- what the table may print --------------------------------------------------------------------------
+
+
+def rate_cell(value: float, *, n_pairs: int = 400, n_components: int = 250, do_not_read: bool = False) -> dict:
+    """A harness ``rate()`` cell: value, support, the harness's own interval and flags."""
+    return {
+        "value": value,
+        "n_pairs": n_pairs,
+        "n_entities": n_components,
+        "n_components": n_components,
+        "ci95": [max(0.0, value - 0.01), min(1.0, value + 0.01)],
+        "low_support": n_components < 50,
+        "do_not_read": do_not_read,
+        "zero_events": False,
+    }
+
+
+def fake_result(seed: int, numbers: dict, *, executor: str = EXECUTOR_LOCAL, **extra) -> dict:
+    return {
+        "entry": {"seed": seed, "scorerVersion": "handset-1", "tier": TIER_SYNTHEA},
+        "numbers": numbers,
+        "runId": f"run-{seed}",
+        "elapsedSeconds": 1.0,
+        "executor": executor,
+        **extra,
+    }
+
+
+FIVE_SEEDS = (20261017, 20261018, 20261019, 20261020, 20261021)
+# the per-seed values of the five-seed development pass published in the README (scorer handset-1)
+PUBLISHED_FIVE_SEED = {
+    "band.review.precision": ([0.883991, 0.947507, 0.892421, 0.869976, 0.912195], 0.901, (0.864, 0.939)),
+    "recall.lenient.end_to_end": ([0.883065, 0.875274, 0.903297, 0.884368, 0.899142], 0.889, (0.874, 0.904)),
+    "review_burden": ([0.728041, 0.7666, 0.756007, 0.759425, 0.723104], 0.747, (0.722, 0.771)),
+    "blocking.recall": ([0.929435, 0.910284, 0.936264, 0.922912, 0.927039], 0.925, (0.913, 0.937)),
+}
+
+
+def test_the_five_seed_table_reproduces_the_published_numbers():
+    results = [
+        fake_result(seed, {key: rate_cell(values[i]) for key, (values, _, _) in PUBLISHED_FIVE_SEED.items()})
+        for i, seed in enumerate(FIVE_SEEDS)
+    ]
+    metrics = aggregate(results)["cells"][0]["metrics"]
+    for key, (_, mean, (low, high)) in PUBLISHED_FIVE_SEED.items():
+        assert metrics[key]["reported"] is True and metrics[key]["n"] == 5
+        assert round(metrics[key]["mean"], 3) == mean, key
+        assert [round(x, 3) for x in metrics[key]["ci95"]] == [low, high], key
+    # the first run of this table, which used the hand-typed t value 2.776: unrounded, within 1e-4
+    assert metrics["band.review.precision"]["mean"] == pytest.approx(0.9012180000000001, abs=1e-4)
+    assert metrics["band.review.precision"]["ci95"] == pytest.approx([0.8639048766528894, 0.9385311233471108], abs=1e-4)
+    text = render_table(aggregate(results))
+    assert "| REVIEW precision | 0.901 | [0.864, 0.939] |" in text
+    assert "| Blocking recall | 0.925 | [0.913, 0.937] |" in text
+
+
+def test_a_metric_flagged_do_not_read_on_any_seed_is_not_reported():
+    flagged_on_some = [False, True, True, True, False]  # KEEP_SEPARATE precision in the five-seed pass
+    results = [
+        fake_result(
+            seed,
+            {
+                "band.auto_link.precision": rate_cell(1.0, n_pairs=45, n_components=40, do_not_read=True),
+                "band.keep_separate.precision": rate_cell(0.314159, do_not_read=flagged_on_some[i]),
+                "band.review.precision": rate_cell(0.9),
+            },
+        )
+        for i, seed in enumerate(FIVE_SEEDS)
+    ]
+    table = aggregate(results)
+    metrics = table["cells"][0]["metrics"]
+    for key in ("band.auto_link.precision", "band.keep_separate.precision"):
+        assert metrics[key]["reported"] is False and metrics[key]["reason"] == NOT_REPORTED
+        assert not {"mean", "sd", "ci95", "values", "n"} & set(metrics[key]), key
+    assert metrics["band.keep_separate.precision"]["seedsBelowFloor"] == [FIVE_SEEDS[i] for i in (1, 2, 3)]
+    assert metrics["band.review.precision"]["reported"] is True
+    text = render_table(table)
+    assert f"| AUTO_LINK precision | {NOT_REPORTED} | n/a | n/a |" in text
+    assert f"| KEEP_SEPARATE precision | {NOT_REPORTED} | n/a | n/a |" in text
+    assert "0.314" not in text and "0.314159" not in json.dumps(table)
+
+
+@pytest.mark.parametrize(
+    ("n_pairs", "n_components", "reported"),
+    [(100, 30, True), (99, 30, False), (100, 29, False), (57, 44, False)],
+)
+def test_a_cell_below_the_harness_floor_is_not_reported_even_without_a_flag(
+    n_pairs: int, n_components: int, reported: bool
+):
+    """Count cells (``band.auto_link.count``) carry support but not the flag; the floor is the harness's own."""
+    count = {"value": float(n_pairs), "n_pairs": n_pairs, "n_entities": n_components, "n_components": n_components}
+    metrics = aggregate([fake_result(seed, {"band.auto_link.count": dict(count)}) for seed in (1, 2)])["cells"][0][
+        "metrics"
+    ]
+    assert metrics["band.auto_link.count"]["reported"] is reported
+
+
+def test_rate_intervals_are_clipped_to_the_unit_range_and_other_numbers_are_not():
+    seeds = (1, 2)
+    per_seed = {
+        "recall.lenient.end_to_end": [0.9, 1.0],  # the t interval runs above 1
+        "review_burden": [0.0, 0.1],  # and below 0
+        "blocking.reduction_ratio": [0.9996, 0.9998],  # a ratio with no ci95 of its own
+    }
+    results = []
+    for i, seed in enumerate(seeds):
+        numbers = {key: rate_cell(values[i]) for key, values in per_seed.items() if key != "blocking.reduction_ratio"}
+        numbers["blocking.reduction_ratio"] = {"value": per_seed["blocking.reduction_ratio"][i], "n_blocked": 1, "N": 9}
+        numbers["thresholds.c_high"] = {"value": 4.0 + i, "thresholds_id": "x"}
+        results.append(fake_result(seed, numbers))
+    table = aggregate(results)
+    metrics = table["cells"][0]["metrics"]
+    assert metrics["recall.lenient.end_to_end"]["ci95"][1] == 1.0 and metrics["recall.lenient.end_to_end"]["clipped"]
+    assert metrics["recall.lenient.end_to_end"]["ci95"][0] == pytest.approx(0.95 - 0.635, abs=1e-3)
+    assert metrics["review_burden"]["ci95"][0] == 0.0 and metrics["review_burden"]["clipped"]
+    assert metrics["blocking.reduction_ratio"]["ci95"][1] == 1.0 and metrics["blocking.reduction_ratio"]["rate"]
+    for key in per_seed:
+        low, high = metrics[key]["ci95"]
+        assert 0.0 <= low <= metrics[key]["mean"] <= high <= 1.0, key
+    unclipped = metrics["thresholds.c_high"]  # a raw-score cutoff, not a rate
+    assert unclipped["rate"] is False and unclipped["clipped"] is False and unclipped["ci95"][1] > 1.0
+    assert "clipped to [0, 1]" in table["note"] and "clipped to [0, 1]" in render_table(table)
+
+
+def test_the_caption_states_the_floor_the_harness_uses():
+    from eval.harness.metrics import DO_NOT_READ_COMPONENTS, DO_NOT_READ_PAIRS
+
+    text = render_table(aggregate([fake_result(1, {"band.review.precision": rate_cell(0.9)})]))
+    assert f"{DO_NOT_READ_COMPONENTS} components" in text and f"{DO_NOT_READ_PAIRS} pairs" in text
+    assert "not reported" in text
 
 
 # --- Modal executor fallback (no cloud) --------------------------------------------------------------
@@ -374,3 +531,74 @@ def test_remote_raw_dir_extracts_the_volume_archives_once_and_checks_their_hashe
     with pytest.raises(modal_app.SampleUnavailable, match="missing.zip"):
         modal_app.prepare_raw_dir(tmp_path / "volume", tmp_path / "other", {"missing.zip": digest})
     assert not (tmp_path / "volume" / "fhir").exists()  # the Volume is never written
+
+
+# --- the executor that actually ran ----------------------------------------------------------------
+
+
+def test_executor_ran_names_the_executor_that_produced_the_results():
+    local = fake_result(1, {})
+    remote = fake_result(2, {}, executor=EXECUTOR_MODAL)
+    fell_back = fake_result(3, {}, fallbackFrom=EXECUTOR_MODAL, fallbackReason="RuntimeError: stalled")
+    assert executor_ran([local, local]) == "local"
+    assert executor_ran([remote, remote]) == "modal"
+    assert executor_ran([fell_back, fell_back]) == "local (fallback from modal)"
+    assert executor_ran([remote, fell_back]) == "local + modal (1 of 2 entries fell back from modal)"
+
+
+def stub_executor(name: str, results: list[dict]):
+    class Stub:
+        def run(self, entries, *, out_dir=None, raw_dir=None):
+            return results
+
+    stub = Stub()
+    stub.name = name  # type: ignore[attr-defined]
+    return stub
+
+
+def test_cli_records_the_executor_that_ran_when_every_seed_fell_back(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    def remote_map(batch, *, raw_dir):
+        raise RemoteRunFailed("no route to modal")
+
+    modal_with_fallback = ModalExecutor(remote_map=remote_map, fallback=LocalPoolExecutor(workers=2))
+    monkeypatch.setattr(cli, "select_executor", lambda name, **kwargs: (modal_with_fallback, "Modal: test token"))
+    code = cli.main(
+        ["--seeds", "99", "20261017", "--tiers", TIER_FIXTURE, "--scorer-versions", standin.SCORER_VERSION]
+        + ["--executor", EXECUTOR_MODAL, "--out", str(tmp_path)]
+    )
+    assert code == 0
+    out = capsys.readouterr().out
+    doc = json.loads(next((tmp_path / "sweeps").glob("*/sweep.json")).read_text())
+    assert doc["executor"] == "local (fallback from modal)" and doc["executorRequested"] == EXECUTOR_MODAL
+    assert all(e["executor"] == EXECUTOR_LOCAL and e["fallbackFrom"] == EXECUTOR_MODAL for e in doc["entries"])
+    assert "ran on: local (fallback from modal)" in out
+
+
+def test_cli_never_prints_or_tabulates_a_flagged_metric_but_keeps_the_per_seed_entries(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+):
+    flagged = 0.987654
+    results = [
+        fake_result(
+            seed,
+            {
+                "band.auto_link.precision": rate_cell(flagged, n_pairs=45, n_components=40, do_not_read=True),
+                "band.review.precision": rate_cell(0.7),
+            },
+        )
+        for seed in (1, 2)
+    ]
+    monkeypatch.setattr(cli, "select_executor", lambda name, **kwargs: (stub_executor("local", results), "stub"))
+    code = cli.main(
+        ["--seeds", "1", "2", "--tiers", TIER_FIXTURE, "--scorer-versions", standin.SCORER_VERSION]
+        + ["--executor", EXECUTOR_LOCAL, "--out", str(tmp_path)]
+    )
+    assert code == 0
+    out = capsys.readouterr().out
+    assert f"| AUTO_LINK precision | {NOT_REPORTED} | n/a | n/a |" in out and "0.988" not in out
+    doc = json.loads(next((tmp_path / "sweeps").glob("*/sweep.json")).read_text())
+    assert "0.987654" not in json.dumps(doc["table"])
+    stored = [e["numbers"]["band.auto_link.precision"] for e in doc["entries"]]  # as the harness itself stores them
+    assert [c["value"] for c in stored] == [flagged, flagged] and all(c["do_not_read"] for c in stored)

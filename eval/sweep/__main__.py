@@ -27,6 +27,7 @@ from eval.sweep.executors import (
     EXECUTORS,
     ModalTokenMissing,
     TokenCheck,
+    executor_ran,
     modal_token_present,
     select_executor,
 )
@@ -105,10 +106,12 @@ def main(argv: Sequence[str] | None = None, *, token_present: TokenCheck = modal
         return EXIT_SCORER_MISMATCH
     elapsed = time.perf_counter() - clock
     table = aggregate(results)
+    ran_on = executor_ran(results)
     doc = {
         "sweepSha256": manifest.sha256,
         "manifest": json.loads(manifest.to_json()),
-        "executor": executor.name,
+        "executor": ran_on,
+        "executorRequested": executor.name,
         "executorReason": reason,
         "startedAt": started_at.isoformat(),
         "finishedAt": datetime.now(UTC).isoformat(),
@@ -125,7 +128,7 @@ def main(argv: Sequence[str] | None = None, *, token_present: TokenCheck = modal
             f"  seed {r['entry']['seed']} · {r['entry']['tier']} · {r['entry']['scorerVersion']} · "
             f"{r['elapsedSeconds']:.1f} s · {where} · run {r['runId']}"
         )
-    print(f"total {elapsed:.1f} s")
+    print(f"ran on: {ran_on} · total {elapsed:.1f} s")
     print(render_table(table))
     print(f"sweep written to {sweep_dir}")
     return EXIT_OK
