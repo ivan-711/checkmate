@@ -1,13 +1,11 @@
 import { expect, test, type Route } from "@playwright/test";
 
-// Runs against the API-mode build (NEXT_PUBLIC_CHECKMATE_SOURCE=api) and a running API: the
-// match-run response is held open with a route so the screen can be checked mid-run. The fixture
-// adapter resolves without a request, so the test skips there.
+// Run by `npm run e2e:api` (playwright.api.config.ts) against the API-mode build and a running API:
+// the match-run response is held open with a route so the screen can be checked mid-run.
 test("Approve, Reject and Resolve are disabled while a match run is in flight", async ({ page }) => {
   await page.goto("/");
-  const mode = page.getByTestId("app-mode-badge");
-  await expect(mode).toBeVisible();
-  test.skip(!/LOCAL/.test((await mode.textContent()) ?? ""), "needs the API-mode build and a running API");
+  // Fails, never skips, if the build is not in API mode.
+  await expect(page.getByTestId("app-mode-badge")).toHaveText(/LOCAL/);
 
   await page.getByTestId("reset-button").click();
   await expect(page.getByTestId("reset-button")).toBeEnabled({ timeout: 30_000 });
