@@ -5,6 +5,8 @@ const PORT = Number(process.env.CHECKMATE_UI_PORT ?? 3000);
 
 export default defineConfig({
   testDir: "e2e",
+  // *.api.spec.ts need the API-mode build and a running API: playwright.api.config.ts runs them.
+  testIgnore: "**/*.api.spec.ts",
   fullyParallel: false,
   retries: 0,
   reporter: [["list"], ["html", { open: "never" }]],
