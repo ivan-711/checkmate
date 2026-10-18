@@ -109,10 +109,10 @@ Max content 1440 px, `p-4` gutter. Case: `grid-cols-[1fr_28rem]`, one column at 
 Placement decided by the UX lead (Christian Flores, design squad, UX lead). The queue is the registrar's backlog, not a stop on the judge's path: Case stays at `/` with every data-testid unchanged, FrontDesk stays first, and the queue goes third. It never decides anything; Approve and Reject stay on Case (the FrontDesk registrar handoff gets its own, later).
 
 1. Route `/queue`, new file `app/queue/page.tsx`. Add `{ href: "/queue", label: "Work queue" }` to `TABS` in `components/ui/Header.tsx` after Case. Final order: FrontDesk, Case, Work queue. Do not touch `/` or `/frontdesk`.
-2. Data path. Add one read to `DataSource` (`src/data/source.ts`): `getReviewQueue(cursor?: string): Promise<{ items: CandidatePair[]; nextCursor: string | null }>`.
-   - `ApiSource`: `GET /api/v1/candidate-pairs?band=REVIEW&status=PROPOSED&limit=50&cursor=…` through the generated client. The endpoint is in the frozen contract, so no contract change.
-   - `FixtureSource`: one row, the fixture pair, while its decision is `PROPOSED`; none after.
-   - Existing methods, their calls and the Case screen's reads stay exactly as they are.
+2. Data path. Add two reads to `DataSource` (`src/data/source.ts`) and implement both in each adapter:
+   - `getReviewQueue(cursor?: string): Promise<{ items: CandidatePair[]; nextCursor: string | null }>`. `ApiSource`: `GET /api/v1/candidate-pairs?band=REVIEW&status=PROPOSED&limit=50&cursor=…` through the generated client. `FixtureSource`: one item, the fixture pair, while its decision is `PROPOSED`; none after.
+   - `getCandidatePair(id: string): Promise<CandidatePairDetail>`. `ApiSource`: `GET /api/v1/candidate-pairs/{pair_id}`. `FixtureSource`: the fixture's pair detail for its pair id, `DataError("NOT_FOUND")` otherwise.
+   - Both endpoints are in the frozen contract, so no contract change. Existing methods, their calls and the Case screen's reads stay exactly as they are.
 3. Order: keep the server's order ("most uncertain first", `|p − 0.5|`) and say so in the header line. Don't re-sort on the client: "Load more" appends the next page.
 4. Collapsed row, 56 px minimum, built only from the list item:
    - the band chip (`BandChip`, text and icon);
@@ -120,7 +120,7 @@ Placement decided by the UX lead (Christian Flores, design squad, UX lead). The 
    - the origin as "Match run" or "FrontDesk hand-off";
    - the age from `decision.decidedAt` ("waiting 3 m");
    - a short pair id (mono, first 8 characters).
-5. Expanded row: fetch `GET /api/v1/candidate-pairs/{id}` for that row only, on expand. Show the two source names (`recordA` and `recordB` `displayLabel` and names), then the top 3 rows from `rankContributions(detail.contributions)`. That helper already returns plain labels.
+5. Expanded row: call `getCandidatePair(id)` for that row only, on expand. Show the two source names (`recordA` and `recordB` `displayLabel` and names), then the top 3 rows from `rankContributions(detail.contributions)`. That helper already returns plain labels.
 6. The Case pair: a row whose `recordAId` and `recordBId` are the session's two `sources[].record.id` (from `getSession()`, in either order) gets a secondary **Open in Case** link to `/`. Other rows have no decision buttons. Case doesn't read a `?pair=` parameter. Adding one changes Case data flow and is a fork for the lead.
 7. States:
    - empty: "No pairs need a registrar." (`ink-3`);
