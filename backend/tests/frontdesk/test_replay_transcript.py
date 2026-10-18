@@ -127,3 +127,59 @@ def test_authoring_script_reproduces_the_committed_file(tmp_path: Path):
     out = tmp_path / "t.json"
     author_transcript.write_transcript(built, out)
     assert load_transcript(out).turns == committed.turns
+
+
+def test_fill_hashes_records_real_result_hashes_that_then_replay_cleanly(hero_clinic_record, intake_sessions):
+    """The recorder around the replay adapter learns each ToolResult hash from the engine; the filled
+    transcript then plays through the routes with the divergence check active and never diverges."""
+    import uuid
+
+    from sqlalchemy import text as sql
+
+    from backend.frontdesk.replay import ReplayAgentModel, TextModelStep
+    from backend.tests.frontdesk.conftest import engine
+
+    filled = author_transcript.fill_hashes(load_transcript(TRANSCRIPT), engine)
+    with engine.connect() as conn:  # fill_hashes opened its own sessions; collect them for the purge
+        intake_sessions.extend(
+            str(r[0])
+            for r in conn.execute(
+                sql("SELECT id FROM intake_session WHERE scenario_context_id = :c AND model_id IS NULL"),
+                {"c": filled.scenario_context_id},
+            )
+        )
+    for turn in filled.turns:
+        tool_steps = [s for s in turn.steps if isinstance(s.model, ToolCallModelStep)]
+        assert tool_steps and all(
+            s.expect is not None and s.expect.tool_result_sha256 and len(s.expect.tool_result_sha256) == 64
+            for s in tool_steps
+        )
+        assert all(s.expect is None for s in turn.steps if isinstance(s.model, TextModelStep))
+
+    # replay the filled transcript: the text step after each tool call requires the hash to match
+    from backend.frontdesk import loop, store
+    from contracts.models.intake import AgentMode, IntakeTurn, TurnRequest
+    from contracts.models.policy import Language
+
+    model = ReplayAgentModel(filled, pacing=False)
+    for turn in filled.turns:
+        sid = uuid.uuid4()
+        lang = Language(turn.steps[0].model.args["preferredLanguage"])
+        with engine.begin() as conn:
+            store.insert_session(
+                conn,
+                session_id=sid,
+                language=lang,
+                agent_mode=AgentMode.REPLAY,
+                scenario_context_id="fill-hashes-replay",
+                prompt_version=filled.prompt_version,
+                tool_schema_version=filled.tool_schema_version,
+                model_id=None,
+            )
+        intake_sessions.append(str(sid))
+        _, response = loop.run_turn(
+            engine, model, session_id=sid, key=str(uuid.uuid4()), body=TurnRequest(text=turn.user_text)
+        )
+        played = IntakeTurn.model_validate(response)
+        assert played.degraded is None, played.degraded
+        assert played.assistant_text == turn.steps[-1].model.text

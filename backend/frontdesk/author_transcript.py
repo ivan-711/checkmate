@@ -20,8 +20,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import tempfile
 from datetime import UTC, date, datetime
 from pathlib import Path
+from uuid import uuid4
 
 from backend.frontdesk.replay import (
     DEFAULT_TRANSCRIPT_PATH,
@@ -220,11 +222,100 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--hero-dir", type=Path, default=HERO_DIR)
     parser.add_argument("--out", type=Path, default=DEFAULT_TRANSCRIPT_PATH)
+    parser.add_argument(
+        "--fill-hashes",
+        metavar="DATABASE_URL",
+        help="run every script through the real engine on this database and record expect.toolResultSha256 "
+        "(the database must hold the hero's Clinic record; never the dev database during a demo)",
+    )
     args = parser.parse_args(argv)
-    write_transcript(build_transcript(args.hero_dir), args.out)
+    transcript = build_transcript(args.hero_dir)
+    if args.fill_hashes:
+        from backend.app.db import make_engine
+
+        transcript = fill_hashes(transcript, make_engine(args.fill_hashes))
+        transcript.authoring = {
+            **(transcript.authoring or {}),
+            "toolResultHashesFilledAt": transcript.recorded_at.isoformat(),
+        }
+    write_transcript(transcript, args.out)
     print(f"wrote {args.out}")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# Filling expect.toolResultSha256 by running the scripts through the real engine. The recorder
+# learns each step's result hash from the next request, so wrapping the replay adapter in it and
+# driving the loop once per script yields exactly the hashes playback will check.
+
+
+def fill_hashes(transcript: Transcript, engine) -> Transcript:
+    """Return a copy of ``transcript`` whose tool steps carry the engine's ToolResult hashes.
+
+    One fresh intake session per script (``turnIndex 0`` entries), every turn of that script in order.
+    The database must hold the records the scripts expect (the hero's Clinic record for the returning
+    patient); the gate decides, the recorder only observes.
+    """
+    from backend.frontdesk import loop, store
+    from backend.frontdesk.replay import RecordingAgentModel, ReplayAgentModel, TranscriptPins
+    from contracts.models.intake import AgentMode, TurnRequest
+
+    pins = TranscriptPins(
+        model_id=transcript.model_id,
+        scorer_version=transcript.scorer_version,
+        threshold_set_id=transcript.threshold_set_id,
+        hero_scenario_sha256=transcript.hero_scenario_sha256,
+        scenario_context_id=transcript.scenario_context_id,
+    )
+    recorded: dict[tuple[int, str], list] = {}
+    for first in (t for t in transcript.turns if t.turn_index == 0):
+        language = _language_of(first)
+        session_id = uuid4()
+        with engine.begin() as conn:
+            store.insert_session(
+                conn,
+                session_id=session_id,
+                language=language,
+                agent_mode=AgentMode.REPLAY,
+                scenario_context_id=transcript.scenario_context_id,
+                prompt_version=transcript.prompt_version,
+                tool_schema_version=transcript.tool_schema_version,
+                model_id=None,
+            )
+        with tempfile.TemporaryDirectory() as scratch:
+            recorder = RecordingAgentModel(
+                ReplayAgentModel(transcript, pacing=False), Path(scratch) / "recording.json", pins
+            )
+            for turn in _script_turns(transcript, first):
+                loop.run_turn(
+                    engine, recorder, session_id=session_id, key=str(uuid4()), body=TurnRequest(text=turn.user_text)
+                )
+            for turn in recorder.transcript().turns:
+                recorded[(turn.turn_index, fold(turn.user_text_folded))] = turn.steps
+    filled = transcript.model_copy(deep=True)
+    for turn in filled.turns:
+        steps = recorded.get((turn.turn_index, fold(turn.user_text_folded)))
+        if steps is None:
+            continue
+        for step, seen in zip(turn.steps, steps, strict=False):
+            if step.expect is not None and seen.expect is not None:
+                step.expect.tool_result_sha256 = seen.expect.tool_result_sha256
+    return filled
+
+
+def _language_of(turn: TranscriptTurn):
+    from contracts.models.policy import Language
+
+    first = turn.steps[0].model
+    if isinstance(first, ToolCallModelStep) and first.args.get("preferredLanguage") in ("ES", "EN"):
+        return Language(first.args["preferredLanguage"])
+    return Language.EN
+
+
+def _script_turns(transcript: Transcript, first: TranscriptTurn) -> list[TranscriptTurn]:
+    """The script starting at ``first``: turn 0 then every higher turn index (one script per index > 0)."""
+    later = sorted((t for t in transcript.turns if t.turn_index > 0), key=lambda t: t.turn_index)
+    return [first, *later]
