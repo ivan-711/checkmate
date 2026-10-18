@@ -1,43 +1,140 @@
-import type { CandidatePairDetail } from "@/api/types";
+import type { DecisionStatus, ReasonCode } from "@/api/types";
 
-/** The stage's state on the Desk (CONCEPT §8, L1 contract). One pane of the decision column is
- * mounted per state; the Organism reads the same value. */
-export type StageState = "idle" | "held" | "review" | "confirm" | "linked" | "rejected";
+/* The Desk contract (CONCEPT.md §8, "contract first"). L1 owns this file; L2, L3 and L4 build
+ * against it and meet only here. Nothing in it renders. */
+
+/** The registrar's stage: which still is on screen. Derived, never set by hand (deriveDeskState). */
+export type DeskState = "idle" | "held" | "review" | "confirm" | "linked" | "rejected";
+
+/** The patient's kiosk. Set by the kiosk (L2) through DeskContext.setKiosk. */
 export type KioskState = "idle" | "working" | "held" | "done";
-export interface DeskState {
-  stage: StageState;
+
+/** The field an evidence row cites; hovering or focusing the row lights it in both records. */
+export type CiteField = "given" | "family" | "dob" | "addr";
+
+/** Shared between the evidence rail (L4, writes) and the Organism (L3, reads). */
+export interface CiteContext {
+  cite: CiteField | null;
+  setCite(cite: CiteField | null): void;
+}
+
+/** Which confirm sheet is open on the decision column; null when none. */
+export type Sheet = "approve" | "reject" | null;
+
+export interface DeskInput {
+  /** The hero pair's decision once Resolve has queued it; null before. */
+  decision: DecisionStatus | null;
+  /** True once a LINKED decision's entity has loaded, so the record can be drawn. */
+  linked: boolean;
+  sheet: Sheet;
   kiosk: KioskState;
 }
 
-/** A record field the evidence can cite. Hovering or focusing an evidence row names one; both
- * records wash that field (hover-to-cite, CONCEPT §5 touch 6). */
-export type CiteField = "given" | "family" | "dob" | "addr" | "phone" | "sex";
-
-export interface CiteContext {
-  cite: CiteField | null;
-  setCite: (field: CiteField | null) => void;
+/** One function decides the stage state, so the title, stepper, panes and Organism never disagree. */
+export function deriveDeskState({ decision, linked, sheet, kiosk }: DeskInput): DeskState {
+  if (decision === "LINKED" && linked) return "linked";
+  if (decision === "REJECTED") return "rejected";
+  if (decision === "PROPOSED" || decision === "LINKED") return sheet ? "confirm" : "review";
+  return kiosk === "held" ? "held" : "idle";
 }
 
-export type ReviewIntent = "APPROVE" | "REJECT";
+/** The story stepper in the header (BUILD-SPEC decision 3, from concept 5). */
+export const STORY_STEPS = [
+  { id: "checkin", label: "Check-in" },
+  { id: "gate", label: "Rules gate" },
+  { id: "compare", label: "Compare" },
+  { id: "link", label: "Link" },
+  { id: "flag", label: "Clinician flag" },
+] as const;
 
-export interface StageInputs {
-  /** The pair under review, once Resolve (or a queue link) has it; null before. */
-  detail: CandidatePairDetail | null;
-  resolved: boolean;
-  /** Hand-off pairs the gate holds for the kiosk's check-in. */
-  heldPairs: number;
-  /** The confirm sheet that is open, if any. */
-  intent: ReviewIntent | null;
-}
+export type StoryStep = (typeof STORY_STEPS)[number]["id"];
 
-/** The decision follows the pair's recorded status; a held check-in only matters before anything
- * is compared. Pure, so the Organism and the column can never disagree. */
-export function deriveStageState({ detail, heldPairs, intent }: StageInputs): StageState {
-  if (detail) {
-    const { status } = detail.pair.decision;
-    if (status === "LINKED") return "linked";
-    if (status === "REJECTED") return "rejected";
-    return intent ? "confirm" : "review";
+export type StepStatus = "done" | "current" | "upcoming";
+
+/** The step the story is on. The gate step is current only while the kiosk is held and the
+ * registrar has not started comparing; a desk with no kiosk activity (G16) starts at Check-in. */
+export function currentStep(desk: DeskState, kiosk: KioskState, flagRaised: boolean): StoryStep {
+  switch (desk) {
+    case "linked":
+      return flagRaised ? "flag" : "link";
+    case "review":
+    case "confirm":
+    case "rejected":
+      return "compare";
+    case "held":
+      return "gate";
+    case "idle":
+      return kiosk === "held" ? "gate" : "checkin";
   }
-  return heldPairs > 0 ? "held" : "idle";
+}
+
+export function stepStatus(step: StoryStep, current: StoryStep): StepStatus {
+  const order = STORY_STEPS.map((s) => s.id);
+  const diff = order.indexOf(step) - order.indexOf(current);
+  return diff < 0 ? "done" : diff === 0 ? "current" : "upcoming";
+}
+
+export interface StageHead {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+}
+
+export interface StageHeadContext {
+  /** The patient's given name from the records; null when no record has one. */
+  name: string | null;
+  /** Who linked the pair ("Registrar A"); null until a link exists. */
+  registrar: string | null;
+  flagRaised: boolean;
+  /** The reject reason, once rejected. */
+  reason: ReasonCode | null;
+}
+
+/** The stage header per state: an eyebrow, a plain-language title and one consequence line
+ * (the keynote pattern). Every name comes from the data; nothing here names the hero. */
+export function stageHead(desk: DeskState, ctx: StageHeadContext): StageHead {
+  const who = ctx.name ?? "the same name";
+  switch (desk) {
+    case "idle":
+      return {
+        eyebrow: "Records on file",
+        title: "Two records, one name",
+        subtitle: `Two sources each hold a record for ${who}. They are not linked.`,
+      };
+    case "held":
+      return {
+        eyebrow: "Needs registrar",
+        title: ctx.name ? `${ctx.name} is at the kiosk` : "A patient is at the kiosk",
+        subtitle: "FrontDesk asked to open a new chart. The gate denied it: these records may be theirs.",
+      };
+    case "review":
+      return {
+        eyebrow: "Needs registrar",
+        title: "Is this the same person?",
+        subtitle: "Approving joins these two records into one. Nothing links until you do.",
+      };
+    case "confirm":
+      return {
+        eyebrow: "Needs registrar",
+        title: "Is this the same person?",
+        subtitle: "Confirm to record your decision. It is saved under your name.",
+      };
+    case "linked":
+      return {
+        eyebrow: ctx.registrar ? `Linked by ${ctx.registrar}` : "Linked",
+        title: ctx.name ? `One record for ${ctx.name}` : "One record",
+        subtitle: ctx.flagRaised
+          ? "Both histories are together now. One item is flagged for a clinician."
+          : "Both histories are together now. The rule found nothing to flag.",
+      };
+    case "rejected":
+      return {
+        eyebrow: "Records on file",
+        title: "Two records, one name",
+        subtitle:
+          ctx.reason === "DIFFERENT_PERSON"
+            ? "Rejected as a different person. Nothing was linked, and this pair will not be suggested again."
+            : "Rejected for now. Nothing was linked, and nothing was suppressed: they can be compared again.",
+      };
+  }
 }

@@ -1,183 +1,259 @@
 @import "tailwindcss";
 
-/* Design tokens. Components use the Tailwind names mapped below, never a hex value.
-   The venue runs light; dark follows the system unless data-theme pins one. */
+/* The living record (CONCEPT.md §4). One color means one thing: mulberry is this person's record
+   and the one action that commits to it; ink is neutral action; amber is "the gate said no"; the
+   flag notice is paper and ink. Nothing is red. The venue runs light; dark values are reserved in
+   DESIGN.md and not built. Components use the Tailwind names mapped in @theme, never a hex.
+   contrast.test.ts reads the hex values of this block. */
 :root {
-  --page: #fafaf7;
-  --surface: #ffffff;
-  --sunken: #f3f3ef;
-  --kiosk-bg: #f2f5f4;
-  --border-subtle: #e4e4df;
-  --border-strong: #7e848d;
-  --ink-1: #111827;
-  --ink-2: #374151;
-  --ink-3: #5b6472;
-  --accent: #0b5d57;
-  --accent-hover: #094b46;
-  --on-accent: #ffffff;
-  --accent-soft: #e4f0ee;
-  --focus: #111827;
-  --denied-bg: #fdf2d0;
-  --denied-ink: #7a4b00;
-  --denied-border: #b7791f;
-  --error-ink: #8c3a12;
-  --error-bg: #fceee6;
-  --banner-bg: #111827;
-  --on-banner: #ffffff;
-  --evidence-for: #0072b2;
-  --evidence-against: #d55e00;
-  --band-auto: #0b5d57;
-  --on-band-auto: #ffffff;
-  --band-review: #f2b705;
-  --on-band-review: #111827;
-  --band-keep: #4b5563;
-  --on-band-keep: #ffffff;
+  --porcelain: #f5f3f4;
+  --paper: #ffffff;
+  --ink: #1b1419;
+  --ink-2: #5c5259;
+  --ink-3: #73686f;
+  --hair: #e6e0e4;
+  --hair-strong: #8e8389;
+  --mulberry: #8c1d7e;
+  --mulberry-deep: #5e1254;
+  --mulberry-tint: #f4e3f0;
+  --mulberry-cite: #ebc6e4;
+  --on-mulberry-2: rgba(255, 255, 255, 0.8);
+  --glow: #b98be0;
+  --amber-surface: #fff3d6;
+  --amber-line: #e0a526;
+  --amber-ink: #6b4300;
+  --scrim: rgba(27, 20, 25, 0.18);
 
-  /* Gate card, allowed outcomes, info and scrim (ux-spec §10.2; see DESIGN.md). */
-  --gate-bg: #fffbeb;
-  --gate-bar: #b7791f;
-  --allowed-bg: #e4f0ee;
-  --allowed-ink: #0b5d57;
-  --allowed-border: #0b5d57;
-  --info: #1d4e89;
-  --scrim: rgba(17, 24, 39, 0.4);
+  --f-display: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --f-text: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --f-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-fast: 150ms;
-  --dur-base: 200ms;
-  --dur-enter: 250ms;
-  --dur-move: 300ms;
-  --stagger: 40ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-fuse: cubic-bezier(0.7, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --t-micro: 120ms;
+  --t-state: 220ms;
+  --t-rise: 520ms;
+  --t-fuse: 720ms;
+
+  --r-record: 36px;
+  --r-device: 32px;
+  --r-control: 14px;
+  --r-small: 8px;
+
+  /* The Desk's fixed geometry (CONCEPT.md §3): nothing jumps between states. The compact layer
+     below scales it for 1280x720 so the window never scrolls (BUILD-SPEC decision 6). */
+  --bar-h: 64px;
+  --kiosk-w: 456px;
+  --stage-head-h: 170px;
+  --stage-title: 60px;
+  --organism-w: 600px;
+  --organism-h: 520px;
+  --organism-scale: 1;
+  --decision-w: 268px;
+  --strip-h: 60px;
+  --desk-gap: 32px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --page: #0f1315;
-    --surface: #171c1f;
-    --sunken: #0b0e10;
-    --kiosk-bg: #121a1a;
-    --border-subtle: #2a3034;
-    --border-strong: #6b757a;
-    --ink-1: #ecefee;
-    --ink-2: #c3cbc9;
-    --ink-3: #97a19f;
-    --accent: #4fc1b3;
-    --accent-hover: #6fd0c3;
-    --on-accent: #0b1413;
-    --accent-soft: #12302c;
-    --focus: #ecefee;
-    --denied-bg: #2b2310;
-    --denied-ink: #f4c863;
-    --denied-border: #c98500;
-    --error-ink: #f2a07a;
-    --error-bg: #341a10;
-    --evidence-for: #3987e5;
-    --evidence-against: #c47a2a;
-    --band-auto: #4fc1b3;
-    --on-band-auto: #0b1413;
-    --gate-bg: #211c0e;
-    --gate-bar: #e3b341;
-    --allowed-bg: #12302c;
-    --allowed-ink: #7fd6ca;
-    --allowed-border: #3e9c90;
-    --info: #8ec1f2;
-    --scrim: rgba(0, 0, 0, 0.6);
+@media (max-width: 1300px), (max-height: 760px) {
+  :root {
+    --kiosk-w: 400px;
+    --stage-head-h: 118px;
+    --stage-title: 44px;
+    --organism-w: 516px;
+    --organism-h: 447px;
+    --organism-scale: 0.86;
+    --strip-h: 52px;
+    --desk-gap: 24px;
   }
 }
 
-:root[data-theme="dark"] {
-  --page: #0f1315;
-  --surface: #171c1f;
-  --sunken: #0b0e10;
-  --kiosk-bg: #121a1a;
-  --border-subtle: #2a3034;
-  --border-strong: #6b757a;
-  --ink-1: #ecefee;
-  --ink-2: #c3cbc9;
-  --ink-3: #97a19f;
-  --accent: #4fc1b3;
-  --accent-hover: #6fd0c3;
-  --on-accent: #0b1413;
-  --accent-soft: #12302c;
-  --focus: #ecefee;
-  --denied-bg: #2b2310;
-  --denied-ink: #f4c863;
-  --denied-border: #c98500;
-  --error-ink: #f2a07a;
-  --error-bg: #341a10;
-  --evidence-for: #3987e5;
-  --evidence-against: #c47a2a;
-  --band-auto: #4fc1b3;
-  --on-band-auto: #0b1413;
-  --gate-bg: #211c0e;
-  --gate-bar: #e3b341;
-  --allowed-bg: #12302c;
-  --allowed-ink: #7fd6ca;
-  --allowed-border: #3e9c90;
-  --info: #8ec1f2;
-  --scrim: rgba(0, 0, 0, 0.6);
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-micro: 0ms;
+    --t-state: 0ms;
+    --t-rise: 0ms;
+    --t-fuse: 0ms;
+  }
 }
 
 @theme inline {
-  --color-page: var(--page);
-  --color-surface: var(--surface);
-  --color-sunken: var(--sunken);
-  --color-kiosk: var(--kiosk-bg);
-  --color-border-subtle: var(--border-subtle);
-  --color-border-strong: var(--border-strong);
-  --color-ink-1: var(--ink-1);
+  --color-porcelain: var(--porcelain);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-on-accent: var(--on-accent);
-  --color-accent-soft: var(--accent-soft);
-  --color-focus: var(--focus);
-  --color-denied-bg: var(--denied-bg);
-  --color-denied-ink: var(--denied-ink);
-  --color-denied-border: var(--denied-border);
-  --color-error-ink: var(--error-ink);
-  --color-error-bg: var(--error-bg);
-  --color-banner: var(--banner-bg);
-  --color-on-banner: var(--on-banner);
-  --color-evidence-for: var(--evidence-for);
-  --color-evidence-against: var(--evidence-against);
-  --color-band-auto: var(--band-auto);
-  --color-on-band-auto: var(--on-band-auto);
-  --color-band-review: var(--band-review);
-  --color-on-band-review: var(--on-band-review);
-  --color-band-keep: var(--band-keep);
-  --color-on-band-keep: var(--on-band-keep);
-  --color-gate-bg: var(--gate-bg);
-  --color-gate-bar: var(--gate-bar);
-  --color-allowed-bg: var(--allowed-bg);
-  --color-allowed-ink: var(--allowed-ink);
-  --color-allowed-border: var(--allowed-border);
-  --color-info: var(--info);
+  --color-hair: var(--hair);
+  --color-hair-strong: var(--hair-strong);
+  --color-mulberry: var(--mulberry);
+  --color-mulberry-deep: var(--mulberry-deep);
+  --color-mulberry-tint: var(--mulberry-tint);
+  --color-mulberry-cite: var(--mulberry-cite);
+  --color-on-mulberry-2: var(--on-mulberry-2);
+  --color-glow: var(--glow);
+  --color-amber-surface: var(--amber-surface);
+  --color-amber-line: var(--amber-line);
+  --color-amber-ink: var(--amber-ink);
   --color-scrim: var(--scrim);
-  --font-sans: var(--font-plex-sans), system-ui, "Segoe UI", sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --font-display: var(--f-display);
+  --font-sans: var(--f-text);
+  --font-mono: var(--f-mono);
+
+  --radius-record: var(--r-record);
+  --radius-device: var(--r-device);
+  --radius-control: var(--r-control);
+  --radius-small: var(--r-small);
+
+  --ease-out: var(--ease-out);
+  --ease-fuse: var(--ease-fuse);
+  --ease-spring: var(--ease-spring);
+
+  /* Legacy names (the pre-redesign DESIGN.md) mapped onto the new tokens, so components the
+     kiosk, Organism and decision lanes have not replaced yet render in the new palette. Each lane
+     removes the aliases its last user leaves behind; DESIGN.md lists the mapping. */
+  --color-page: var(--porcelain);
+  --color-surface: var(--paper);
+  --color-sunken: var(--porcelain);
+  --color-kiosk: var(--paper);
+  --color-border-subtle: var(--hair);
+  --color-border-strong: var(--hair-strong);
+  --color-ink-1: var(--ink);
+  --color-accent: var(--mulberry);
+  --color-accent-hover: var(--mulberry-deep);
+  --color-on-accent: var(--paper);
+  --color-accent-soft: var(--mulberry-tint);
+  --color-focus: var(--ink);
+  --color-denied-bg: var(--amber-surface);
+  --color-denied-ink: var(--amber-ink);
+  --color-denied-border: var(--amber-line);
+  --color-error-ink: var(--ink-2);
+  --color-error-bg: var(--porcelain);
+  --color-banner: var(--ink);
+  --color-on-banner: var(--paper);
+  --color-evidence-for: var(--ink);
+  --color-evidence-against: var(--ink-3);
+  --color-band-auto: var(--ink);
+  --color-on-band-auto: var(--paper);
+  --color-band-review: var(--paper);
+  --color-on-band-review: var(--ink);
+  --color-band-keep: var(--ink-3);
+  --color-on-band-keep: var(--paper);
+  --color-gate-bg: var(--amber-surface);
+  --color-gate-bar: var(--amber-line);
+  --color-allowed-bg: var(--mulberry-tint);
+  --color-allowed-ink: var(--mulberry-deep);
+  --color-allowed-border: var(--mulberry);
+  --color-info: var(--ink-2);
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--page);
-  color: var(--ink-1);
-  line-height: 1.4;
+  background: var(--porcelain);
+  color: var(--ink);
+  font-family: var(--f-text);
+  font-size: 17px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01";
 }
 
+/* Ink ring, 3 px off the control; on a mulberry surface the ring is paper so it still shows. */
 :focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.on-mulberry :focus-visible,
+.on-mulberry:focus-visible {
+  outline-color: var(--paper);
 }
 
-/* The approve moment: the golden record, timeline and flag card enter in that order.
-   Transitions rather than keyframes, so a fast Reset retargets cleanly. */
+kbd {
+  font: 500 12px/1 var(--f-mono);
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  opacity: 0.62;
+  margin-left: 10px;
+}
+
+/* The Desk (CONCEPT.md §3): top bar, then the kiosk device and the registrar's stage. The window
+   never scrolls; the stage body and the kiosk scroll inside themselves when they must. */
+.desk {
+  display: grid;
+  grid-template-columns: var(--kiosk-w) minmax(0, 1fr);
+  gap: var(--desk-gap);
+  padding: 4px 28px 20px 24px;
+  height: calc(100dvh - var(--bar-h));
+  min-height: 0;
+}
+.desk-region {
+  min-width: 0;
+  min-height: 0;
+}
+.stage {
+  display: grid;
+  grid-template-rows: var(--stage-head-h) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+.stage-head {
+  padding-top: 10px;
+  overflow: hidden;
+}
+.stage-title {
+  font: 720 var(--stage-title) / 1 var(--f-display);
+  letter-spacing: -0.035em;
+  margin-top: 10px;
+}
+.stage-body {
+  display: grid;
+  grid-template-columns: var(--organism-w) minmax(0, 1fr);
+  gap: var(--desk-gap);
+  min-height: 0;
+  overflow: auto;
+}
+/* The Organism keeps its 600x520 drawing; the slot scales it for the compact layer. */
+.organism-slot {
+  width: var(--organism-w);
+  height: var(--organism-h);
+  flex: none;
+}
+.organism-scale {
+  width: 600px;
+  height: 520px;
+  transform: scale(var(--organism-scale));
+  transform-origin: top left;
+}
+.decision-col {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: var(--strip-h);
+  border-top: 1px solid var(--hair);
+  margin-top: 8px;
+  padding-top: 4px;
+}
+
+/* ───────── legacy rules kept until L2 (kiosk), L3 (Organism) and L4 (decision column) retire
+   the components that use them. Nothing below is used by the Desk shell. ───────── */
+
 .enter {
   transition:
-    opacity var(--dur-move) var(--ease-out-strong),
-    transform var(--dur-move) var(--ease-out-strong);
+    opacity var(--t-state) var(--ease-out),
+    transform var(--t-state) var(--ease-out);
   @starting-style {
     opacity: 0;
     transform: translateY(-8px) scale(0.95);
@@ -189,10 +265,9 @@ body {
 .enter-last {
   transition-delay: 700ms;
 }
-
 @media (prefers-reduced-motion: reduce) {
   .enter {
-    transition: opacity var(--dur-fast) linear;
+    transition: opacity 150ms linear;
     transition-delay: 0ms;
     @starting-style {
       transform: none;
@@ -200,12 +275,10 @@ body {
   }
 }
 
-/* The registrar's flag summary after Approve: one easing, one duration. Reduced motion: it simply
-   appears (no transition at all, so the starting style never shows). */
 .reveal {
   transition:
-    opacity var(--dur-move) var(--ease-out-expo),
-    transform var(--dur-move) var(--ease-out-expo);
+    opacity 300ms var(--ease-out),
+    transform 300ms var(--ease-out);
   @starting-style {
     opacity: 0;
     transform: translateY(8px);
@@ -217,9 +290,6 @@ body {
   }
 }
 
-/* Short laptop screens (1366x650): the evidence rail shows its top rows and a "Show all" control,
-   so the review step's submit button stays above the fold (UX 3.1). Unlayered, so it wins over
-   the display utilities on the same elements. */
 .short-screen-only {
   display: none;
 }
@@ -232,34 +302,27 @@ body {
   }
 }
 
-/* Side-by-side panes (Case, FrontDesk; UI audit #5). When the two columns sit side by side the
-   page stops scrolling and each pane scrolls on its own, so Approve, the flag card and the kiosk's
-   latest message stay in view whatever the other pane holds. A screen opts in with .pane-layout
-   on its two-column grid and .pane on each column; every element between main and that grid
-   fills the height left under the header. Below 1100 px wide (200% zoom on a laptop included)
-   the columns stack and the page scrolls as before. */
+/* Side-by-side panes on the queue's pair page (UI audit #5). Scoped off the Desk, which has its
+   own fixed rows. */
 @media (min-width: 1100px) {
-  body:has(.pane-layout) {
+  body:has(.pane-layout):not(:has(.desk)) {
     display: flex;
     flex-direction: column;
     height: 100dvh;
   }
-  body:has(.pane-layout) > main,
-  main :has(.pane-layout) {
+  body:has(.pane-layout):not(:has(.desk)) > main,
+  main :has(.pane-layout):not(.desk *) {
     display: flex;
     flex: 1;
     flex-direction: column;
     min-height: 0;
     width: 100%;
   }
-  .pane-layout {
+  .pane-layout:not(.desk *) {
     flex: 1;
     min-height: 0;
     grid-template-rows: minmax(0, 1fr);
   }
-  /* The padding, undone by the margin, keeps focus rings at a pane's edge inside its scrollport.
-     Relative, so absolutely placed descendants (sr-only text, tooltips) scroll and clip with the
-     pane instead of reaching past it and making the page itself scroll. */
   .pane {
     position: relative;
     min-height: 0;
@@ -269,9 +332,8 @@ body {
   }
 }
 
-/* FrontDesk status row: a turn is running. The only keyframes on the site (DESIGN.md, Motion). */
 .indeterminate {
-  background: linear-gradient(90deg, transparent 0%, var(--info) 40%, var(--info) 60%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, var(--ink-2) 40%, var(--ink-2) 60%, transparent 100%);
   background-size: 200% 100%;
   animation: indeterminate 1.2s linear infinite;
 }
@@ -286,25 +348,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .indeterminate {
     animation: none;
-    background: var(--info);
-  }
-}
-
-/* FrontDesk: a soft accent glow at the kiosk edge while the agent works on a turn. It fades in
-   and out once with the state (DESIGN.md: motion marks a real state change; no pulsing), never
-   amber or red, and is absent under reduced motion. */
-.kiosk-frame {
-  transition: box-shadow var(--dur-move) var(--ease-out-strong);
-}
-.kiosk-frame[data-working="true"] {
-  box-shadow:
-    0 0 0 2px var(--accent-soft),
-    0 0 24px 2px color-mix(in srgb, var(--accent) 28%, transparent);
-}
-@media (prefers-reduced-motion: reduce) {
-  .kiosk-frame,
-  .kiosk-frame[data-working="true"] {
-    transition: none;
-    box-shadow: none;
+    background: var(--ink-2);
   }
 }

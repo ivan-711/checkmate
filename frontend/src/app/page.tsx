@@ -1,6 +1,7 @@
-import { CaseScreen } from "@/components/case/CaseScreen";
+import { DeskScreen } from "@/components/desk/DeskScreen";
 
-// Case is the landing tab until FrontDesk passes its 20:00 check.
-export default function CasePage() {
-  return <CaseScreen />;
+// The Desk: the patient's kiosk on the left, the registrar's stage on the right, one screen
+// (CONCEPT.md §3). This is the demo and the G16 surface.
+export default function DeskPage() {
+  return <DeskScreen />;
 }

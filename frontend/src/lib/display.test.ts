@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { scenario } from "@/data/scenario";
 import {
-  FEATURE_FIELD,
-  citeFieldFor,
+  CITE_CARD_FIELDS,
   evidenceDots,
   evidenceNote,
   FEATURE_LABELS,
+  citeFieldFor,
+  eventLabel,
   actorName,
   footerWithoutRule,
   differingFields,
@@ -170,25 +171,84 @@ describe("FEATURE_LABELS", () => {
   });
 });
 
-describe("FEATURE_FIELD", () => {
-  it("maps every scorer feature to the record field it cites", () => {
-    expect(FEATURE_FIELD.dob_exact).toBe("dob");
-    expect(FEATURE_FIELD.dob_day_month_swap).toBe("dob");
-    expect(FEATURE_FIELD.given_jw_folded).toBe("given");
-    expect(FEATURE_FIELD.given_name_jw).toBe("given");
-    expect(FEATURE_FIELD.family_dmeta).toBe("family");
-    expect(FEATURE_FIELD.family_metaphone).toBe("family");
-    expect(FEATURE_FIELD.address_jaccard).toBe("addr");
-    expect(FEATURE_FIELD.zip_match).toBe("addr");
-    expect(FEATURE_FIELD.phone_match).toBe("phone");
-    expect(FEATURE_FIELD.sex_match).toBe("sex");
-    expect(FEATURE_FIELD.missing_phone).toBe("phone");
+describe("citeFieldFor (evidence row to record field)", () => {
+  it("maps every name feature to its name field", () => {
+    expect(citeFieldFor("given_jw")).toBe("given");
+    expect(citeFieldFor("given_nickname")).toBe("given");
+    expect(citeFieldFor("family_jw_folded")).toBe("family");
+    expect(citeFieldFor("family_dmeta")).toBe("family");
   });
 
-  it("leaves an unknown feature without a field, so the row cites nothing rather than the wrong thing", () => {
-    expect(FEATURE_FIELD.new_thing).toBeUndefined();
+  it("maps the date features to the date of birth", () => {
+    for (const f of [
+      "dob_exact",
+      "dob_day_month_swap",
+      "dob_one_digit_edit",
+      "dob_one_component_off",
+      "dob_year_match",
+    ]) {
+      expect(citeFieldFor(f), f).toBe("dob");
+    }
+  });
+
+  it("maps the address and ZIP features to the address", () => {
+    expect(citeFieldFor("address_jaccard")).toBe("addr");
+    expect(citeFieldFor("zip_match")).toBe("addr");
+  });
+
+  it("maps the contract fixture's older ids too", () => {
+    expect(citeFieldFor("given_name_jw")).toBe("given");
+    expect(citeFieldFor("family_name_jw")).toBe("family");
+    expect(citeFieldFor("family_metaphone")).toBe("family");
+  });
+
+  it("cites nothing for features without a field on the record, or unknown ones", () => {
+    expect(citeFieldFor("sex_match")).toBeNull();
+    expect(citeFieldFor("missing_phone")).toBeNull();
     expect(citeFieldFor("new_thing")).toBeNull();
-    expect(citeFieldFor("dob_exact")).toBe("dob");
+  });
+
+  it("names the card fields each cite lights up", () => {
+    expect(CITE_CARD_FIELDS.given).toEqual(["givenName"]);
+    expect(CITE_CARD_FIELDS.addr).toEqual(["addressLine", "zip5"]);
+  });
+});
+
+describe("eventLabel", () => {
+  it("shows a display label for every event type the contract lists", () => {
+    // contracts/models/common.py EventType, as CLAUDE.md lists it.
+    const types = [
+      "RECORD_INGESTED",
+      "MATCH_RUN_COMPLETED",
+      "PAIR_SCORED",
+      "LINK_APPROVED",
+      "LINK_REJECTED",
+      "LINK_REVOKED",
+      "ENTITY_MERGED",
+      "ENTITY_SPLIT",
+      "ALERT_RAISED",
+      "ALERT_RETRACTED",
+      "WHATIF_APPLIED",
+      "DEMO_RESET",
+      "DEMO_RESTORED",
+      "EXPLANATION_GENERATED",
+      "EXTERNAL_CALL",
+      "EVAL_RUN_STARTED",
+      "EVAL_RUN_FINISHED",
+      "INTAKE_STARTED",
+      "AGENT_TOOL_CALLED",
+      "INTAKE_HANDOFF_CREATED",
+      "AGENT_TURN_DEGRADED",
+    ];
+    expect(eventLabel("LINK_APPROVED")).toBe("Link approved");
+    expect(eventLabel("PAIR_SCORED")).toBe("Pairs scored");
+    expect(eventLabel("INTAKE_HANDOFF_CREATED")).toBe("Held for registrar");
+    expect(eventLabel("ALERT_RAISED")).toBe("Flag raised");
+    for (const t of types) expect(eventLabel(t)).not.toMatch(/_/);
+  });
+
+  it("reads an unknown type as words rather than its code", () => {
+    expect(eventLabel("SOMETHING_NEW")).toBe("Something new");
   });
 });
 
