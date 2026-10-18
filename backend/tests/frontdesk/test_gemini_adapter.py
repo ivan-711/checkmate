@@ -117,13 +117,44 @@ def test_contents_rebuilt_with_user_role_for_function_responses(monkeypatch):
         (errors.APIError(504, {"error": {"message": "deadline"}}), "UNAVAILABLE", True),
         (errors.APIError(400, {"error": {"message": "bad"}}), "UNAVAILABLE", False),
         (errors.APIError(404, {"error": {"message": "no model"}}), "UNAVAILABLE", False),
-        (httpx.ConnectError("down"), "UNAVAILABLE", True),
+        (httpx.ConnectError("down"), "UNAVAILABLE", False),
     ],
 )
 def test_errors_become_error_steps(monkeypatch, exc, kind, retryable):
+    """ADR-016 §8: the one retry only for a timeout, a 429 that fits, or a 5xx; never another 4xx or a
+    transport failure."""
     adapter, _ = _adapter(monkeypatch, exc)
     step = adapter.next_step(_request())
     assert step == ErrorStep(kind=kind, retryable=retryable, mode=AgentMode.LIVE)
+
+
+def _rate_limited(retry_after: str | None, status: str | None = None) -> errors.APIError:
+    headers = {} if retry_after is None else {"Retry-After": retry_after}
+    response = httpx.Response(429, headers=headers, request=httpx.Request("POST", "https://example.invalid"))
+    body = {"error": {"message": "quota", "status": status}} if status else {"error": {"message": "quota"}}
+    return errors.APIError(429, body, response)
+
+
+def test_429_resource_exhausted_degrades_at_once_without_a_retry(monkeypatch, caplog):
+    """Lead decision 19:31: the free tier's daily quota is gone until tomorrow; the retry is wasted."""
+    adapter, _ = _adapter(monkeypatch, _rate_limited(None, "RESOURCE_EXHAUSTED"))
+    with caplog.at_level("WARNING", logger="checkmate.frontdesk.gemini"):
+        step = adapter.next_step(_request())
+    assert step == ErrorStep(kind="UNAVAILABLE", retryable=False, mode=AgentMode.LIVE)
+    assert "status=RESOURCE_EXHAUSTED" in caplog.text and "quota" not in caplog.text
+
+
+def test_429_resource_exhausted_with_a_short_retry_after_is_still_not_retried(monkeypatch):
+    adapter, _ = _adapter(monkeypatch, _rate_limited("1", "RESOURCE_EXHAUSTED"))
+    assert adapter.next_step(_request()).retryable is False
+
+
+@pytest.mark.parametrize(
+    "retry_after, retryable", [(None, True), ("1", True), ("0.5", True), ("20", False), ("Wed, 21 Oct", False)]
+)
+def test_429_is_retried_only_when_retry_after_fits_the_retry_delay(monkeypatch, retry_after, retryable):
+    adapter, _ = _adapter(monkeypatch, _rate_limited(retry_after))
+    assert adapter.next_step(_request()).retryable is retryable
 
 
 def test_blocked_and_malformed_finish_reasons(monkeypatch):
@@ -143,3 +174,87 @@ def test_error_logs_never_carry_the_message_or_the_key(monkeypatch, caplog):
         adapter.next_step(_request())
     assert "SECRET-DETAILS" not in caplog.text and "not-a-real-key" not in caplog.text
     assert "code=503" in caplog.text
+
+
+class _ProbeModels:
+    def __init__(self, outcome):
+        self.outcome = outcome
+        self.calls = []
+
+    def generate_content(self, **kwargs):
+        self.calls.append(kwargs)
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return self.outcome
+
+    def get(self, **kwargs):
+        raise AssertionError("the probe must make a real generate call, not a metadata read")
+
+
+class _ProbeClient:
+    def __init__(self, outcome):
+        self.models = _ProbeModels(outcome)
+
+
+def _auto_settings(key_present: bool = True, model_id: str | None = "fixture-model"):
+    from backend.app.config import Settings
+
+    return Settings(
+        database_url="unused",
+        cors_origins=(),
+        frontdesk_agent_mode="AUTO",
+        gemini_model_id=model_id,
+        gemini_api_key_present=key_present,
+        capture_dir=None,
+        git_sha=None,
+    )
+
+
+def test_auto_pins_replay_on_a_probe_429_resource_exhausted(monkeypatch):
+    from backend.frontdesk import adapters
+
+    monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-key")
+    client = _ProbeClient(errors.APIError(429, {"error": {"message": "quota", "status": "RESOURCE_EXHAUSTED"}}))
+    monkeypatch.setattr(gemini, "Client", lambda **kwargs: client)
+    assert adapters.pin_mode(_auto_settings()) == AgentMode.REPLAY
+    assert len(client.models.calls) == 1  # one real generate call, one request of the daily quota
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        errors.APIError(429, {"error": {"message": "per-minute"}}),
+        errors.APIError(503, {"error": {"message": "overloaded"}}),
+        errors.APIError(400, {"error": {"message": "deadline too short"}}),
+        httpx.ReadTimeout("t"),
+        httpx.ConnectError("down"),
+    ],
+)
+def test_auto_pins_replay_on_any_probe_failure(monkeypatch, outcome):
+    from backend.frontdesk import adapters
+
+    monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-key")
+    monkeypatch.setattr(gemini, "Client", lambda **kwargs: _ProbeClient(outcome))
+    assert adapters.pin_mode(_auto_settings()) == AgentMode.REPLAY
+
+
+def test_auto_pins_live_only_when_the_probe_generate_call_answers(monkeypatch):
+    from backend.frontdesk import adapters
+
+    monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-key")
+    client = _ProbeClient(_response([types.Part.from_text(text="ok")]))
+    monkeypatch.setattr(gemini, "Client", lambda **kwargs: client)
+    assert adapters.pin_mode(_auto_settings()) == AgentMode.LIVE
+    assert client.models.calls[0]["model"] == "fixture-model"
+
+
+def test_auto_pins_replay_without_a_key_or_model_id_and_never_probes(monkeypatch):
+    from backend.frontdesk import adapters
+
+    def explode(**kwargs):
+        raise AssertionError("no probe without a key and a model id")
+
+    monkeypatch.setattr(gemini, "Client", explode)
+    assert adapters.pin_mode(_auto_settings(key_present=False)) == AgentMode.REPLAY
+    monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-key")
+    assert adapters.pin_mode(_auto_settings(model_id=None)) == AgentMode.REPLAY

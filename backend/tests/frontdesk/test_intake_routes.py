@@ -93,7 +93,7 @@ def test_near_duplicate_is_held_handed_off_and_audited(client, fake, db_conn, cl
         text("SELECT args FROM agent_tool_call WHERE id = :id"), {"id": uuid.UUID(call["id"])}
     ).scalar_one()
     assert stored_args["evidence"]["birthDate"] == "3 de julio de 1985"
-    assert ev["pair_id"] is not None
+    assert ev["pair_id"] is not None and ev["decision_id"] is not None  # the handoff decision the call created
     handoffs = db_conn.execute(
         text("SELECT count(*) FROM event_log WHERE event_type = 'INTAKE_HANDOFF_CREATED' AND pair_id = ANY(:p)"),
         {"p": [uuid.UUID(p) for p in body["registration"]["handoffPairIds"]]},
@@ -283,10 +283,21 @@ def test_timeout_retries_once_then_degrades_to_the_template(client, fake, db_con
     assert len(fake.requests) == 2  # one retry, no third attempt
     degraded = events(db_conn, session["id"], "AGENT_TURN_DEGRADED")
     assert len(degraded) == 1 and degraded[0]._mapping["outcome"] == "TIMEOUT"
+    versions = degraded[0]._mapping["versions"]
+    for k in ("scorerVersion", "thresholdSetId", "policyVersion", "promptVersion", "toolSchemaVersion"):
+        assert versions.get(k), k
     stored = db_conn.execute(
         text("SELECT degraded, status FROM intake_turn WHERE session_id = :s"), {"s": uuid.UUID(session["id"])}
     ).one()
     assert (stored.degraded, stored.status) == ("TIMEOUT", "COMPLETED")
+
+
+def test_empty_model_text_is_not_trusted(client, fake, cleanup):
+    session = create_session(client, "EN")
+    cleanup[0].append(session["id"])
+    fake.final_text = "   "
+    body = turn(client, session["id"], "Hello").json()
+    assert body["assistantTextSource"] == "TEMPLATE" and body["degraded"] == "UNAVAILABLE"
 
 
 def test_non_retryable_error_is_not_retried(client, fake, cleanup):

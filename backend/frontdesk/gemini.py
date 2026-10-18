@@ -10,11 +10,13 @@ never the key.
 from __future__ import annotations
 
 import logging
+import math
 import time
 
 import httpx
 from google.genai import Client, errors, types
 
+from backend.frontdesk.budget import RETRY_AFTER_MAX_S
 from backend.frontdesk.model import ErrorStep, Message, ModelRequest, ModelStep, TextStep, ToolCallStep
 from contracts.models.intake import AgentMode
 from contracts.version import AUTO_MODE_PROBE_S, MODEL_TIMEOUT_MS
@@ -26,6 +28,9 @@ SDK_ATTEMPTS = 1  # includes the original call: no SDK retry, the loop retries o
 FUNCTION_RESPONSE_ROLE = "user"
 _RETRYABLE_HTTP_MIN = 500
 _RATE_LIMITED = 429
+QUOTA_STATUS = "RESOURCE_EXHAUSTED"
+PROBE_TEXT = "ok"
+PROBE_MAX_OUTPUT_TOKENS = 1
 _BLOCKED_FINISH = {types.FinishReason.SAFETY: "SAFETY_BLOCKED", types.FinishReason.MALFORMED_FUNCTION_CALL: "MALFORMED"}
 
 
@@ -68,24 +73,82 @@ class GeminiAgentModel:
             log.warning("gemini timeout exception_class=%s", type(exc).__name__)
             return ErrorStep(kind="TIMEOUT", retryable=True, mode=self.mode)
         except errors.APIError as exc:
-            retryable = exc.code == _RATE_LIMITED or (exc.code or 0) >= _RETRYABLE_HTTP_MIN
-            log.warning("gemini api error exception_class=%s code=%s", type(exc).__name__, exc.code)
-            return ErrorStep(kind="UNAVAILABLE", retryable=retryable, mode=self.mode)
+            log.warning(
+                "gemini api error exception_class=%s code=%s status=%s", type(exc).__name__, exc.code, _status(exc)
+            )
+            return ErrorStep(kind="UNAVAILABLE", retryable=api_error_retryable(exc), mode=self.mode)
         except httpx.HTTPError as exc:
+            # ADR-016 §8: the one retry is for a timeout, a 429 that fits, or a 5xx; a transport
+            # failure (connection refused, DNS) is none of those.
             log.warning("gemini transport error exception_class=%s", type(exc).__name__)
-            return ErrorStep(kind="UNAVAILABLE", retryable=True, mode=self.mode)
+            return ErrorStep(kind="UNAVAILABLE", retryable=False, mode=self.mode)
         return step_from_response(response, _elapsed_ms(started), self.mode)
 
 
-def probe_live(*, api_key: str, model_id: str) -> bool:
-    """AUTO mode's session-start probe: one metadata read inside AUTO_MODE_PROBE_S. Any failure,
-    including the API refusing the short deadline, pins the session to REPLAY (fail closed)."""
+def retry_after_seconds(exc: errors.APIError) -> float | None:
+    """``Retry-After`` from the 429 response: None when absent, ``inf`` when present but not a number
+    of seconds (an HTTP-date cannot be shown to fit the retry delay)."""
+    headers = getattr(getattr(exc, "response", None), "headers", None)
+    raw = headers.get("retry-after") if headers is not None else None
+    if raw is None:
+        return None
     try:
-        client = Client(api_key=api_key, http_options=types.HttpOptions(timeout=int(AUTO_MODE_PROBE_S * 1000)))
-        client.models.get(model=model_id)
+        return float(raw)
+    except (TypeError, ValueError):
+        return math.inf
+
+
+def _status(exc: errors.APIError) -> str | None:
+    """The gRPC-style status string (e.g. RESOURCE_EXHAUSTED); never the message body."""
+    status = getattr(exc, "status", None)
+    return str(status) if status else None
+
+
+def quota_exhausted(exc: errors.APIError) -> bool:
+    """A 429 carrying RESOURCE_EXHAUSTED is the free tier's daily quota (lead decision 19:31): gone
+    until the next day, so not worth the one retry."""
+    return exc.code == _RATE_LIMITED and QUOTA_STATUS in (_status(exc) or "").upper()
+
+
+def api_error_retryable(exc: errors.APIError) -> bool:
+    """5xx: yes. 429: only when it is not RESOURCE_EXHAUSTED and Retry-After is absent or fits the
+    loop's retry delay. Other 4xx: no."""
+    code = exc.code or 0
+    if code >= _RETRYABLE_HTTP_MIN:
         return True
-    except (httpx.HTTPError, errors.APIError) as exc:
-        log.warning("gemini probe failed exception_class=%s code=%s", type(exc).__name__, getattr(exc, "code", None))
+    if code == _RATE_LIMITED:
+        if quota_exhausted(exc):
+            return False
+        wait = retry_after_seconds(exc)
+        return wait is None or wait <= RETRY_AFTER_MAX_S
+    return False
+
+
+def probe_live(*, api_key: str, model_id: str) -> bool:
+    """AUTO mode's session-start probe: one minimal real generate call inside AUTO_MODE_PROBE_S, so a
+    model whose daily quota is gone cannot pass (a metadata read would). It spends one request of the
+    free tier's daily quota. Any 429, any other API error, a timeout or a transport failure pins the
+    session to REPLAY (fail closed)."""
+    try:
+        client = Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(
+                timeout=int(AUTO_MODE_PROBE_S * 1000), retry_options=types.HttpRetryOptions(attempts=SDK_ATTEMPTS)
+            ),
+        )
+        client.models.generate_content(
+            model=model_id,
+            contents=PROBE_TEXT,
+            config=types.GenerateContentConfig(temperature=0, max_output_tokens=PROBE_MAX_OUTPUT_TOKENS),
+        )
+        return True
+    except errors.APIError as exc:
+        log.warning(
+            "gemini probe failed exception_class=%s code=%s status=%s", type(exc).__name__, exc.code, _status(exc)
+        )
+        return False
+    except httpx.HTTPError as exc:
+        log.warning("gemini probe failed exception_class=%s", type(exc).__name__)
         return False
 
 

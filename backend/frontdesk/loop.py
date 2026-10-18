@@ -19,8 +19,10 @@ from uuid import UUID
 from sqlalchemy.engine import Engine, Row
 from sqlalchemy.exc import IntegrityError
 
+from backend.api.common import current_thresholds
 from backend.app.errors import ApiError
-from backend.frontdesk import registration, store
+from backend.core.api import CORE
+from backend.frontdesk import budget, registration, store
 from backend.frontdesk.audit import event_mode, write_agent_event
 from backend.frontdesk.executor import Degraded, Notice, execute
 from backend.frontdesk.model import AgentModel, ErrorStep, Message, ModelRequest, TextStep
@@ -41,13 +43,13 @@ from contracts.version import (
     MAX_DEGRADED_TURNS_BEFORE_TEMPLATE,
     MAX_TOOL_CALLS_PER_TURN,
     MAX_TURNS_PER_SESSION,
+    POLICY_VERSION,
     TURN_BUDGET_S,
     TURN_LEASE_S,
 )
 
 log = logging.getLogger("checkmate.frontdesk.loop")
 
-RETRY_DELAY_S = 1.0
 _DEGRADED_FOR_ERROR: dict[str, DegradedKind] = {
     "TIMEOUT": DegradedKind.TIMEOUT,
     "UNAVAILABLE": DegradedKind.UNAVAILABLE,
@@ -113,6 +115,18 @@ def claim(engine: Engine, session_id: UUID, key: str, body: TurnRequest) -> Clai
         prior = tuple(t for t in store.read_turns(conn, session_id) if t.turn_index != turn_index)
         first_step = store.next_step_index(conn, session_id, turn_index)
     return Claim(session=session, turn_index=turn_index, prior_turns=prior, first_step_index=first_step)
+
+
+def _versions(conn, session: store.SessionRow) -> Versions:
+    """Every FrontDesk event row names the same six versions (ADR-016 §6), degraded turns included."""
+    return Versions(
+        scorer_version=CORE.scorer_version,
+        threshold_set_id=current_thresholds(conn).threshold_set_id,
+        policy_version=POLICY_VERSION,
+        prompt_version=session.prompt_version,
+        tool_schema_version=session.tool_schema_version,
+        model_id=session.model_id,
+    )
 
 
 def _history_messages(prior_turns: tuple[Row, ...]) -> list[Message]:
@@ -184,7 +198,9 @@ def _run_claimed(
     new_chart_created = False
 
     if _consecutive_degraded(claimed.prior_turns) >= MAX_DEGRADED_TURNS_BEFORE_TEMPLATE:
-        # Fail fast: a dead network costs the patient one degraded turn, not every turn.
+        # Fail fast: a dead network costs the patient one degraded turn, not every turn. Every
+        # DegradedKind counts, LOOP_GUARD included: a model that loops twice in a row is as unusable
+        # at the kiosk as one that times out, and the registrar path needs no model.
         degraded = DegradedKind.UNAVAILABLE
     else:
         messages = _history_messages(claimed.prior_turns) + [Message(role="user", text=body.text)]
@@ -212,13 +228,17 @@ def _run_claimed(
             step = model.next_step(req)
             if isinstance(step, ErrorStep):
                 remaining = TURN_BUDGET_S - (time.perf_counter() - started)
-                if step.retryable and not retried and remaining > RETRY_DELAY_S:
+                if step.retryable and not retried and remaining > budget.RETRY_DELAY_S:
                     retried = True
-                    sleep(RETRY_DELAY_S)
+                    sleep(budget.RETRY_DELAY_S)
                     continue
                 degraded = _DEGRADED_FOR_ERROR[step.kind]
                 break
             if isinstance(step, TextStep):
+                if not step.text.strip():
+                    # The loop does not trust the adapter: an empty reply is a malformed step.
+                    degraded = DegradedKind.UNAVAILABLE
+                    break
                 hit = banned_phrase(step.text, new_chart_created=new_chart_created)
                 if hit is None:
                     text, source = step.text, AssistantTextSource.MODEL
@@ -262,9 +282,7 @@ def _run_claimed(
                 mode=event_mode(model.mode),
                 outcome=degraded.value,
                 latency_ms=int((time.perf_counter() - started) * 1000),
-                versions=Versions(
-                    prompt_version=session.prompt_version, tool_schema_version=session.tool_schema_version
-                ),
+                versions=_versions(conn, session),
                 payload={"turnIndex": turn_index, "kind": degraded.value, "toolCalls": len(tool_calls)},
                 client_request_id=key,
             )

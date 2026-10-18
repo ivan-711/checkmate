@@ -23,11 +23,12 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import IntegrityError
 
-from backend.api.common import display_label
+from backend.api.common import current_decision_row, display_label
 from backend.frontdesk import store
 from backend.frontdesk.audit import event_mode, write_agent_event
 from backend.frontdesk.model import ToolCallStep
 from backend.frontdesk.templates import fold, message_for
+from backend.frontdesk.tools import tool_result_schema
 from contracts.models.common import Band, EventType
 from contracts.models.events import Versions
 from contracts.models.intake import Effect, EffectStatus, GateResult, ToolCallCandidate, ToolCallRecord
@@ -44,10 +45,11 @@ from contracts.version import MAX_CANDIDATES_IN_TOOL_CALL_RECORD, POLICY_VERSION
 
 log = logging.getLogger("checkmate.frontdesk.executor")
 
-MAX_CANDIDATES_FOR_MODEL = 5  # tools/tool_result.schema.json maxItems
+MAX_CANDIDATES_FOR_MODEL: int = tool_result_schema()["properties"]["candidates"]["maxItems"]
 OUTCOME_LABEL = {PolicyOutcome.ALLOW: "ALLOWED", PolicyOutcome.DENY: "DENIED"}
 BAND_RANK = {Band.AUTO_LINK: 0, Band.REVIEW: 1, Band.KEEP_SEPARATE: 2}
 
+_INTAKE_ENTITY = text("SELECT entity_id FROM entity_member WHERE source_record_id = :record_id")
 _BIRTH_YEARS = text("SELECT record_id, birth_year FROM normalized_record WHERE record_id = ANY(:ids)")
 _EXISTING_HISTORY = text("SELECT kind, text FROM intake_history_item WHERE intake_record_id = :intake_record_id")
 
@@ -273,6 +275,8 @@ def _execute(
         client_request_id=client_request_id,
         effect_status=effect.status.value,
         pair_id=pair_ids[0] if pair_ids else None,
+        decision_id=_decision_id(conn, pair_ids, candidates, decision),
+        entity_id=_intake_entity_id(conn, current.intake_record_id),
     )
     aliases = _candidate_aliases(conn, session.id, candidates)
     message = message_for(decision.message_key, decision.outcome, decision.reason_code, session.language)
@@ -364,6 +368,22 @@ def _apply_effect(
     if decision.handoff_required:
         return Notice.HANDED_TO_REGISTRAR, none, None, [], current.intake_record_id
     return Notice.NONE, none, None, [], current.intake_record_id
+
+
+def _decision_id(conn: Connection, pair_ids: list[UUID], candidates, decision) -> UUID | None:
+    """The decision the call created (the first handoff pair's current one) or rests on (an evidence
+    candidate's current human decision), per ADR-016 §6."""
+    if pair_ids:
+        row = current_decision_row(conn, pair_ids[0])
+        return row.id if row is not None else None
+    evidence = {ref.id for ref in decision.evidence_ids}
+    return next((c.decision_id for c in candidates if c.decision_id and c.record_id in evidence), None)
+
+
+def _intake_entity_id(conn: Connection, intake_record_id: UUID | None) -> UUID | None:
+    if intake_record_id is None:
+        return None
+    return conn.execute(_INTAKE_ENTITY, {"record_id": intake_record_id}).scalar_one_or_none()
 
 
 def _digest(value: str) -> str:
