@@ -1,10 +1,12 @@
 import type { SourceCard } from "@/api/types";
 
-// The two demo sources in plain words (CONCEPT.md §3). Any other source keeps the API's own
+// The demo sources in plain words (CONCEPT.md §3). Any other source keeps the API's own
 // label, so a new source is visible rather than misnamed.
 const SOURCE_NAMES: Record<string, string> = {
   ER_FHIR: "Emergency room",
   CLINIC_CSV: "Clinic",
+  // The kiosk check-in, once a registrar attaches it to the linked record.
+  FRONTDESK_INTAKE: "Kiosk check-in",
 };
 
 const FORMATS: Record<string, string> = {

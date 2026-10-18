@@ -10,6 +10,11 @@ describe("sourceName", () => {
     expect(sourceName("CLINIC_CSV", cl.displayLabel)).toBe("Clinic");
   });
 
+  it("names the kiosk's intake record in plain words, never its code", () => {
+    // The attached check-in joins the record as a third source; the Desk holds no card for it.
+    expect(sourceName("FRONTDESK_INTAKE", "FRONTDESK_INTAKE")).toBe("Kiosk check-in");
+  });
+
   it("falls back to the API's own label for any other source", () => {
     expect(sourceName("KIOSK", "Kiosk check-in")).toBe("Kiosk check-in");
   });
