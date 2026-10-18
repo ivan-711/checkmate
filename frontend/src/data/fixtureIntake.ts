@@ -17,11 +17,22 @@ export function foldText(text: string): string {
   return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-/** The exact words of `text` that match `value` (case and accents ignored), or null. */
+/** The exact words of `text` that match `value` (case, accents and spacing ignored), or null.
+ * Scans the original text, so the quote is always a verbatim slice of what was typed. */
 function quoted(text: string, value: string | null | undefined): string | null {
   if (!value) return null;
-  const at = foldText(text).indexOf(foldText(value));
-  return at < 0 ? null : text.slice(at, at + value.length);
+  const target = foldText(value);
+  const isSpace = (ch: string | undefined) => !ch || /\s/.test(ch);
+  for (let start = 0; start < text.length; start++) {
+    if (isSpace(text[start])) continue;
+    for (let end = start + 1; end <= text.length; end++) {
+      if (isSpace(text[end - 1])) continue;
+      const folded = foldText(text.slice(start, end));
+      if (folded === target) return text.slice(start, end);
+      if (folded.length > target.length) break;
+    }
+  }
+  return null;
 }
 
 // A spoken date: "July 3, 1985" or "3 de julio de 1985".
@@ -120,6 +131,8 @@ export class FixtureIntake {
     const searchArgs = heardArgs(userText, this.fixture);
     // The patient did not state their sex, so the agent passes UNKNOWN, as the authored transcript does.
     const proposeArgs = { ...searchArgs, sex: "UNKNOWN", preferredLanguage: language };
+    // The fixture utterance has no phone or address, so the real gate would stop at row 7
+    // (INCOMPLETE_DEMOGRAPHICS) before this deny; fork #31 asks the lead to fix the utterance.
     const candidate = {
       recordId: existing.id,
       sourceSystem: existing.sourceSystem,
@@ -141,7 +154,8 @@ export class FixtureIntake {
       args,
       gate,
       effect: { status: "NONE" },
-      candidates: [candidate],
+      // No hand-off pair exists until the propose call is denied, so the search returns none.
+      candidates: [toolName === "propose_new_chart" ? candidate : { ...candidate, pairId: null }],
       latencyMs: 0,
     });
     return {
