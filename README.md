@@ -311,4 +311,3 @@ The contract's default flag footer, `CARD_FOOTER` in `contracts/models/alerts.py
 - **Not on `main`:** the what-if route and the entity history route answer `501` (`backend/app/main.py`, `contracts/api_spec.py`).
 - **No authentication.** A registrar name is a recorded label, not an authenticated identity (`contracts/models/reviews.py`).
 - **One process on one laptop, reachable only from localhost** (`docker-compose.yml`, `Makefile`, `frontend/package.json`).
-- **Optional registrar notifier.** An optional notifier (tools/notify) can send the registrar a generic iMessage when a check-in is held; it carries no patient data and is off unless started.
