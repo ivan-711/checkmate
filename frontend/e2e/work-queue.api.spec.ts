@@ -27,14 +27,15 @@ async function refocus(page: Page) {
 test("the work queue sends no POST on open, on window focus or on reload", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("app-mode-badge")).toHaveText(/LOCAL/);
-  // Wait for the reset itself: right after the click the button can still read enabled for a
-  // frame, and a Resolve clicked in that frame lands on a button that is turning disabled.
-  const reset = page.waitForResponse(
-    (r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/api/v1/sessions",
-    { timeout: RESET_MS },
-  );
-  await page.getByTestId("reset-button").click();
-  await reset;
+  // Wait for the reset itself: right after the click the button can still read enabled, and a
+  // Resolve pressed during the reset is held, so no match run would start (as in-flight does).
+  await Promise.all([
+    page.waitForResponse(
+      (r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/api/v1/sessions",
+      { timeout: RESET_MS },
+    ),
+    page.getByTestId("reset-button").click(),
+  ]);
   await expect(page.getByTestId("reset-button")).toBeEnabled({ timeout: RESET_MS });
   await page.getByTestId("resolve-button").click();
   await expect(page.getByTestId("candidate-pair")).toBeVisible({ timeout: 30_000 });

@@ -208,7 +208,7 @@ export function WorkQueue() {
           <p className="rounded-lg border border-border-subtle bg-surface p-6 text-ink-3">
             {band || status
               ? "No candidate pairs match these filters."
-              : "No candidate pairs yet. Resolve identity on Case scores the loaded records."}
+              : "Nothing is waiting for review. Pairs arrive when Resolve identity runs on Case, or when the identity gate hands a FrontDesk check-in to a registrar."}
           </p>
         )}
         {page.data && page.data.items.length > 0 && (

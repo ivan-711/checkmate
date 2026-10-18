@@ -38,12 +38,12 @@ export function ToolCallChip({
   const row = (
     <>
       <ToolIcon aria-hidden size={20} className="shrink-0 text-ink-2" />
-      <span className="font-mono text-[14px] text-ink-2">{call.toolName}</span>
+      <span className="font-mono text-[16px] text-ink-2">{call.toolName}</span>
       <span aria-hidden className="text-ink-3">
         ·
       </span>
       <span className="text-[16px] text-ink-1">{summary(call, t)}</span>
-      <span className={`ml-auto inline-flex items-center gap-1 text-[14px] font-semibold ${outcome.ink}`}>
+      <span className={`ml-auto inline-flex items-center gap-1 text-[18px] font-semibold ${outcome.ink}`}>
         <outcome.Icon aria-hidden size={16} />
         {call.gate.outcome === "ALLOW" ? t.allowed : t.denied}
       </span>
@@ -60,7 +60,7 @@ export function ToolCallChip({
         </button>
       )}
       {open && !hasGateCard && (
-        <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-4 px-3 text-[14px] text-ink-2">
+        <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-4 px-3 text-[16px] text-ink-2">
           <dt>{t.detailDecision}</dt>
           <dd className="font-mono">{call.gate.reasonCode ?? call.gate.outcome}</dd>
           <dt>{t.detailLatency}</dt>
