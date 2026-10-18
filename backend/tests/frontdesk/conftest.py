@@ -26,10 +26,13 @@ if "test" not in TEST_URL.rsplit("/", 1)[-1]:
 
 os.environ["DATABASE_URL"] = TEST_URL
 os.environ.setdefault("FRONTDESK_AGENT_MODE", "REPLAY")
+# No test ever calls the live API: the key leaves the environment for the whole session before the
+# app is imported, and every Client construction in gemini.py is a fake unless a test installs its own.
+os.environ.pop("GEMINI_API_KEY", None)
 
 from backend.api import intake as intake_api
 from backend.app.main import app, engine
-from backend.frontdesk import budget
+from backend.frontdesk import budget, gemini
 
 API = "/api/v1"
 DEFAULT_TEXT_REPLY = "Gracias. Una persona de registro va a confirmar su expediente en un momento."
@@ -69,6 +72,29 @@ class ModelHolder:
 
 HOLDER = ModelHolder()
 app.dependency_overrides[intake_api.get_model_factory] = lambda: HOLDER.factory
+
+
+class _NoNetworkClient:
+    """Stands in for google.genai.Client in every test; any call is a test bug, never a request."""
+
+    def __init__(self, **kwargs) -> None:
+        raise AssertionError("tests never construct a real Gemini client; install a fake on gemini.Client")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _no_key_for_the_session():
+    # Another module's load_dotenv() may have re-read a .env after collection: drop the key again for
+    # the whole session. The value is never read, compared or printed.
+    os.environ.pop("GEMINI_API_KEY", None)
+    yield
+    os.environ.pop("GEMINI_API_KEY", None)
+
+
+@pytest.fixture(autouse=True)
+def _never_the_live_api(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert "GEMINI_API_KEY" not in os.environ
+    monkeypatch.setattr(gemini, "Client", _NoNetworkClient)
 
 
 @pytest.fixture(scope="session")
