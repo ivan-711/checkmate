@@ -167,6 +167,78 @@ def cleanup(db_conn):
     sessions: list[str] = []
     records: list = []
     yield sessions, records
-    for sid in sessions:
+    # Newest first: a later session's handoff pair can reference an earlier session's intake record.
+    for sid in reversed(sessions):
         purge_session(db_conn, sid)
     purge_records(db_conn, records)
+
+
+# Q1.4 (replay): the real adapter factory, the hero's two records, and no pacing in tests.
+
+os.environ["FRONTDESK_REPLAY_PACING"] = "0"  # transcript latencies are cosmetic; never sleep in tests
+
+import json
+from pathlib import Path
+
+from backend.frontdesk import adapters
+from backend.tests.policy.seed import insert_record
+from contracts.models.common import SourceKind
+
+HERO_JSON = Path(__file__).resolve().parents[3] / "data" / "scenarios" / "hero" / "hero.json"
+HERO_SOURCE_KIND = {"ER_FHIR": SourceKind.FHIR_PATIENT, "CLINIC_CSV": SourceKind.CSV_ROW}
+HERO_DEMOGRAPHIC_FIELDS = ("given_name", "family_name", "birth_date", "sex", "phone", "address_line", "zip5")
+
+
+def hero_demographics() -> dict[str, dict]:
+    """The hero's ER and Clinic records exactly as hero.json renders them: the two records a real
+    ``POST /sessions {"scenarioId":"hero"}`` loads for the hero, so the gate sees the candidates (and the
+    ToolResult hashes) a demo reset produces. Read from the file, so a hero change reaches the tests."""
+    records = json.loads(HERO_JSON.read_text(encoding="utf-8"))["records"]
+    return {system: {k: records[system][k] for k in HERO_DEMOGRAPHIC_FIELDS} for system in HERO_SOURCE_KIND}
+
+
+@pytest.fixture
+def model_factory_override():
+    """Swap the module-level fake for another factory during one test, then restore it."""
+
+    def install(factory) -> None:
+        app.dependency_overrides[intake_api.get_model_factory] = lambda: factory
+
+    yield install
+    app.dependency_overrides[intake_api.get_model_factory] = lambda: HOLDER.factory
+
+
+@pytest.fixture
+def real_model_factory(model_factory_override):
+    """Routes build the adapter through ``adapters.make_model`` as in production (REPLAY here)."""
+    model_factory_override(adapters.make_model)
+
+
+@pytest.fixture
+def hero_records(cleanup) -> dict[str, uuid.UUID]:
+    """Commit the hero's ER and Clinic records (the hero's state after a demo reset) so the gate finds
+    both by block key; purged with the test. Returns ``{source_system: record_id}``."""
+    ids = {}
+    with engine.begin() as conn:
+        for system, demographics in hero_demographics().items():
+            ids[system] = insert_record(
+                conn,
+                system=system,
+                local_id=f"hero-{system.lower()}-q1-4-{uuid.uuid4()}",
+                kind=HERO_SOURCE_KIND[system],
+                demographics=demographics,
+            )
+    cleanup[1].extend(ids.values())
+    return ids
+
+
+@pytest.fixture
+def hero_clinic_record(hero_records) -> uuid.UUID:
+    """The hero's Clinic record id; the ER record is seeded beside it, as a reset does."""
+    return hero_records["CLINIC_CSV"]
+
+
+@pytest.fixture
+def intake_sessions(cleanup) -> list[str]:
+    """Session ids created in a test; purged with the test."""
+    return cleanup[0]
