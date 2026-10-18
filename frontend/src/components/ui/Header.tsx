@@ -80,7 +80,9 @@ export function Header() {
         <button
           type="button"
           onClick={() => setCommandsOpen(true)}
-          aria-label="Commands, shortcut ⌘K"
+          data-testid="header-commands"
+          // The name holds the visible text word for word (WCAG 2.5.3), so a voice user can say what they see.
+          aria-label="Commands ⌘K"
           aria-haspopup="dialog"
           className="inline-flex h-9 items-center rounded-[10px] border border-hair px-3 text-[14px] text-ink-2 hover:bg-ink/5"
         >

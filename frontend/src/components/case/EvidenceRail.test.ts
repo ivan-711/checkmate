@@ -49,7 +49,9 @@ describe("EvidenceRail", () => {
   it("says auto-link is off and that the weights are hand-set, from the threshold set", () => {
     const html = render();
     expect(html).toContain("Auto-link is off. You decide.");
-    expect(html).toContain("Hand-set demo weights, not calibrated.");
+    expect(html).toContain("Hand-set demo weights. Not a probability.");
+    // The word may appear only for a calibrated threshold set; this one is not.
+    expect(html.toLowerCase()).not.toContain("calibrated");
     const calibrated = render({ ...thresholds, isCalibrated: true, autoLinkEnabled: true });
     expect(calibrated).not.toContain("Hand-set demo weights");
     expect(calibrated).not.toContain("Auto-link is off");
@@ -57,7 +59,8 @@ describe("EvidenceRail", () => {
 
   it("makes no claim about calibration or auto-link while the threshold set is still loading", () => {
     const html = render(null);
-    expect(html).not.toContain("not calibrated");
+    expect(html).not.toContain("Not a probability");
+    expect(html.toLowerCase()).not.toContain("calibrated");
     expect(html).not.toContain("Auto-link is off");
     expect(html).toMatch(/data-testid="pair-band"[^>]*>REVIEW</);
   });

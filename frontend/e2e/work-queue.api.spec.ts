@@ -26,7 +26,7 @@ async function refocus(page: Page) {
 
 test("the work queue sends no POST on open, on window focus or on reload", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("app-mode-badge")).toHaveText(/LOCAL/);
+  await expect(page.getByTestId("app-mode-badge")).toHaveAttribute("data-mode", "LOCAL");
   // Wait for the reset itself: right after the click the button can still read enabled, and a
   // Resolve pressed during the reset is held, so no match run would start (as in-flight does).
   await Promise.all([

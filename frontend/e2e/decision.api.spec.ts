@@ -65,7 +65,9 @@ test("one Confirm links the records and attaches the held check-in: one flag, ki
 
   await expect(page.getByTestId("golden-record")).toBeVisible();
   await expect(page.getByTestId("flag-card")).toHaveCount(1);
-  await expect(page.getByText("Your chart is confirmed")).toBeVisible({ timeout: 15_000 });
+  // The kiosk's done state (L2): "You’re checked in, <name>."
+  await expect(page.getByTestId("kiosk")).toHaveAttribute("data-k", "done", { timeout: 15_000 });
+  await expect(page.getByTestId("kiosk")).toContainText("You’re checked in");
   await expect(page.getByTestId("attach-checkin-button")).toHaveCount(0);
 
   await expect
