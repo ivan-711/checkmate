@@ -22,6 +22,7 @@ export default defineConfig({
   ],
   webServer: {
     // next build points next-env.d.ts at the folder it built; put the tracked file back after.
+    // This discards any local edit to next-env.d.ts (Next owns that file) and needs git.
     command: `npm run build && git checkout -- next-env.d.ts && npx next start -H 127.0.0.1 -p ${PORT}`,
     env: { NEXT_PUBLIC_CHECKMATE_SOURCE: "api", CHECKMATE_DIST_DIR: DIST },
     url: `http://127.0.0.1:${PORT}/`,
