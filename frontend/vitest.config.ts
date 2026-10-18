@@ -9,5 +9,7 @@ export default defineConfig({
       "@hero": path.resolve(__dirname, "../data/scenarios/hero"),
     },
   },
+  // tsconfig keeps JSX for Next (jsx: preserve); Vite compiles it here so a test can render a component.
+  oxc: { jsx: { runtime: "automatic" } },
   test: { include: ["src/**/*.test.ts"] },
 });
