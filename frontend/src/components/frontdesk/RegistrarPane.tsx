@@ -1,32 +1,13 @@
 "use client";
 
-import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { IdCard, ShieldCheck } from "lucide-react";
-import type { IntakeSession } from "@/api/types";
 import { EvidenceRail } from "@/components/case/EvidenceRail";
 import { ReviewPanel } from "@/components/case/ReviewPanel";
 import { SourceCardView } from "@/components/case/SourceCardView";
 import { BandChip } from "@/components/ui/BandChip";
-import { useDataSource } from "@/data/DataSourceProvider";
 import { differingFields } from "@/lib/display";
-import { INTAKE_KEY } from "./KioskPane";
-
-/** The pair a held check-in waits on; the kiosk reads the same entry to tell the patient. */
-export const handoffPairKey = (pairId: string | null) => ["handoff-pair", pairId] as const;
-
-/** Reads the kiosk's check-in without starting one: the kiosk owns that request. */
-export function useIntakeSession() {
-  return useQuery<IntakeSession>({ queryKey: INTAKE_KEY, queryFn: skipToken });
-}
-
-export function useHandoffPair() {
-  const source = useDataSource();
-  const pairId = useIntakeSession().data?.registration.handoffPairIds?.[0] ?? null;
-  return useQuery({
-    queryKey: handoffPairKey(pairId),
-    queryFn: pairId ? () => source.getCandidatePair(pairId) : skipToken,
-  });
-}
+import { useHandoffPair, useIntakeSession } from "./intake";
 
 /** UX 3.12: the check-in the gate held, decided by a person through the existing review
  * endpoint. A held check-in exists only because the gate denied an agent action. */
