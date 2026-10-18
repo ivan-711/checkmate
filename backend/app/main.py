@@ -17,7 +17,7 @@ from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
 from starlette.responses import Response
 
-from backend.api import events, match_runs, pairs, reviews, sessions, thresholds, tiles
+from backend.api import events, intake, match_runs, pairs, reviews, sessions, thresholds, tiles
 from backend.app import request_context
 from backend.app.config import load_settings
 from backend.app.db import db_is_up, make_engine
@@ -61,6 +61,9 @@ IMPLEMENTED = frozenset(
         ("GET", API_PREFIX + "/entities/{entity_id}"),  # W3b
         ("GET", API_PREFIX + "/entities/{entity_id}/timeline"),  # W3b
         ("GET", API_PREFIX + "/alerts"),  # W3b
+        ("POST", API_PREFIX + "/intake-sessions"),  # Q1.2
+        ("POST", API_PREFIX + "/intake-sessions/{session_id}/turns"),  # Q1.2 (gate: Q1.1)
+        ("GET", API_PREFIX + "/intake-sessions/{session_id}"),  # Q1.2
     }
 )
 app = build_app(implemented=IMPLEMENTED)
@@ -74,6 +77,7 @@ for router in (
     tiles.router,
     thresholds.router,
     events.router,
+    intake.router,
 ):
     app.include_router(router)
 
