@@ -5,6 +5,7 @@ import { forwardRef } from "react";
 import type { ToolCallCandidate, ToolCallRecord } from "@/api/types";
 import { BandChip } from "@/components/ui/BandChip";
 import { rankContributions } from "@/lib/display";
+import { RuleResultTag } from "@/components/ui/RuleResultTag";
 import { sourceSystemLabel, type KioskCopy } from "./copy";
 
 const EVIDENCE_ROWS = 5; // UX 3.11: up to 5 rows, by absolute weight
@@ -32,6 +33,9 @@ export const GateCard = forwardRef<
       <h4 className="flex items-center gap-2 text-[24px] font-semibold leading-8 text-ink-1">
         <ShieldAlert aria-hidden size={24} className="shrink-0 text-denied-ink" />
         {t.gateTitle}
+        <span className="ml-auto">
+          <RuleResultTag label={t.ruleResult} />
+        </span>
       </h4>
       <p className="mt-1">{t.gateDenied}</p>
       <p>
@@ -43,7 +47,7 @@ export const GateCard = forwardRef<
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold">{t.gateCandidate}</span>
           <span className="ml-auto text-[20px] font-semibold tabular-nums">{score}</span>
-          <BandChip band={candidate.band} label={t.band[candidate.band]} />
+          <BandChip band={candidate.band} label={t.band[candidate.band]} kiosk />
         </div>
         <p className="text-ink-2">
           {t.gateChart(candidate.recordId.slice(-2), sourceSystemLabel(candidate.sourceSystem))}
