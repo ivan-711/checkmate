@@ -12,10 +12,10 @@ We used coding and research agents, and we reviewed, integrated and evaluated wh
 
 At build time:
 - Coding agents built each lane in its own git worktree from a one-page build brief (`CLAUDE.md`, mirrored as `AGENTS.md`) and the lane's spec section.
-- A paired adversarial reviewer agent reviewed every lane: it ran the app and the acceptance script, wrote tests meant to fail, and posted PASS or BLOCK on the pull request.
-- Codex (read-only sandbox) and GitHub Copilot code review ran on every pull request.
+- A paired adversarial reviewer agent reviewed lane pull requests: it ran the app and the acceptance script, wrote tests meant to fail, and posted PASS or BLOCK on the pull request.
+- Codex, in a read-only sandbox, reviewed several pull requests. The build brief also called for GitHub Copilot code review, but it did not run on any merged pull request.
 - The evaluation harness ran on every merge to `main` and posted per-band precision and recall with n.
-- A human clicked every merge until 17:15 CT on Saturday. After that, the lead orchestration session merged pull requests under the owner's standing authorization, and only when every gate was green: CI, the paired reviewer's PASS and a second independent review. Either of us could still click merge.
+- A human clicked every merge until 17:15 CT on Saturday. After that, the lead orchestration session merged pull requests under the owner's standing authorization, normally when CI, the paired reviewer's PASS and a second independent review were all green. Two small pull requests on Sunday morning (the evaluation sweep and the never-say list) merged on green CI and the lead session's own reading of the diff, with the owner's approval. Either of us could still click merge.
 
 Separately, the running app can use a model. In `LIVE` mode Gemini runs the intake conversation, the language handling and the tool arguments (`backend/frontdesk/gemini.py`). The API starts in `REPLAY` mode (`backend/app/config.py`, `docker-compose.yml`), where a committed transcript stands in for the model and plays through the real gate, matcher and database (`backend/frontdesk/replay.py`). That transcript is marked `AUTHORED`: the team wrote it from the call shapes a Gemini spike verified; it is not a recorded model run (`data/scenarios/hero/frontdesk_transcript.json`). In every mode, matching, the rules gate, the allergy rule and the approval are deterministic code or a human decision, so no language model is on the decision path.
 
