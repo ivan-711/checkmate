@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { scenario } from "@/data/scenario";
 import {
+  FEATURE_LABELS,
   actorName,
   footerWithoutRule,
   differingFields,
@@ -118,5 +119,49 @@ describe("footerWithoutRule", () => {
   it("leaves any other footer unchanged", () => {
     expect(footerWithoutRule("Not checked: dose.", "BL-AMOX-01", "v1")).toBe("Not checked: dose.");
     expect(footerWithoutRule("Rule BL-AMOX-02 v1. x", "BL-AMOX-01", "v1")).toBe("Rule BL-AMOX-02 v1. x");
+  });
+});
+
+describe("FEATURE_LABELS", () => {
+  // Every id the scorer emits: FEATURE_NAMES and the missing flags in backend/core/features.py.
+  const SCORER_IDS = [
+    ...["jw", "jw_folded", "dl", "dmeta", "nickname", "initial", "token_overlap"].map((f) => `given_${f}`),
+    ...["jw", "jw_folded", "dl", "dmeta", "token_overlap"].map((f) => `family_${f}`),
+    "dob_exact",
+    "dob_day_month_swap",
+    "dob_one_digit_edit",
+    "dob_one_component_off",
+    "dob_year_match",
+    "sex_match",
+    "phone_match",
+    "address_jaccard",
+    "zip_match",
+    ...["given_name", "family_name", "dob", "sex", "phone", "address", "zip"].map((f) => `missing_${f}`),
+  ];
+  const FIXTURE_IDS = scenario.pair.contributions.map((c: { feature: string }) => c.feature);
+
+  it("gives every scorer id a plain label, never the raw id", () => {
+    for (const id of SCORER_IDS) {
+      expect(FEATURE_LABELS[id], id).toBeTruthy();
+      expect(FEATURE_LABELS[id]).not.toMatch(/_/);
+    }
+  });
+
+  it("keeps labels distinct within each source, so five rows never read the same", () => {
+    expect(SCORER_IDS).toHaveLength(28);
+    for (const ids of [SCORER_IDS, FIXTURE_IDS]) {
+      const labels = ids.map((id: string) => FEATURE_LABELS[id] ?? id);
+      expect(new Set(labels).size).toBe(labels.length);
+    }
+  });
+
+  it("labels only ids the scorer or the fixture can send", () => {
+    const known = new Set([...SCORER_IDS, ...FIXTURE_IDS]);
+    expect(Object.keys(FEATURE_LABELS).filter((id) => !known.has(id))).toEqual([]);
+  });
+
+  it("labels the folded given-name feature the evidence rail showed raw", () => {
+    const [row] = rankContributions([{ feature: "given_jw_folded", logit: 1.5, value: 1 }]);
+    expect(row.label).toBe("Given name, accents ignored");
   });
 });
