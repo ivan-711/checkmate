@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from backend.policy.tokens import PolicyAllow, PolicyHandoff
 from contracts.models.common import Band, DecisionStatus
 from contracts.models.policy import (
+    HANDOFF_REASONS,
     AgentAction,
     EvidenceKind,
     EvidenceRef,
@@ -43,12 +44,7 @@ def _deny(reason: PolicyReason, evidence: Sequence[EvidenceRef] = ()) -> PolicyD
     return PolicyDecision(
         outcome=PolicyOutcome.DENY,
         reason_code=reason,
-        handoff_required=reason
-        in {
-            PolicyReason.CANDIDATE_IN_REVIEW_OR_HIGHER,
-            PolicyReason.LOOP_GUARD,
-            PolicyReason.INTAKE_ALREADY_RECORDED,
-        },
+        handoff_required=reason in HANDOFF_REASONS,
         evidence_ids=list(evidence),
         message_key=MESSAGE_KEYS[reason],
     )
