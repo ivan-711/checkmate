@@ -13,7 +13,7 @@ At build time:
 - A paired adversarial reviewer agent reviewed every lane: it ran the app and the acceptance script, wrote tests meant to fail, and posted PASS or BLOCK on the pull request.
 - Codex (read-only sandbox) and GitHub Copilot code review ran on every pull request.
 - The evaluation harness ran on every merge to `main` and posts per-band precision and recall with n.
-- A human clicked every merge. No agent merges.
+- Merges: a human clicked every merge until 17:15 CT on Saturday. From then on, under the owner's standing authorization, the lead orchestration session merged a pull request only when every gate was green: CI, the paired reviewer's PASS and a second independent review. Either of us could still click merge.
 
 At runtime, separately: Gemini runs the intake conversation, language handling and tool arguments. Matching, the policy gate, the allergy rule and the approval are deterministic code or a human decision. No language model sits on the decision path.
 
