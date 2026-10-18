@@ -3,13 +3,13 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { CandidatePairDetail, IntakeSession, IntakeTurn } from "@/api/types";
-import { SESSION_CHANGE_KEY } from "@/components/ui/demoReset";
+import { RESOLVE_KEY, SESSION_CHANGE_KEY } from "@/components/ui/demoReset";
 import { DataSourceProvider } from "@/data/DataSourceProvider";
 import { FixtureSource } from "@/data/fixtureSource";
 import { scenario } from "@/data/scenario";
 import { COPY } from "./copy";
 import { handoffPairKey, INTAKE_KEY, SEND_TURN_KEY } from "./intake";
-import { KioskPane, runStartOver } from "./KioskPane";
+import { KioskPane, runStartOver, startOverBlocked } from "./KioskPane";
 
 /** The kiosk with one check-in already in the cache, rendered for real. A decided hand-off pair
  * goes in the cache too, as the registrar pane's approval leaves it. */
@@ -203,17 +203,23 @@ describe("KioskPane states", () => {
   });
 });
 
+const IDLE = { sending: false, resetting: false, resolving: false };
+
 describe("KioskPane Start over", () => {
-  it("runs the full demo reset in LOCAL real-API mode", () => {
+  it("runs the full demo reset when no turn, reset or match run is in flight", () => {
     const resetDemo = vi.fn();
-    runStartOver("LOCAL", resetDemo);
+    expect(runStartOver(startOverBlocked(IDLE), resetDemo)).toBe(true);
     expect(resetDemo).toHaveBeenCalledOnce();
   });
 
-  it("runs the same full demo reset in REPLAY fixture mode", () => {
+  it.each([
+    ["a turn is being read", { ...IDLE, sending: true }],
+    ["the demo is resetting", { ...IDLE, resetting: true }],
+    ["a match run is in flight", { ...IDLE, resolving: true }],
+  ])("does not reset while %s", (_, work) => {
     const resetDemo = vi.fn();
-    runStartOver("REPLAY", resetDemo);
-    expect(resetDemo).toHaveBeenCalledOnce();
+    expect(runStartOver(startOverBlocked(work), resetDemo)).toBe(false);
+    expect(resetDemo).not.toHaveBeenCalled();
   });
 });
 
@@ -238,6 +244,12 @@ describe("KioskPane while work is in flight", () => {
   it("locks Use this while the first turn is being read", () => {
     expect(isDisabled(renderKiosk(fresh), COPY.en.suggestUse)).toBe(false);
     expect(isDisabled(renderKiosk(fresh, undefined, inFlight(SEND_TURN_KEY)), COPY.en.suggestUse)).toBe(true);
+  });
+
+  it("locks Start over while a match run is in flight, as Reset demo does", async () => {
+    // A reset that overlaps a match run gets a 503 and leaves no candidate pair.
+    const { session } = await checkIn(scenario.frontdeskIntake.utteranceEn);
+    expect(isDisabled(renderKiosk(session, undefined, inFlight(RESOLVE_KEY)), COPY.en.startOver)).toBe(true);
   });
 
   it("locks Start over while the demo resets", async () => {
