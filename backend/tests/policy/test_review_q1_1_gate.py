@@ -8,6 +8,7 @@ from sqlalchemy import text
 from backend.chart_store import writes
 from backend.policy.decide import allow_token
 from backend.policy.gate import GateUnavailable, evaluate
+from backend.policy.tokens import TokenMismatch
 from backend.tests.link.seed import insert_decision, insert_pair
 from backend.tests.policy.seed import ER_DEMOGRAPHICS, insert_record, insert_session, near_duplicates
 from backend.tests.policy.test_gate_db import PROPOSE_ARGS, USER_TEXT, propose
@@ -141,7 +142,7 @@ def test_search_allow_token_cannot_mint_a_new_chart(conn):
     )
     assert ev.decision.outcome == PolicyOutcome.ALLOW and ev.decision.message_key == "gate.allow.search"
     tok = allow_token(ev.decision)
-    with pytest.raises(Exception):
+    with pytest.raises(TokenMismatch):
         writes.create_intake_record(
             conn,
             tok,

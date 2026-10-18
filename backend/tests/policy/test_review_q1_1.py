@@ -204,8 +204,12 @@ def test_denial_rule_property(seed):
     cands = _random_candidates(rng)
     d = decide(action(), cands)
     any_linked = any(c.human_status == DecisionStatus.LINKED for c in cands)
+    # REVOKED is unresolved (fix round, lead's call): a human undid the link, so the pair is neither
+    # linked nor rejected and a REVIEW-or-higher candidate blocks again.
     any_blocking = any(
-        c.human_status in (None, DecisionStatus.PROPOSED) and c.band in (Band.REVIEW, Band.AUTO_LINK) for c in cands
+        c.human_status in (None, DecisionStatus.PROPOSED, DecisionStatus.REVOKED)
+        and c.band in (Band.REVIEW, Band.AUTO_LINK)
+        for c in cands
     )
     if any_linked:
         assert d.reason_code == PolicyReason.ALREADY_LINKED

@@ -13,14 +13,21 @@ from backend.chart_store import writes
 from backend.policy.decide import allow_token, decide, handoff_token
 from backend.policy.gate import evaluate
 from backend.policy.tokens import TokenMismatch
-from backend.tests.policy.factories import action, attach_args, candidate, propose_args
+from backend.tests.policy.factories import action, attach_args, candidate, propose_args, session
 from backend.tests.policy.seed import insert_session, near_duplicates
 from backend.tests.policy.test_gate_db import FACTS, PROPOSE_ARGS, USER_TEXT
 from contracts.models.common import Band, DecisionStatus, EventType, PairOrigin, SourceKind
 from contracts.models.intake import EffectStatus
 from contracts.models.policy import HistoryItem, HistoryKind, ToolName
 
-ALLOW = allow_token(decide(action(ToolName.SEARCH_PATIENTS.value), []))
+ALLOW = allow_token(decide(action(), []))  # propose_new_chart ALLOW
+INTAKE_ID = candidate().record_id
+ATTACH = allow_token(
+    decide(
+        action(ToolName.ATTACH_HISTORY.value, session=session(intake_record_id=INTAKE_ID, intake_args_sha256="a")), []
+    )
+)
+SEARCH = allow_token(decide(action(ToolName.SEARCH_PATIENTS.value), []))
 HANDOFF = handoff_token(decide(action(), [candidate(Band.REVIEW)]))
 BARE = decide(action(), [])
 
@@ -136,10 +143,10 @@ def test_mark_new_chart_and_history(conn):
     effect = writes.mark_new_chart(conn, ALLOW, session_id=sid, intake_record_id=rid)
     assert (effect.status, effect.ref) == (EffectStatus.APPLIED, str(rid))
     items = [HistoryItem(kind=HistoryKind.ALLERGY, text="Amoxicillin", evidence_quote="alergia a la amoxicilina")]
-    first = writes.append_intake_history(conn, ALLOW, intake_record_id=rid, items=items)
+    first = writes.append_intake_history(conn, ATTACH, intake_record_id=rid, items=items)
     assert [e.status for e in first] == [EffectStatus.APPLIED]
     replay = writes.append_intake_history(
-        conn, ALLOW, intake_record_id=rid, items=[items[0].model_copy(update={"text": "  AMOXICILLIN "})]
+        conn, ATTACH, intake_record_id=rid, items=[items[0].model_copy(update={"text": "  AMOXICILLIN "})]
     )
     assert [e.status for e in replay] == [EffectStatus.REPLAYED] and replay[0].ref == first[0].ref
     rows = conn.execute(
@@ -177,6 +184,20 @@ def test_every_write_refuses_anything_but_a_token(conn, bad):
         writes.mark_new_chart(conn, bad, session_id=sid, intake_record_id=sid)
     with pytest.raises(TokenMismatch):
         writes.append_intake_history(conn, bad, intake_record_id=sid, items=attach_args().items)
+
+
+def test_tokens_for_the_wrong_tool_are_refused(conn):
+    sid = insert_session(conn)
+    for wrong in (SEARCH, ATTACH):
+        with pytest.raises(TokenMismatch):
+            writes.create_intake_record(
+                conn, wrong, session_id=sid, args=propose_args(), args_sha256="a", scenario_context_id=None
+            )
+        with pytest.raises(TokenMismatch):
+            writes.mark_new_chart(conn, wrong, session_id=sid, intake_record_id=sid)
+    for wrong in (SEARCH, ALLOW):
+        with pytest.raises(TokenMismatch):
+            writes.append_intake_history(conn, wrong, intake_record_id=sid, items=attach_args().items)
 
 
 def test_handoff_writes_refuse_an_allow_token(conn):

@@ -113,7 +113,7 @@ def test_row_11_propose_allows_with_all_candidates():
     cands = [
         candidate(Band.KEEP_SEPARATE, s=-1.0),
         candidate(Band.REVIEW, s=1.0, human_status=DecisionStatus.REJECTED),
-        candidate(Band.AUTO_LINK, s=3.0, human_status=DecisionStatus.REVOKED),
+        candidate(Band.KEEP_SEPARATE, s=-3.0, human_status=DecisionStatus.REVOKED),
     ]
     d = decide(action(PROPOSE), cands)
     assert d.outcome == PolicyOutcome.ALLOW and d.message_key == "gate.allow.propose"
@@ -209,7 +209,8 @@ def test_review_or_higher_iff_unresolved_blocking_candidate(seed):
     blocking = [
         c
         for c in cands
-        if c.human_status in (None, DecisionStatus.PROPOSED) and c.band in (Band.REVIEW, Band.AUTO_LINK)
+        if c.human_status in (None, DecisionStatus.PROPOSED, DecisionStatus.REVOKED)
+        and c.band in (Band.REVIEW, Band.AUTO_LINK)
     ]
     d = decide(action(PROPOSE), cands)
     if linked:
@@ -225,10 +226,14 @@ def test_review_or_higher_iff_unresolved_blocking_candidate(seed):
     assert again == decide(action(PROPOSE), shuffled) == d
 
 
-@pytest.mark.parametrize("status", [DecisionStatus.REJECTED, DecisionStatus.REVOKED])
-def test_rejected_candidate_never_blocks(status):
-    cands = [candidate(Band.AUTO_LINK, s=4.0, human_status=status)]
+def test_rejected_candidate_never_blocks():
+    cands = [candidate(Band.AUTO_LINK, s=4.0, human_status=DecisionStatus.REJECTED)]
     assert decide(action(PROPOSE), cands).outcome == PolicyOutcome.ALLOW
+
+
+def test_revoked_link_is_unresolved_and_blocks_again():
+    cands = [candidate(Band.REVIEW, s=1.0, human_status=DecisionStatus.REVOKED)]
+    assert decide(action(PROPOSE), cands).reason_code == PolicyReason.CANDIDATE_IN_REVIEW_OR_HIGHER
 
 
 def test_keep_separate_never_blocks():
@@ -246,7 +251,14 @@ def test_tokens_only_from_matching_decisions():
     allowed = decide(action(SEARCH), [])
     held = decide(action(PROPOSE), [candidate(Band.REVIEW)])
     assert allow_token(allowed).decision is allowed
+    assert allow_token(allowed).tool == ToolName.SEARCH_PATIENTS
+    assert allow_token(allowed, SEARCH).tool == ToolName.SEARCH_PATIENTS
     assert handoff_token(held).decision is held
+    assert handoff_token(held, PROPOSE).tool == ToolName.PROPOSE_NEW_CHART
+    with pytest.raises(TokenMismatch):
+        allow_token(allowed, PROPOSE)  # a search ALLOW is never a propose capability
+    with pytest.raises(TokenMismatch):
+        handoff_token(held, ATTACH)
     with pytest.raises(TokenMismatch):
         allow_token(held)
     with pytest.raises(TokenMismatch):

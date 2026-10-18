@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from backend.policy.tokens import PolicyAllow, PolicyHandoff
+from backend.policy.tokens import PolicyAllow, PolicyHandoff, TokenMismatch
 from contracts.models.common import Band, DecisionStatus
 from contracts.models.policy import (
     HANDOFF_REASONS,
@@ -26,8 +26,13 @@ from contracts.models.policy import (
 from contracts.version import MAX_IDENTICAL_CALLS_PER_SESSION, MAX_TOOL_CALLS_PER_TURN
 
 BLOCKING_BANDS: frozenset[Band] = frozenset({Band.REVIEW, Band.AUTO_LINK})
-# A pair with no human decision yet, or only the gate's own proposal, is still unresolved.
-UNRESOLVED_STATUSES: frozenset[DecisionStatus | None] = frozenset({None, DecisionStatus.PROPOSED})
+# Unresolved (ADR-016 §2): no human has decided the pair at its current version. No decision and the
+# gate's or scorer's own PROPOSED are unresolved; REJECTED (either reason) releases the candidate and
+# LINKED makes the intake already linked. REVOKED is a human undoing a link, which leaves the pair
+# neither linked nor rejected, so it is unresolved too and a REVIEW-or-higher candidate blocks again.
+UNRESOLVED_STATUSES: frozenset[DecisionStatus | None] = frozenset(
+    {None, DecisionStatus.PROPOSED, DecisionStatus.REVOKED}
+)
 
 MESSAGE_KEYS: dict[PolicyReason | None, str] = {
     None: "gate.allow",
@@ -121,11 +126,29 @@ def decide(action: AgentAction, candidates: Sequence[ScoredCandidate]) -> Policy
     return _allow(tool, [EvidenceRef(kind=EvidenceKind.INTAKE_RECORD, id=session.intake_record_id)])
 
 
-def allow_token(decision: PolicyDecision) -> PolicyAllow:
-    """The capability an ALLOW write needs; raises ``TokenMismatch`` for any other decision."""
-    return PolicyAllow(decision)
+def _tool_of(decision: PolicyDecision, tool: ToolName | str | None) -> ToolName:
+    """The tool a token is for: given by the caller, or read back from the decision's message key
+    (an ALLOW key names its tool; the handoff reason is only ever decided for propose_new_chart)."""
+    if tool is not None:
+        tool = ToolName(tool)
+    derived = next((t for t, key in ALLOW_MESSAGE_KEYS.items() if key == decision.message_key), None)
+    if derived is None and decision.reason_code == PolicyReason.CANDIDATE_IN_REVIEW_OR_HIGHER:
+        derived = ToolName.PROPOSE_NEW_CHART
+    if tool is None:
+        if derived is None:
+            raise TokenMismatch("no tool can be read from this decision; pass it explicitly")
+        return derived
+    if derived is not None and derived != tool:
+        raise TokenMismatch(f"decision was made for {derived.value}, not {tool.value}")
+    return tool
 
 
-def handoff_token(decision: PolicyDecision) -> PolicyHandoff:
+def allow_token(decision: PolicyDecision, tool: ToolName | str | None = None) -> PolicyAllow:
+    """The capability an ALLOW write needs; raises ``TokenMismatch`` for any other decision or a
+    tool that does not match the one the decision was made for."""
+    return PolicyAllow(decision, _tool_of(decision, tool))
+
+
+def handoff_token(decision: PolicyDecision, tool: ToolName | str | None = None) -> PolicyHandoff:
     """The capability the handoff writes need; raises unless DENY CANDIDATE_IN_REVIEW_OR_HIGHER."""
-    return PolicyHandoff(decision)
+    return PolicyHandoff(decision, _tool_of(decision, tool))
