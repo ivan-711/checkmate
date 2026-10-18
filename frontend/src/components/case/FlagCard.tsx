@@ -1,5 +1,6 @@
 import { Flag } from "lucide-react";
 import { ConstructedChip } from "@/components/ui/ConstructedChip";
+import { FlagHeadline } from "@/components/ui/FlagHeadline";
 import { footerWithoutRule } from "@/lib/display";
 import type { FlagState } from "@/lib/flagState";
 
@@ -42,18 +43,25 @@ export function FlagCard({ state }: { state: FlagState }) {
           Rule <span data-testid="flag-card-rule-id">{alert.ruleId}</span> {alert.ruleVersion}
         </span>
       </header>
-      <p className="mb-2 max-w-[68ch]">{alert.cardText}</p>
-      {alert.citation && (
-        <p className="mb-2 text-[16px] text-ink-2">
-          Source:{" "}
-          <a href={alert.citation.url} target="_blank" rel="noreferrer" className="underline">
-            {alert.citation.labelName}, DailyMed, revised {alert.citation.revised}
-          </a>
+      <FlagHeadline alert={alert} testId="flag-card-headline" />
+      {/* The full text (codes, citation, the rule's limits) is one click away, so the card reads in a glance. */}
+      <details className="mt-1">
+        <summary className="w-fit cursor-pointer py-2.5 font-semibold text-accent hover:underline">
+          Details
+        </summary>
+        <p className="mb-2 max-w-[68ch]">{alert.cardText}</p>
+        {alert.citation && (
+          <p className="mb-2 text-[16px] text-ink-2">
+            Source:{" "}
+            <a href={alert.citation.url} target="_blank" rel="noreferrer" className="underline">
+              {alert.citation.labelName}, DailyMed, revised {alert.citation.revised}
+            </a>
+          </p>
+        )}
+        <p className="max-w-[68ch] text-[14px] text-ink-3">
+          {footerWithoutRule(alert.cardFooter, alert.ruleId, alert.ruleVersion)}
         </p>
-      )}
-      <p className="max-w-[68ch] text-[14px] text-ink-3">
-        {footerWithoutRule(alert.cardFooter, alert.ruleId, alert.ruleVersion)}
-      </p>
+      </details>
     </article>
   );
 }

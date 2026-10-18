@@ -24,6 +24,12 @@ export function subscribeToIntake(queryClient: QueryClient, onChange: () => void
   });
 }
 
+/** The linked chart's active flags as an approval's review response returned them (every current
+ * alert on the entity, kept ones included), keyed by that decision: a Reset makes a new one, so an
+ * old flag never shows again. Kept in the cache, not under HANDOFF_KEY, which is refetched, so the
+ * pane still shows them after a visit to Case and back. */
+export const approvalAlertsKey = (decisionId: string) => ["approval-alerts", decisionId] as const;
+
 /** Reads the kiosk's check-in from the cache without observing the query. A second observer
  * would replace the kiosk's queryFn, so Start over and Reset could not start a new check-in. */
 export function useIntakeSession(): IntakeSession | undefined {
