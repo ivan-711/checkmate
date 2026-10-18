@@ -68,7 +68,9 @@ export function HumanReviewMeter() {
           ))}
         </div>
         {/* auto_link_enabled is false in this build (CLAUDE.md), so this is a fact, not a count. */}
-        <span title="Auto-link is off in this build; every link is a registrar's decision.">0 automatic links</span>
+        <span title="Auto-link is off in this build; every link is a registrar's decision.">
+          0 automatic links
+        </span>
         {tiles.isError && <span className="sr-only">Tile unavailable: {tiles.error.message}</span>}
       </div>
     </div>

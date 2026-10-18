@@ -14,6 +14,7 @@ import type {
   ReviewResponse,
   SafetyAlert,
   SessionResponse,
+  ThresholdSet,
   TimelineEvent,
 } from "@/api/types";
 import { DEMO_SCRIPT } from "./demoScript";
@@ -152,6 +153,12 @@ export class ApiSource implements DataSource {
 
   async getTiles() {
     const res = await this.client.GET("/api/v1/metrics/tiles");
+    if (!res.data) fail(res.error);
+    return res.data;
+  }
+
+  async getThresholds(): Promise<ThresholdSet> {
+    const res = await this.client.GET("/api/v1/threshold-sets/current");
     if (!res.data) fail(res.error);
     return res.data;
   }

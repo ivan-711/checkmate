@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { scenario } from "@/data/scenario";
 import {
   CITE_CARD_FIELDS,
+  evidenceDots,
+  evidenceNote,
   FEATURE_LABELS,
   citeFieldFor,
   eventLabel,
@@ -178,7 +180,13 @@ describe("citeFieldFor (evidence row to record field)", () => {
   });
 
   it("maps the date features to the date of birth", () => {
-    for (const f of ["dob_exact", "dob_day_month_swap", "dob_one_digit_edit", "dob_one_component_off", "dob_year_match"]) {
+    for (const f of [
+      "dob_exact",
+      "dob_day_month_swap",
+      "dob_one_digit_edit",
+      "dob_one_component_off",
+      "dob_year_match",
+    ]) {
       expect(citeFieldFor(f), f).toBe("dob");
     }
   });
@@ -210,11 +218,27 @@ describe("eventLabel", () => {
   it("shows a display label for every event type the contract lists", () => {
     // contracts/models/common.py EventType, as CLAUDE.md lists it.
     const types = [
-      "RECORD_INGESTED", "MATCH_RUN_COMPLETED", "PAIR_SCORED", "LINK_APPROVED", "LINK_REJECTED",
-      "LINK_REVOKED", "ENTITY_MERGED", "ENTITY_SPLIT", "ALERT_RAISED", "ALERT_RETRACTED",
-      "WHATIF_APPLIED", "DEMO_RESET", "DEMO_RESTORED", "EXPLANATION_GENERATED", "EXTERNAL_CALL",
-      "EVAL_RUN_STARTED", "EVAL_RUN_FINISHED", "INTAKE_STARTED", "AGENT_TOOL_CALLED",
-      "INTAKE_HANDOFF_CREATED", "AGENT_TURN_DEGRADED",
+      "RECORD_INGESTED",
+      "MATCH_RUN_COMPLETED",
+      "PAIR_SCORED",
+      "LINK_APPROVED",
+      "LINK_REJECTED",
+      "LINK_REVOKED",
+      "ENTITY_MERGED",
+      "ENTITY_SPLIT",
+      "ALERT_RAISED",
+      "ALERT_RETRACTED",
+      "WHATIF_APPLIED",
+      "DEMO_RESET",
+      "DEMO_RESTORED",
+      "EXPLANATION_GENERATED",
+      "EXTERNAL_CALL",
+      "EVAL_RUN_STARTED",
+      "EVAL_RUN_FINISHED",
+      "INTAKE_STARTED",
+      "AGENT_TOOL_CALLED",
+      "INTAKE_HANDOFF_CREATED",
+      "AGENT_TURN_DEGRADED",
     ];
     expect(eventLabel("LINK_APPROVED")).toBe("Link approved");
     expect(eventLabel("PAIR_SCORED")).toBe("Pairs scored");
@@ -225,5 +249,28 @@ describe("eventLabel", () => {
 
   it("reads an unknown type as words rather than its code", () => {
     expect(eventLabel("SOMETHING_NEW")).toBe("Something new");
+  });
+});
+
+describe("evidenceDots", () => {
+  it("draws six dots, one per 0.5 log-odds, with partial fill", () => {
+    expect(evidenceDots(3.0)).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(evidenceDots(1.47)).toEqual([1, 1, 0.94, 0, 0, 0]);
+    expect(evidenceDots(0)).toEqual([0, 0, 0, 0, 0, 0]);
+  });
+
+  it("shows the weight of evidence against by magnitude and never more than six dots", () => {
+    expect(evidenceDots(-1.2)).toEqual([1, 1, 0.4, 0, 0, 0]);
+    expect(evidenceDots(9)).toEqual([1, 1, 1, 1, 1, 1]);
+  });
+});
+
+describe("evidenceNote", () => {
+  it("says what a row compared in plain words from the feature and the two values", () => {
+    expect(evidenceNote("dob_exact", 1)).toBe("Exact");
+    expect(evidenceNote("given_jw_folded", 1)).toBe("Same, accents ignored");
+    expect(evidenceNote("family_jw_folded", 0.93)).toBe("Close, accents ignored");
+    expect(evidenceNote("address_jaccard", 1)).toBe("Same street and ZIP");
+    expect(evidenceNote("phone_match", null)).toBe("Not given on one side");
   });
 });

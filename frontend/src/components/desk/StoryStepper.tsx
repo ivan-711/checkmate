@@ -39,13 +39,22 @@ export function StoryStepper() {
             >
               {status === "done" && (
                 <svg viewBox="0 0 24 24" width="11" height="11">
-                  <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M5 12.5l4.5 4.5L19 7.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               )}
               {status === "current" && <span className="block h-2 w-2 rounded-full bg-ink" />}
             </span>
             <span className={STATUS_LABEL[status]}>{step.label}</span>
-            <span className="sr-only">{status === "done" ? ", done" : status === "current" ? ", current step" : ""}</span>
+            <span className="sr-only">
+              {status === "done" ? ", done" : status === "current" ? ", current step" : ""}
+            </span>
           </li>
         );
       })}

@@ -1,6 +1,15 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { DecisionStatus, ReasonCode } from "@/api/types";
 import { useIntakeSession } from "@/components/frontdesk/intake";
 import {
@@ -71,7 +80,8 @@ export function DeskProvider({ children }: { children: ReactNode }) {
 
   const registerAction = useCallback((name: DeskAction, run: () => void) => {
     setActions((current) => ({ ...current, [name]: run }));
-    return () => setActions((current) => (current[name] === run ? { ...current, [name]: undefined } : current));
+    return () =>
+      setActions((current) => (current[name] === run ? { ...current, [name]: undefined } : current));
   }, []);
 
   const value = useMemo<DeskContextValue>(

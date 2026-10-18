@@ -393,3 +393,18 @@ describe("ApiSource after a reset", () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+describe("ApiSource thresholds", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reads the current threshold set the bands are decided with", async () => {
+    const calls = stubFetch({
+      "GET /api/v1/threshold-sets/current": () => ({ body: scenario.thresholds }),
+    });
+    const thresholds = await new ApiSource(ORIGIN).getThresholds();
+    expect(thresholds.cLow).toBe(scenario.thresholds.cLow);
+    expect(thresholds.cHigh).toBe(scenario.thresholds.cHigh);
+    expect(thresholds.autoLinkEnabled).toBe(false);
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(["GET /api/v1/threshold-sets/current"]);
+  });
+});

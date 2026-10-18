@@ -61,8 +61,12 @@ export function ActivityStrip() {
             Loading…
           </li>
         )}
-        {events.isError && <li className="text-[14px] text-ink-2">Activity unavailable: {events.error.message}</li>}
-        {events.isSuccess && rows.length === 0 && <li className="text-[14px] text-ink-3">No activity yet.</li>}
+        {events.isError && (
+          <li className="text-[14px] text-ink-2">Activity unavailable: {events.error.message}</li>
+        )}
+        {events.isSuccess && rows.length === 0 && (
+          <li className="text-[14px] text-ink-3">No activity yet.</li>
+        )}
         {groups.map((g) => (
           <li
             key={g.eventId}

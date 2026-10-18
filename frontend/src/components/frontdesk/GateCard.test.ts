@@ -19,7 +19,9 @@ function gateRows(call: ToolCallRecord, candidate: ToolCallCandidate, language: 
 
 function railRows(contributions: Contribution[]) {
   const detail: CandidatePairDetail = { ...scenario.pair, contributions };
-  return rows(renderToStaticMarkup(createElement(EvidenceRail, { detail })));
+  // The rail adds a plain-words note under each label (<small>); the label, weight and order are what must agree.
+  const html = renderToStaticMarkup(createElement(EvidenceRail, { detail, thresholds: undefined }));
+  return rows(html.replace(/<small[^>]*>.*?<\/small>/g, ""));
 }
 
 async function heldCall() {

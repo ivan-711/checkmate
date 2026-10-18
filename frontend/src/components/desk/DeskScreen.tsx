@@ -1,17 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { EvidenceRail } from "@/components/case/EvidenceRail";
-import { ReviewPanel } from "@/components/case/ReviewPanel";
-import { Timeline } from "@/components/case/Timeline";
 import { KioskPane } from "@/components/frontdesk/KioskPane";
 import { citedFields } from "@/components/record/cite";
-import { CiteContextProvider } from "@/components/record/CiteContext";
 import { Organism } from "@/components/record/Organism";
 import { typingInField } from "@/components/ui/Header";
 import { DataError } from "@/data/source";
 import { agoText, formatHeld, stageHead, type CiteContext, type DeskState } from "@/lib/desk";
 import { ActivityStrip } from "./ActivityStrip";
+import { CiteProvider } from "./CiteProvider";
+import { DecisionColumn } from "./DecisionColumn";
 import { useDesk, useDeskAction } from "./DeskContext";
 import { useDeskCase } from "./useDeskCase";
 
@@ -74,8 +72,7 @@ function StageHead() {
 
 /** The Desk (CONCEPT.md §3): the kiosk device on the left, the registrar's stage on the right,
  * three fixed rows so nothing jumps between states. The body holds the Organism (L3) beside the
- * decision column; until L4's column lands, that column composes the current case components so
- * every G16 hook stays live; the kiosk slot holds the current KioskPane until L2's. */
+ * decision column (L4); the kiosk slot holds L2's kiosk. */
 export function DeskScreen() {
   const { desk, kiosk, sheet, cite, setCite, actions, commandsOpen } = useDesk();
   const c = useDeskCase();
@@ -87,8 +84,8 @@ export function DeskScreen() {
   const resolveNow = () => {
     if (!c.resolve.isPending && !c.sessionChanging) c.resolve.mutate();
   };
-  // Resolve is offered while the pair is not proposed: before the first run and after a reject.
-  const canResolve = !c.caseQuery.isPending && !c.linked && c.detail?.pair.decision.status !== "PROPOSED";
+  // Resolve is offered while the pair is not under review: before the first run and after a reject.
+  const canResolve = !c.caseQuery.isPending && !c.linked && !c.underReview;
   useDeskAction("resolve", canResolve ? resolveNow : null);
 
   // The keyboard map (CONCEPT.md §5, touch 11): R, A, X, Enter, Escape. ⌘K and ⇧R are the
@@ -100,7 +97,11 @@ export function DeskScreen() {
         actions.cancel?.();
         return;
       }
-      if (e.key === "Enter" && desk === "confirm" && (e.target as HTMLElement | null)?.tagName !== "TEXTAREA") {
+      if (
+        e.key === "Enter" &&
+        desk === "confirm" &&
+        (e.target as HTMLElement | null)?.tagName !== "TEXTAREA"
+      ) {
         if (actions.confirm) {
           e.preventDefault();
           actions.confirm();
@@ -137,19 +138,19 @@ export function DeskScreen() {
       <section aria-label="Registrar" className="desk-region stage">
         <StageHead />
 
-        <div className="stage-body">
-          {/* The Organism (L3): the fragments, their threads, and after Approve the one record with
-              the notice risen from the join. History sits under it until L4 places it. */}
-          <div className="min-w-0">
-            <div className="organism-slot" data-testid="organism-slot">
-              {c.caseQuery.isPending && <p aria-busy="true">Loading records…</p>}
-              {noSession && <p data-testid="reset-prompt">{c.caseQuery.error?.message}</p>}
-              {c.caseQuery.isError && !noSession && (
-                <p className="text-ink-2">Records unavailable: {c.caseQuery.error.message}</p>
-              )}
-              {cards.length > 0 && (
-                <div className="organism-scale">
-                  <CiteContextProvider value={citeValue}>
+        <CiteProvider value={citeValue}>
+          <div className="stage-body">
+            {/* The Organism (L3): the fragments, their threads, and after Approve the one record with
+                the notice risen from the join. History lives in the decision column. */}
+            <div className="min-w-0">
+              <div className="organism-slot" data-testid="organism-slot">
+                {c.caseQuery.isPending && <p aria-busy="true">Loading records…</p>}
+                {noSession && <p data-testid="reset-prompt">{c.caseQuery.error?.message}</p>}
+                {c.caseQuery.isError && !noSession && (
+                  <p className="text-ink-2">Records unavailable: {c.caseQuery.error.message}</p>
+                )}
+                {cards.length > 0 && (
+                  <div className="organism-scale">
                     <Organism
                       cards={cards}
                       stage={desk}
@@ -160,78 +161,17 @@ export function DeskScreen() {
                       focusAfterLink={c.justApproved}
                       onFocused={onFocused}
                     />
-                  </CiteContextProvider>
-                </div>
-              )}
-            </div>
-            {c.linked && c.entity && (
-              <div className="mt-4">
-                <Timeline events={c.timeline.data} cards={cards} />
-              </div>
-            )}
-          </div>
-
-          {/* The decision column (L4). Interim: a pane per state with the current evidence and review panels. */}
-          <div className="decision-col" data-testid="decision-column">
-            {c.detail && (c.resolved || c.linked) ? (
-              <div
-                data-testid="candidate-pair"
-                aria-busy={c.resolve.isPending || c.sessionChanging}
-                className="space-y-3"
-              >
-                <EvidenceRail detail={c.detail} />
-                <ReviewPanel detail={c.detail} onDecided={c.onDecided} />
-                {canResolve && (
-                  <button
-                    type="button"
-                    data-testid="resolve-button"
-                    onClick={resolveNow}
-                    disabled={c.resolve.isPending || c.sessionChanging}
-                    className="flex h-[52px] w-full items-center justify-center rounded-control font-semibold text-ink shadow-[inset_0_0_0_1.5px_var(--hair-strong)] hover:bg-ink/5 disabled:text-ink-3"
-                  >
-                    {c.resolve.isPending ? "Resolving…" : "Resolve again"}
-                    <kbd aria-hidden="true">R</kbd>
-                  </button>
+                  </div>
                 )}
               </div>
-            ) : (
-              !c.caseQuery.isPending &&
-              !noSession && (
-                <div data-pane={desk === "held" ? "held" : "idle"}>
-                  <p className="text-[15px] font-semibold text-ink-2">
-                    {desk === "held" ? "Ready for you" : "Not compared yet"}
-                  </p>
-                  <h2 className="my-2 font-display text-[26px] font-[680] leading-[1.12] tracking-[-0.02em]">
-                    {desk === "held" ? "Why the gate held this check-in" : "Same person, or two people?"}
-                  </h2>
-                  <p className="mb-4 text-[16px] leading-[1.45] text-ink-2">
-                    {desk === "held"
-                      ? "FrontDesk asked to open a new chart. The gate denied it because an existing chart may already be this person's. No chart was opened. Nothing was linked."
-                      : "Resolving compares these records field by field and scores the match. It links nothing."}
-                  </p>
-                  {c.resolve.isError && (
-                    <p className="mb-2 text-[15px] text-ink-2">Resolve failed: {c.resolve.error.message}</p>
-                  )}
-                  <button
-                    type="button"
-                    data-testid="resolve-button"
-                    onClick={resolveNow}
-                    disabled={c.resolve.isPending || c.sessionChanging}
-                    className={`flex h-[52px] w-full items-center justify-center rounded-control text-[17px] font-semibold disabled:text-ink-3 ${
-                      desk === "held"
-                        ? "bg-ink text-paper hover:bg-black disabled:bg-hair"
-                        : "text-ink shadow-[inset_0_0_0_1.5px_var(--hair-strong)] hover:bg-ink/5"
-                    }`}
-                  >
-                    {c.resolve.isPending ? "Resolving…" : "Resolve identity"}
-                    <kbd aria-hidden="true">R</kbd>
-                  </button>
-                  <p className="mt-3 text-[15px] text-ink-3">Nothing links until a registrar approves.</p>
-                </div>
-              )
-            )}
+            </div>
+
+            {/* The decision column (L4): Resolve, the evidence and Approve, the confirm sheet, History. */}
+            <div className="decision-col" data-testid="decision-column">
+              <DecisionColumn c={c} onResolve={resolveNow} />
+            </div>
           </div>
-        </div>
+        </CiteProvider>
 
         <ActivityStrip />
       </section>

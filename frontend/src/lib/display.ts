@@ -124,6 +124,61 @@ export function eventLabel(eventType: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** Weight as dots (CONCEPT §5 touch 8): six dots, one per 0.5 log-odds, partial fill allowed, by
+ * magnitude. 1.47 is 2.94 dots. It reads at a glance and claims no more precision than it has. */
+export const EVIDENCE_DOTS = 6;
+const LOGIT_PER_DOT = 0.5;
+
+export function evidenceDots(logit: number): number[] {
+  const dots = Math.abs(logit) / LOGIT_PER_DOT;
+  return Array.from(
+    { length: EVIDENCE_DOTS },
+    (_, i) => Math.round(Math.max(0, Math.min(1, dots - i)) * 100) / 100,
+  );
+}
+
+const SAME = 1;
+const CLOSE = 0.85;
+// Every comparison the scorer makes, said as what it found (backend/core/features.py).
+const NAME_NOTES: Record<NameFeature, [same: string, close: string, different: string]> = {
+  jw: ["Same letters", "Close spelling", "Different spelling"],
+  jw_folded: ["Same, accents ignored", "Close, accents ignored", "Different, accents ignored"],
+  dl: ["Same, typos allowed", "Close, typos allowed", "Different, typos allowed"],
+  dmeta: ["Same sound", "Similar sound", "Different sound"],
+  nickname: ["Nickname match", "Nickname match", "No nickname match"],
+  initial: ["Same initial", "Same initial", "Different initial"],
+  token_overlap: ["Same parts", "Some parts shared", "Different parts"],
+};
+const FIELD_NOTES: Record<string, [same: string, close: string, different: string]> = {
+  dob_exact: ["Exact", "Exact", "Differs"],
+  dob_day_month_swap: ["Day and month swapped", "Day and month swapped", "Not swapped"],
+  dob_one_digit_edit: ["One digit off", "One digit off", "More than one digit off"],
+  dob_one_component_off: ["One part off", "One part off", "More than one part off"],
+  dob_year_match: ["Same year", "Same year", "Different year"],
+  sex_match: ["Same", "Same", "Differs"],
+  phone_match: ["Same phone", "Same phone", "Different phone"],
+  address_jaccard: ["Same street and ZIP", "Mostly the same", "Different address"],
+  zip_match: ["Same ZIP", "Same ZIP", "Different ZIP"],
+  given_name_jw: NAME_NOTES.jw,
+  family_name_jw: NAME_NOTES.jw,
+  family_metaphone: NAME_NOTES.dmeta,
+};
+const NAME_FEATURE = /^(given|family)_(.+)$/;
+
+/** What a row compared, in plain words: the feature's own comparison and how close the two values
+ * came. A missing value says so; it is never called a difference. */
+export function evidenceNote(feature: string, value: number | null | undefined): string {
+  if (value == null) return "Not given on one side";
+  const name = NAME_FEATURE.exec(feature);
+  const notes = FIELD_NOTES[feature] ?? (name ? NAME_NOTES[name[2] as NameFeature] : undefined);
+  if (!notes) return value >= SAME ? "Same" : value > 0 ? "Partly the same" : "Differs";
+  return value >= SAME
+    ? notes[0]
+    : value >= CLOSE || (value > 0 && notes[1] === notes[0])
+      ? notes[1]
+      : notes[2];
+}
+
 export interface RankedContribution extends Contribution {
   label: string;
   missing: boolean;
