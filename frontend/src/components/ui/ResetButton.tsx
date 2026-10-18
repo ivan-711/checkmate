@@ -15,6 +15,8 @@ export function ResetButton() {
   const source = useDataSource();
   const queryClient = useQueryClient();
   const resolving = useIsMutating({ mutationKey: RESOLVE_KEY }) > 0;
+  // Counts Undo as well as Reset, so a reset never races a restore still in flight.
+  const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
 
   // Reset, not invalidate, the case: its panels remount, so no half-typed note or stale
   // error survives. Tiles keep showing their values while they refetch.
@@ -56,7 +58,7 @@ export function ResetButton() {
       type="button"
       data-testid="reset-button"
       onClick={() => reset.mutate()}
-      disabled={reset.isPending || resolving}
+      disabled={sessionChanging || resolving}
       className="h-11 rounded-md border border-border-strong bg-surface px-4 text-[16px] font-semibold text-ink-1 hover:bg-sunken disabled:text-ink-3"
     >
       {reset.isPending ? "Resetting..." : "Reset demo"}
