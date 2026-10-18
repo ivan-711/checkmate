@@ -19,7 +19,7 @@ export const COPY = {
     empty: "Your conversation will appear here.",
     language: "Language",
     pane: "Patient kiosk",
-    switched: "Language switched to English.",
+    switched: "Language set to English",
     startOver: "Start over",
     speaker: "FrontDesk",
     automatic: "automatic message",
@@ -59,6 +59,7 @@ export const COPY = {
       `New chart request denied by the identity gate. An existing chart scored ${score}, ${band} band. Sent to a registrar.`,
     noEvidence: "no evidence",
     band: BAND_LABEL.en,
+    field: { name: "Name", dob: "Date of birth", sex: "Sex", address: "Address", phone: "Phone" },
   },
   es: {
     title: "Le damos la bienvenida. Registremos su llegada.",
@@ -70,7 +71,7 @@ export const COPY = {
     empty: "Su conversación aparecerá aquí.",
     language: "Idioma",
     pane: "QUIOSCO DE PACIENTES",
-    switched: "Idioma cambiado a español.",
+    switched: "Idioma cambiado a español",
     startOver: "Empezar de nuevo",
     speaker: "FrontDesk",
     automatic: "mensaje automático",
@@ -113,10 +114,33 @@ export const COPY = {
       `El control de identidad denegó un expediente nuevo. Un expediente existente obtuvo ${score}, franja ${band}. Enviado al personal de admisión.`,
     noEvidence: "sin evidencia",
     band: BAND_LABEL.es,
+    field: {
+      name: "Nombre",
+      dob: "Fecha de nacimiento",
+      sex: "Sexo",
+      address: "Dirección",
+      phone: "Teléfono",
+    },
   },
 };
 
 export type KioskCopy = (typeof COPY)["en"];
+
+export type KioskField = keyof KioskCopy["field"];
+
+// Scorer feature ids by prefix, mapped to the five fields the kiosk names (UX 10.9 ev.feature.*).
+const FIELD_PATTERNS: [RegExp, KioskField][] = [
+  [/^(missing_)?(given|family)/, "name"],
+  [/^(missing_)?(dob|birth)/, "dob"],
+  [/^(missing_)?sex/, "sex"],
+  [/^(missing_)?(address|zip)/, "address"],
+  [/^(missing_)?phone/, "phone"],
+];
+
+/** The kiosk field a scorer feature belongs to; null for an id it does not know. */
+export function kioskField(feature: string): KioskField | null {
+  return FIELD_PATTERNS.find(([re]) => re.test(feature))?.[1] ?? null;
+}
 
 /** "CLINIC_CSV" reads "Clinic CSV": short all-caps words are acronyms and stay as they are. */
 export function sourceSystemLabel(sourceSystem: string): string {
