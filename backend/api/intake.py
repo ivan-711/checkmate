@@ -34,12 +34,23 @@ router = APIRouter(prefix=API_PREFIX, tags=["frontdesk"])
 
 DEFAULT_LANGUAGE = Language.EN
 
+# JSON lets a string carry U+0000 and the frozen schema allows it, but Postgres text and jsonb cannot hold
+# it: the insert raised DataError, a 500 (CI schemathesis). The request is schema-compliant, so refusing it
+# would reject valid input; the boundary drops the character and the route proceeds (lead decision, PR #35).
+# Every other character is kept. (An unpaired surrogate never gets this far: Pydantic rejects it, a 422.)
+_NUL = "\x00"
+
 
 def get_model_factory() -> adapters.ModelFactory:
     return adapters.make_model
 
 
 ModelFactoryDep = Annotated[adapters.ModelFactory, Depends(get_model_factory)]
+
+
+def strip_nul(value: str | None) -> str | None:
+    """Checklist 13: normalise at the boundary, before any row, event, idempotency hash or model call."""
+    return None if value is None else value.replace(_NUL, "")
 
 
 def _session_view(conn, session_id: UUID) -> IntakeSession:
@@ -72,6 +83,7 @@ def _session_view(conn, session_id: UUID) -> IntakeSession:
     description="Lane Q1.2. Start an intake; the server pins the agent mode from FRONTDESK_AGENT_MODE.",
 )
 def create_intake_session(body: CreateIntakeSessionRequest, engine: EngineDep, settings: SettingsDep):
+    scenario_context_id = strip_nul(body.scenario_context_id)
     session_id = uuid.uuid4()
     language = body.language or DEFAULT_LANGUAGE
     mode = adapters.pin_mode(settings)
@@ -82,7 +94,7 @@ def create_intake_session(body: CreateIntakeSessionRequest, engine: EngineDep, s
             session_id=session_id,
             language=language,
             agent_mode=mode,
-            scenario_context_id=body.scenario_context_id,
+            scenario_context_id=scenario_context_id,
             prompt_version=PROMPT_VERSION,
             tool_schema_version=TOOL_SCHEMA_VERSION,
             model_id=model_id,
@@ -96,7 +108,7 @@ def create_intake_session(body: CreateIntakeSessionRequest, engine: EngineDep, s
             versions=Versions(
                 prompt_version=PROMPT_VERSION, tool_schema_version=TOOL_SCHEMA_VERSION, model_id=model_id
             ),
-            payload={"language": language.value, "scenarioContextId": body.scenario_context_id},
+            payload={"language": language.value, "scenarioContextId": scenario_context_id},
         )
         return _session_view(conn, session_id)
 
@@ -119,6 +131,7 @@ def create_intake_turn(
     settings: SettingsDep,
     model_factory: ModelFactoryDep,
 ):
+    body = body.model_copy(update={"text": strip_nul(body.text)})
     with engine.connect() as conn:
         session = store.read_session(conn, session_id)
     if session is None:
