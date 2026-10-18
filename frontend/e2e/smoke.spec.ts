@@ -69,9 +69,16 @@ test("case path: reject keeps the rule silent, then approve links and flags", as
   const flag = page.getByRole("article", { name: "Flagged for clinician review" });
   await expect(flag).toBeVisible();
   await expect(flag.getByText("constructed scenario")).toBeVisible();
-  // The footer's limits stay; its "Rule <id> <version>." prefix moved to the header, so the id shows once.
+  // The card leads with one line; the full text and the rule's limits sit under Details.
+  await expect(flag.getByTestId("flag-card-headline")).toHaveText(
+    "Penicillin V allergy (anaphylaxis) from Clinic CSV · active amoxicillin order from ER FHIR",
+  );
   const { cardFooter, ruleId, ruleVersion } = scenario.alertIfApproved;
-  await expect(flag.getByText(cardFooter.replace(`Rule ${ruleId} ${ruleVersion}.`, "").trim())).toBeVisible();
+  const footer = flag.getByText(cardFooter.replace(`Rule ${ruleId} ${ruleVersion}.`, "").trim());
+  await expect(footer).toBeHidden();
+  await flag.getByText("Details", { exact: true }).click();
+  // The footer's limits stay; its "Rule <id> <version>." prefix moved to the header, so the id shows once.
+  await expect(footer).toBeVisible();
   expect(((await flag.textContent()) ?? "").split(ruleId).length - 1).toBe(1);
   await expect(page.getByTestId("flag-card-rule-id")).toHaveText("BL-AMOX-01");
   await expect(flag.getByTestId("constructed-scenario-chip")).toBeVisible();
@@ -271,6 +278,61 @@ test("FrontDesk registrar: the held check-in is decided through the review step 
   await expect(page.getByText("A registrar is creating a new chart for you.")).toHaveCount(0);
   // The kiosk never shows the allergy or the flag card.
   await expect(page.getByTestId("flag-card")).toHaveCount(0);
+});
+
+test("FrontDesk registrar: the approval that raises the flag shows it there, eased in, and opens the case", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/frontdesk");
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  const held = page.getByTestId("registrar-held");
+  await expect(held).toContainText("Held check-ins (1)");
+  await expect(held.getByTestId("registrar-flag-summary")).toHaveCount(0);
+
+  await review(page, "approve");
+  const summary = held.getByTestId("registrar-flag-summary");
+  await expect(summary).toBeVisible();
+  await expect(summary.getByTestId("registrar-flag-headline")).toHaveText(
+    "Penicillin V allergy (anaphylaxis) from Clinic CSV · active amoxicillin order from ER FHIR",
+  );
+  await expect(summary.getByTestId("registrar-flag-count")).toHaveText("1 allergy surfaced");
+  const openCase = summary.getByRole("link", { name: "Open case" });
+  await expect(openCase).toBeFocused();
+  await expect(summary).toBeInViewport();
+  // Said once, politely: the summary itself is not a live region and nothing is an alert.
+  await expect(page.getByRole("status")).toHaveText(
+    "Link approved. Flagged for clinician review: Penicillin V allergy (anaphylaxis) · active amoxicillin order. 1 allergy surfaced.",
+  );
+  await expect(summary.locator("[aria-live], [role=alert], [role=status]")).toHaveCount(0);
+  await expect(page.locator('main [role="alert"]')).toHaveCount(0);
+  const motion = await summary.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { duration: style.transitionDuration, easing: style.transitionTimingFunction };
+  });
+  expect(motion.duration).toBe("0.3s, 0.3s");
+  expect(motion.easing).toBe("cubic-bezier(0.16, 1, 0.3, 1), cubic-bezier(0.16, 1, 0.3, 1)");
+
+  await openCase.click();
+  await expect(page).toHaveURL(new RegExp(`/queue/${scenario.pair.pair.id}$`));
+  await expect(page.getByTestId("flag-card-headline")).toHaveText(
+    "Penicillin V allergy (anaphylaxis) from Clinic CSV · active amoxicillin order from ER FHIR",
+  );
+});
+
+test("FrontDesk registrar: with reduced motion the flag summary appears without a transition", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/frontdesk");
+  await page.getByRole("button", { name: "Use this" }).click();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("registrar-held")).toContainText("Held check-ins (1)");
+  await review(page, "approve");
+  const summary = page.getByTestId("registrar-flag-summary");
+  await expect(summary).toBeVisible();
+  expect(await summary.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe("0s");
 });
 
 test("FrontDesk Start over: a new check-in starts at once and the next message is sent", async ({ page }) => {

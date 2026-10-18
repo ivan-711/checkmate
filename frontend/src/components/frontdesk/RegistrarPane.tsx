@@ -1,23 +1,89 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { IdCard, ShieldCheck } from "lucide-react";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Flag, IdCard, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import type { ReviewResponse, SafetyAlert } from "@/api/types";
 import { EvidenceRail } from "@/components/case/EvidenceRail";
 import { ReviewPanel } from "@/components/case/ReviewPanel";
 import { SourceCardView } from "@/components/case/SourceCardView";
+import { ConstructedChip } from "@/components/ui/ConstructedChip";
+import { FlagHeadline } from "@/components/ui/FlagHeadline";
+import { useAnnounce } from "@/components/ui/LiveRegion";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { differingFields } from "@/lib/display";
+import { flagHeadline, surfacedLine } from "@/lib/flagHeadline";
 import { COPY } from "./copy";
-import { HANDOFF_KEY, handoffPairKey, useIntakeSession } from "./intake";
+import { HANDOFF_KEY, handoffPairKey, raisedAlertsKey, useIntakeSession } from "./intake";
+
+/** What an approval raised, one line per alert, with the way to the full flag card on the Case
+ * screen. Neutral like the flag card: no red, no alert role; the pane announces it once, politely. */
+function RaisedFlag({
+  alerts,
+  pairId,
+  focusOnMount,
+  onFocused,
+}: {
+  alerts: SafetyAlert[];
+  pairId: string;
+  focusOnMount: boolean;
+  onFocused: () => void;
+}) {
+  const openCase = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    if (!focusOnMount) return;
+    openCase.current?.focus();
+    onFocused();
+  }, [focusOnMount, onFocused]);
+  const headingId = `raised-flag-${pairId}`;
+  return (
+    <section
+      data-testid="registrar-flag-summary"
+      aria-labelledby={headingId}
+      className="reveal space-y-2 rounded-lg border-2 border-l-[6px] border-ink-1 border-l-band-keep bg-surface p-3"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <Flag aria-hidden size={18} />
+        <h3 id={headingId} className="text-[16px] font-semibold uppercase tracking-wider">
+          Flagged for clinician review
+        </h3>
+        {alerts.some((a) => a.constructedScenario) && <ConstructedChip />}
+      </div>
+      {alerts.map((alert) => (
+        <FlagHeadline key={alert.id} alert={alert} testId="registrar-flag-headline" />
+      ))}
+      <p data-testid="registrar-flag-count" className="text-[16px] text-ink-2">
+        {surfacedLine(alerts.length)}
+      </p>
+      <Link
+        ref={openCase}
+        href={`/queue/${pairId}`}
+        data-testid="open-case-link"
+        className="inline-flex h-11 items-center rounded-md border border-border-strong bg-surface px-4 font-semibold text-ink-1 hover:bg-sunken"
+      >
+        Open case
+      </Link>
+    </section>
+  );
+}
 
 /** One pair the gate held, decided by a person through the existing review endpoint. */
 function HeldPair({ pairId, index, total }: { pairId: string; index: number; total: number }) {
   const source = useDataSource();
   const queryClient = useQueryClient();
+  const announce = useAnnounce();
   const pair = useQuery({
     queryKey: handoffPairKey(pairId),
     queryFn: () => source.getCandidatePair(pairId),
   });
+  // Written only by this pane's own approval (below); never fetched.
+  const raised = useQuery<SafetyAlert[]>({
+    queryKey: raisedAlertsKey(pairId),
+    queryFn: skipToken,
+    gcTime: Infinity,
+  }).data;
+  const [focusOpenCase, setFocusOpenCase] = useState(false);
   const headingId = `held-heading-${index}`;
 
   if (pair.isError) {
@@ -37,6 +103,23 @@ function HeldPair({ pairId, index, total }: { pairId: string; index: number; tot
 
   const detail = pair.data;
   const { decision } = detail.pair;
+  const alerts = decision.status === "LINKED" ? (raised ?? []) : [];
+
+  function onDecided(response: ReviewResponse) {
+    void queryClient.invalidateQueries({ queryKey: HANDOFF_KEY });
+    const surfaced = response.decision.status === "LINKED" ? (response.alerts ?? []) : [];
+    if (response.decision.status === "LINKED") queryClient.setQueryData(raisedAlertsKey(pairId), surfaced);
+    if (surfaced.length > 0) {
+      // The flag is what this approval changed: say it once and land on the way to the case.
+      const lines = surfaced.map(flagHeadline).join("; ");
+      announce(`Link approved. Flagged for clinician review: ${lines}. ${surfacedLine(surfaced.length)}.`);
+      setFocusOpenCase(true);
+      return;
+    }
+    // The Case screen's focus target is not on this pane: go on to the next held pair.
+    const next = document.getElementById(`held-heading-${index + 1}`);
+    (next ?? document.getElementById(headingId))?.focus();
+  }
   const differs = differingFields(detail.recordA.normalized, detail.recordB.normalized);
   return (
     <article
@@ -59,15 +142,16 @@ function HeldPair({ pairId, index, total }: { pairId: string; index: number; tot
         <IdCard aria-hidden size={16} />
         Confirm with the patient before deciding: ask for a phone number or a photo ID.
       </p>
-      <ReviewPanel
-        detail={detail}
-        onDecided={() => {
-          void queryClient.invalidateQueries({ queryKey: HANDOFF_KEY });
-          // The Case screen's focus target is not on this pane: go on to the next held pair.
-          const next = document.getElementById(`held-heading-${index + 1}`);
-          (next ?? document.getElementById(headingId))?.focus();
-        }}
-      />
+      <ReviewPanel detail={detail} onDecided={onDecided}>
+        {alerts.length > 0 && (
+          <RaisedFlag
+            alerts={alerts}
+            pairId={pairId}
+            focusOnMount={focusOpenCase}
+            onFocused={() => setFocusOpenCase(false)}
+          />
+        )}
+      </ReviewPanel>
     </article>
   );
 }

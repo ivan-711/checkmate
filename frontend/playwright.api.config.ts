@@ -13,6 +13,8 @@ export default defineConfig({
   testDir: "e2e",
   testMatch: "**/*.api.spec.ts",
   fullyParallel: false,
+  // Every spec presses Reset demo on the one API, so spec files must not run side by side.
+  workers: 1,
   retries: 0,
   reporter: [["list"]],
   use: {
