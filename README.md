@@ -301,6 +301,7 @@ The contract's default flag footer, `CARD_FOOTER` in `contracts/models/alerts.py
 ## Known limits and non-goals
 
 - **Synthetic data only.** The database holds only synthetic records and is dropped with one command (`docker-compose.yml`, `Makefile`); source datasets are never committed (`.gitignore`).
+- **Optional notifier.** `tools/notify` can send the registrar a generic iMessage ("CheckMate: a kiosk check-in is waiting for registrar review.") when a check-in is held. The text carries no patient data, travels through Apple's Messages service, and nothing is sent unless someone starts the notifier.
 - **Hand-set scorer and thresholds.** The weights (`handset-1`) and the threshold row (`provisional-1`) are set by hand, not trained or calibrated (`backend/core/score.py`, `contracts/migrations/0002_provisional_thresholds.sql`). Thresholds are evaluation thresholds, not clinical ones. Auto-link stays off (`contracts/models/thresholds.py`).
 - **The hero is provisional.** The hero export is marked `provisional` and not `qualified`: two of its required selection criteria are unmet, `change_birth_year_keep_separate` and `swap_dob_day_month_robust` (`data/scenarios/hero/hero.json`).
 - **REPLAY is scripted.** The replay transcript was written by the team, not recorded from a model run, and answers only its scripted lines (`data/scenarios/hero/frontdesk_transcript.json`, `backend/frontdesk/replay.py`).
