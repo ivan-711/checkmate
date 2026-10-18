@@ -102,8 +102,8 @@ export function Organism({
       custom={custom}
     >
       <AnimatePresence initial={false} custom={custom}>
-        {!linked && er && <Fragment key="er" card={er} side="er" diff={diff} />}
-        {!linked && cl && <Fragment key="cl" card={cl} side="cl" diff={diff} />}
+        {!linked && er && <Fragment key="er" card={er} side="er" diff={diff} custom={custom} />}
+        {!linked && cl && <Fragment key="cl" card={cl} side="cl" diff={diff} custom={custom} />}
         {(stage === "review" || stage === "confirm") && drawn.length > 0 && (
           <Threads key="threads" fields={drawn} marks={marks} host={host} armed={armed} />
         )}

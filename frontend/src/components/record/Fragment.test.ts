@@ -3,7 +3,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { SourceCard } from "@/api/types";
 import { scenario } from "@/data/scenario";
-import { Fragment, type FragmentProps } from "./Fragment";
+import {
+  bodyVariants,
+  contentVariants,
+  fillVariants,
+  Fragment,
+  fragmentVariants,
+  type FragmentCustom,
+  type FragmentProps,
+} from "./Fragment";
 
 const [er, cl] = scenario.session.sources;
 const render = (props: FragmentProps) => renderToStaticMarkup(createElement(Fragment, props));
@@ -64,5 +72,19 @@ describe("Fragment", () => {
     const html = render({ card: kiosk, side: "er" });
     expect(html).toContain('aria-label="Kiosk check-in record"');
     expect(html).toContain("Kiosk check-in");
+  });
+});
+
+describe("fragment variants", () => {
+  // Motion resolves an inherited label with each node's own `custom`; a node without one passes
+  // undefined. That must never throw (it took the whole Desk down on Approve).
+  it("resolve every stage without a custom, as an instant change", () => {
+    for (const variants of [fragmentVariants("er"), bodyVariants("cl"), contentVariants, fillVariants]) {
+      for (const value of Object.values(variants)) {
+        if (typeof value === "function") expect(() => value(undefined, {}, {})).not.toThrow();
+      }
+    }
+    const linked = fragmentVariants("er").linked as (c?: FragmentCustom) => { opacity?: number };
+    expect(linked()).toMatchObject({ opacity: 0 });
   });
 });
