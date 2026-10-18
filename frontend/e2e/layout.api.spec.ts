@@ -71,7 +71,7 @@ async function resolvedCase(page: Page) {
 /** Reset, then send the demo line: the gate denies the new chart and hands it to a registrar. */
 async function checkIn(page: Page, language: "EN" | "ES" = "EN") {
   await page.goto("/frontdesk");
-  await expect(page.getByTestId("agent-mode-badge")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("kiosk-composer")).toBeVisible({ timeout: 30_000 });
   await reset(page);
   if (language === "ES") {
     // The toggle starts a new check-in in Spanish; the demo line goes in once it exists.
@@ -192,7 +192,9 @@ for (const size of LANDSCAPE) {
       await staff.getByTestId("review-submit-button").click();
       const confirmed = page
         .getByRole("region", { name: "Check-in conversation" })
-        .getByText("Your chart is confirmed. Please wait to be called.");
+        .getByText(
+          "A registrar linked your check-in to your chart. Please have a seat; someone will call your name.",
+        );
       await expect(confirmed).toBeVisible({ timeout: 30_000 });
       await expect.poll(() => shownInPane(confirmed)).toBe(true);
       expect(await pageScroll(page)).toEqual({ x: 0, y: 0, scrollY: 0 });
@@ -229,7 +231,7 @@ for (const size of [...PORTRAIT, ...LANDSCAPE]) {
       page,
     }) => {
       await page.goto("/frontdesk");
-      await expect(page.getByTestId("agent-mode-badge")).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId("kiosk-composer")).toBeVisible({ timeout: 30_000 });
       // Before the first turn the kiosk's suggestion row carries a chip.
       expect(await sideways(page)).toBe(0);
       await openEachTooltip(page);

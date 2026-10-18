@@ -37,10 +37,11 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    ".next-l2fx/types/**/*.ts",
     ".next/e2e-api/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    ".next-l2fx/types/**/*.ts"
+    ".next-l2/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
