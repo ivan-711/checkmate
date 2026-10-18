@@ -153,8 +153,7 @@ export function newChartStageHead(name: string): StageHead {
   return {
     eyebrow: "New patient",
     title: given ? `New chart for ${given}` : "New chart opened",
-    subtitle:
-      "No record on file scored close enough, so the gate let FrontDesk open a new chart. Nothing waits for the registrar.",
+    subtitle: "The identity gate let FrontDesk open a new chart, so nothing waits for the registrar.",
   };
 }
 

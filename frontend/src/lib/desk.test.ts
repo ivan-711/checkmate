@@ -109,7 +109,7 @@ describe("newChartStageHead", () => {
     const head = newChartStageHead("Teodoro Quintanilla Abasolo");
     expect(head.eyebrow).toBe("New patient");
     expect(head.title).toBe("New chart for Teodoro");
-    expect(head.subtitle).toContain("Nothing waits for the registrar");
+    expect(head.subtitle).toContain("nothing waits for the registrar");
   });
 
   it("falls back to a plain title when the name is empty", () => {
