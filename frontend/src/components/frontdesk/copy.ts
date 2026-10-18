@@ -1,5 +1,6 @@
 // UX spec 10.9, the FrontDesk copy deck. Strings with braces are functions filled from the API.
 import type { Band } from "@/api/types";
+import { FEATURE_LABELS } from "@/lib/display";
 
 export type KioskLanguage = "en" | "es";
 
@@ -7,6 +8,50 @@ const BAND_LABEL: Record<KioskLanguage, Record<Band, string>> = {
   en: { AUTO_LINK: "AUTO-LINK", REVIEW: "REVIEW", KEEP_SEPARATE: "KEEP SEPARATE" },
   es: { AUTO_LINK: "VINCULACIÓN AUTOMÁTICA", REVIEW: "REVISIÓN", KEEP_SEPARATE: "MANTENER SEPARADOS" },
 } as const;
+
+// The registrar rail's evidence labels (lib/display FEATURE_LABELS), in Spanish. The gate card
+// lists the rail's rows one for one, so both panes name the same evidence the same way.
+const NAME_PART_ES = {
+  jw: ", ortografía",
+  jw_folded: ", sin contar acentos",
+  dl: ", admite erratas",
+  dmeta: ", pronunciación",
+  nickname: ", diminutivo",
+  initial: ", inicial",
+  token_overlap: ", partes",
+} as const;
+
+function nameLabelsEs(prefix: "given" | "family", name: string): Record<string, string> {
+  // Only given names have nickname and initial checks (backend/core/features.py).
+  const parts = Object.entries(NAME_PART_ES).filter(
+    ([part]) => prefix === "given" || (part !== "nickname" && part !== "initial"),
+  );
+  return Object.fromEntries(parts.map(([part, suffix]) => [`${prefix}_${part}`, `${name}${suffix}`]));
+}
+
+const FEATURE_LABELS_ES: Record<string, string> = {
+  ...nameLabelsEs("given", "Nombre"),
+  ...nameLabelsEs("family", "Apellido"),
+  dob_exact: "Fecha de nacimiento",
+  dob_day_month_swap: "Día y mes invertidos",
+  dob_one_digit_edit: "Fecha de nacimiento, un dígito distinto",
+  dob_one_component_off: "Fecha de nacimiento, una parte distinta",
+  dob_year_match: "Año de nacimiento",
+  sex_match: "Sexo",
+  phone_match: "Teléfono",
+  address_jaccard: "Dirección",
+  zip_match: "Código postal",
+  missing_given_name: "Falta el nombre",
+  missing_family_name: "Falta el apellido",
+  missing_dob: "Falta la fecha de nacimiento",
+  missing_sex: "Falta el sexo",
+  missing_phone: "Falta el teléfono",
+  missing_address: "Falta la dirección",
+  missing_zip: "Falta el código postal",
+  given_name_jw: "Nombre",
+  family_name_jw: "Apellido",
+  family_metaphone: "Apellido, pronunciación",
+};
 
 export const COPY = {
   en: {
@@ -63,7 +108,7 @@ export const COPY = {
       `New chart request denied by the identity gate. An existing chart scored ${score}, ${band} band. Sent to a registrar.`,
     noEvidence: "no evidence",
     band: BAND_LABEL.en,
-    field: { name: "Name", dob: "Date of birth", sex: "Sex", address: "Address", phone: "Phone" },
+    feature: FEATURE_LABELS,
   },
   es: {
     title: "Le damos la bienvenida. Registremos su llegada.",
@@ -122,33 +167,11 @@ export const COPY = {
       `El control de identidad denegó un expediente nuevo. Un expediente existente obtuvo ${score}, franja ${band}. Enviado al personal de admisión.`,
     noEvidence: "sin evidencia",
     band: BAND_LABEL.es,
-    field: {
-      name: "Nombre",
-      dob: "Fecha de nacimiento",
-      sex: "Sexo",
-      address: "Dirección",
-      phone: "Teléfono",
-    },
+    feature: FEATURE_LABELS_ES,
   },
 };
 
 export type KioskCopy = (typeof COPY)["en"];
-
-export type KioskField = keyof KioskCopy["field"];
-
-// Scorer feature ids by prefix, mapped to the five fields the kiosk names (UX 10.9 ev.feature.*).
-const FIELD_PATTERNS: [RegExp, KioskField][] = [
-  [/^(missing_)?(given|family)/, "name"],
-  [/^(missing_)?(dob|birth)/, "dob"],
-  [/^(missing_)?sex/, "sex"],
-  [/^(missing_)?(address|zip)/, "address"],
-  [/^(missing_)?phone/, "phone"],
-];
-
-/** The kiosk field a scorer feature belongs to; null for an id it does not know. */
-export function kioskField(feature: string): KioskField | null {
-  return FIELD_PATTERNS.find(([re]) => re.test(feature))?.[1] ?? null;
-}
 
 /** "CLINIC_CSV" reads "Clinic CSV": short all-caps words are acronyms and stay as they are. */
 export function sourceSystemLabel(sourceSystem: string): string {
