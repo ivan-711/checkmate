@@ -308,3 +308,10 @@ def test_default_transcript_path_is_the_committed_hero_file():
     assert DEFAULT_TRANSCRIPT_PATH.is_absolute()
     assert DEFAULT_TRANSCRIPT_PATH.parts[-4:] == ("data", "scenarios", "hero", "frontdesk_transcript.json")
     assert DEFAULT_TRANSCRIPT_PATH.exists()
+
+
+def test_never_raises_on_a_hostile_request():
+    adapter = ReplayAgentModel(_transcript(), pacing=False)
+    hostile = _req(0, 0, USER_TEXT)
+    hostile = ModelRequest(**{**hostile.__dict__, "user_text_folded": None})  # type: ignore[arg-type]
+    assert adapter.next_step(hostile) == ErrorStep(kind="REPLAY_DIVERGED", retryable=False, mode=AgentMode.REPLAY)

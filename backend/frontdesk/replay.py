@@ -170,6 +170,13 @@ class ReplayAgentModel:
         self.transcript_sha256 = transcript_sha256  # the loop stamps it on AGENT_TOOL_CALLED versions
 
     def next_step(self, req: ModelRequest) -> ModelStep:
+        try:
+            return self._next_step(req)
+        except Exception:
+            log.exception("replay step failed turn=%s step=%s", req.turn_index, req.step_index)
+            return _diverged()
+
+    def _next_step(self, req: ModelRequest) -> ModelStep:
         if not self.transcript.has_turn(req.turn_index):
             return _diverged()
         turn = self.transcript.turn(req.turn_index, req.user_text_folded)
