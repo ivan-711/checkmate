@@ -72,6 +72,37 @@ describe("ApiSource", () => {
     expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(["POST /api/v1/match-runs"]);
   });
 
+  it("Resolve returns the match-run receipt, which the work queue's funnel reads", async () => {
+    const run = { runId: "run-77", allPairs: 6, candidatePairs: 2 };
+    stubFetch({ "POST /api/v1/match-runs": () => ({ status: 201, body: run }) });
+    expect(await new ApiSource(ORIGIN).resolve()).toEqual(run);
+  });
+
+  it("lists a keyset page with its band and status filters", async () => {
+    const calls = stubFetch({
+      "GET /api/v1/candidate-pairs": () => ({ body: { items: [twin], nextCursor: "next-page" } }),
+    });
+    const page = await new ApiSource(ORIGIN).getCandidatePairs({
+      band: "REVIEW",
+      status: "PROPOSED",
+      cursor: "cursor-1",
+      limit: 12,
+    });
+    expect(page.nextCursor).toBe("next-page");
+    expect(calls[0].query.toString()).toBe("band=REVIEW&status=PROPOSED&cursor=cursor-1&limit=12");
+  });
+
+  it("opens a selected non-hero pair without reading the hero session", async () => {
+    const selected = { ...hero, pair: twin, recordA: hero.recordB, recordB: hero.recordA };
+    const calls = stubFetch({
+      [`GET /api/v1/candidate-pairs/${twin.id}`]: () => ({ body: selected }),
+    });
+    const result = await new ApiSource(ORIGIN).getCase(twin.id);
+    expect(result.detail?.pair.id).toBe(twin.id);
+    expect(result.sources).toEqual([selected.recordA, selected.recordB]);
+    expect(calls.map((c) => c.path)).toEqual([`/api/v1/candidate-pairs/${twin.id}`]);
+  });
+
   it("binds the hero by the session's first record and the other record, following nextCursor", async () => {
     const [first, second] = scenario.session.sources.map((c) => c.record.id);
     const other = { ...twin, recordAId: first, recordBId: "r-someone-else" };

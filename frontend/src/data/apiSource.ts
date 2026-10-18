@@ -2,11 +2,14 @@ import createClient from "openapi-fetch";
 import type { paths } from "@/api/schema";
 import type {
   CandidatePairDetail,
+  CandidatePairPage,
+  CandidatePairQuery,
   ErrorEnvelope,
   EventLogRow,
   IntakeSession,
   IntakeTurn,
   Language,
+  MatchRunResponse,
   ReviewRequest,
   ReviewResponse,
   SafetyAlert,
@@ -67,24 +70,47 @@ export class ApiSource implements DataSource {
     return res.data;
   }
 
-  async getCase(): Promise<CaseData> {
+  async getCase(pairId?: string): Promise<CaseData> {
+    if (pairId) {
+      const detail = await this.getCandidatePair(pairId);
+      const { outcome, alertsKnown } = await this.outcomeFor(detail);
+      return {
+        sources: [detail.recordA, detail.recordB],
+        detail,
+        outcome,
+        resolved: true,
+        alertsKnown,
+      };
+    }
     const session = await this.getSession();
     if (!session) throw new DataError("NO_SESSION", NO_SESSION_MESSAGE);
     const { sources } = session;
     const hero = await this.heroPair(sources.map((s) => s.record.id));
     // Until Resolve identity queues the session's pair, the screen shows the cards alone.
     if (!hero) return { sources, detail: null, outcome: null, resolved: false, alertsKnown: true };
-    const detail = await this.client.GET("/api/v1/candidate-pairs/{pair_id}", {
-      params: { path: { pair_id: hero.id } },
-    });
-    if (!detail.data) fail(detail.error);
-    const { outcome, alertsKnown } = await this.outcomeFor(detail.data);
-    return { sources, detail: detail.data, outcome, resolved: true, alertsKnown };
+    const detail = await this.getCandidatePair(hero.id);
+    const { outcome, alertsKnown } = await this.outcomeFor(detail);
+    return { sources, detail, outcome, resolved: true, alertsKnown };
   }
 
-  async resolve(): Promise<void> {
+  async resolve(): Promise<MatchRunResponse> {
     const res = await this.client.POST("/api/v1/match-runs");
     if (!res.data) fail(res.error);
+    return res.data;
+  }
+
+  async getCandidatePairs(query: CandidatePairQuery): Promise<CandidatePairPage> {
+    const res = await this.client.GET("/api/v1/candidate-pairs", { params: { query } });
+    if (!res.data) fail(res.error);
+    return res.data;
+  }
+
+  async getCandidatePair(pairId: string): Promise<CandidatePairDetail> {
+    const res = await this.client.GET("/api/v1/candidate-pairs/{pair_id}", {
+      params: { path: { pair_id: pairId } },
+    });
+    if (!res.data) fail(res.error);
+    return res.data;
   }
 
   async review(pairId: string, body: ReviewRequest, idempotencyKey: string): Promise<ReviewResponse> {
