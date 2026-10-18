@@ -109,11 +109,10 @@ describe("compactLane", () => {
 });
 
 describe("FEATURE_LABELS", () => {
-  // Every id the scorer emits (backend/core/features.py, score.py).
+  // Every id the scorer emits: FEATURE_NAMES and the missing flags in backend/core/features.py.
   const SCORER_IDS = [
-    ...["given", "family"].flatMap((p) =>
-      ["jw", "jw_folded", "dl", "dmeta", "nickname", "initial", "token_overlap"].map((s) => `${p}_${s}`),
-    ),
+    ...["jw", "jw_folded", "dl", "dmeta", "nickname", "initial", "token_overlap"].map((f) => `given_${f}`),
+    ...["jw", "jw_folded", "dl", "dmeta", "token_overlap"].map((f) => `family_${f}`),
     "dob_exact",
     "dob_day_month_swap",
     "dob_one_digit_edit",
@@ -125,6 +124,7 @@ describe("FEATURE_LABELS", () => {
     "zip_match",
     ...["given_name", "family_name", "dob", "sex", "phone", "address", "zip"].map((f) => `missing_${f}`),
   ];
+  const FIXTURE_IDS = scenario.pair.contributions.map((c: { feature: string }) => c.feature);
 
   it("gives every scorer id a plain label, never the raw id", () => {
     for (const id of SCORER_IDS) {
@@ -133,13 +133,21 @@ describe("FEATURE_LABELS", () => {
     }
   });
 
-  it("keeps labels distinct so five rows never read the same", () => {
-    const labels = SCORER_IDS.map((id) => FEATURE_LABELS[id]);
-    expect(new Set(labels).size).toBe(labels.length);
+  it("keeps labels distinct within each source, so five rows never read the same", () => {
+    expect(SCORER_IDS).toHaveLength(28);
+    for (const ids of [SCORER_IDS, FIXTURE_IDS]) {
+      const labels = ids.map((id: string) => FEATURE_LABELS[id] ?? id);
+      expect(new Set(labels).size).toBe(labels.length);
+    }
+  });
+
+  it("labels only ids the scorer or the fixture can send", () => {
+    const known = new Set([...SCORER_IDS, ...FIXTURE_IDS]);
+    expect(Object.keys(FEATURE_LABELS).filter((id) => !known.has(id))).toEqual([]);
   });
 
   it("labels the folded given-name feature the evidence rail showed raw", () => {
     const [row] = rankContributions([{ feature: "given_jw_folded", logit: 1.5, value: 1 }]);
-    expect(row.label).toBe("Given name, no accents");
+    expect(row.label).toBe("Given name, accents ignored");
   });
 });

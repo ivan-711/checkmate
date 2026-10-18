@@ -3,26 +3,34 @@ import type { Contribution, NormalizedRecord, SourceCard } from "@/api/types";
 // Feature codes come from the scorer; the screen shows plain words. One closed list: the scorer's
 // ids (backend/core) plus the contract fixture's older ids. Unknown codes fall through unchanged
 // so a new feature is visible rather than silently dropped.
-// Each name feature reads as "<Given|Family> name" plus this suffix.
+// Each name feature reads as "<Given|Family> name" plus this suffix. The scorer compares the
+// accented spelling (jw) and the folded one: accents stripped, punctuation to spaces (jw_folded).
 const NAME_FEATURES = {
   jw: " spelling",
-  jw_folded: ", no accents",
-  dl: " typos",
+  jw_folded: ", accents ignored",
+  dl: ", typos allowed",
   dmeta: " sound",
-  nickname: " nickname",
+  nickname: ", nickname match",
   initial: " initial",
   token_overlap: " parts",
 } as const;
 
-function nameLabels(prefix: "given" | "family", name: string): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(NAME_FEATURES).map(([suffix, words]) => [`${prefix}_${suffix}`, `${name}${words}`]),
-  );
+// The features backend/core/features.py computes for each name; only given names have
+// nickname and initial checks.
+const GIVEN_FEATURES = Object.keys(NAME_FEATURES) as (keyof typeof NAME_FEATURES)[];
+const FAMILY_FEATURES = GIVEN_FEATURES.filter((f) => f !== "nickname" && f !== "initial");
+
+function nameLabels(
+  prefix: "given" | "family",
+  name: string,
+  features: readonly (keyof typeof NAME_FEATURES)[],
+): Record<string, string> {
+  return Object.fromEntries(features.map((f) => [`${prefix}_${f}`, `${name}${NAME_FEATURES[f]}`]));
 }
 
 export const FEATURE_LABELS: Record<string, string> = {
-  ...nameLabels("given", "Given name"),
-  ...nameLabels("family", "Family name"),
+  ...nameLabels("given", "Given name", GIVEN_FEATURES),
+  ...nameLabels("family", "Family name", FAMILY_FEATURES),
   dob_exact: "Date of birth",
   dob_day_month_swap: "Day and month swapped",
   dob_one_digit_edit: "Date of birth, one digit off",
@@ -39,7 +47,8 @@ export const FEATURE_LABELS: Record<string, string> = {
   missing_phone: "Phone missing",
   missing_address: "Address missing",
   missing_zip: "ZIP code missing",
-  // The contract fixture's ids (REPLAY mode).
+  // The contract fixture's ids (REPLAY mode). They never appear in the same list as the
+  // scorer's, so "Family name sound" can name both family_metaphone and family_dmeta.
   given_name_jw: "Given name",
   family_name_jw: "Family name",
   family_metaphone: "Family name sound",
