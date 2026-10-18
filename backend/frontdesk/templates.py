@@ -121,10 +121,16 @@ def never_say() -> tuple[str, ...]:
     return _phrases("never-say.txt")
 
 
+# The lists spell contractions with the ASCII apostrophe; the model types the curly ones (U+2018,
+# U+2019) and some keyboards the modifier letter (U+02BC). Mapped here, not in fold(), because fold()
+# is also the grounding check's rule and a quote the patient typed must stay byte-comparable.
+_APOSTROPHES = str.maketrans({"\u2018": "'", "\u2019": "'", "\u02bc": "'"})
+
+
 def banned_phrase(text: str, *, new_chart_created: bool) -> str | None:
     """The first banned phrase in ``text`` (folded), or None. Effect claims are allowed only when the
     turn really produced NEW_CHART_CREATED; never-say phrases are never allowed."""
-    folded = fold(text)
+    folded = fold(text.translate(_APOSTROPHES))
     if not new_chart_created:
         for phrase in effect_claims():
             if phrase in folded:
