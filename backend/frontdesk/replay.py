@@ -182,7 +182,7 @@ class ReplayAgentModel:
         turn = self.transcript.turn(req.turn_index, req.user_text_folded)
         if turn is None:
             return _input_mismatch()
-        if req.step_index >= len(turn.steps):
+        if req.step_index < 0 or req.step_index >= len(turn.steps):  # a negative index must never play steps[-1]
             return _diverged()
         if req.step_index > 0 and not self._previous_result_matches(turn, req):
             return _diverged()

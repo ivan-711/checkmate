@@ -197,3 +197,28 @@ def test_built_scripts_do_not_share_expectation_objects():
     built = author_transcript.build_transcript(HERO_DIR)
     expects = [id(t.steps[0].expect) for t in built.turns]
     assert len(set(expects)) == len(expects)
+
+
+def test_fill_hashes_refuses_a_database_with_leftover_intake_state(intake_sessions):
+    import uuid
+
+    from backend.frontdesk import store
+    from backend.tests.frontdesk.conftest import engine
+    from contracts.models.intake import AgentMode
+    from contracts.models.policy import Language
+
+    sid = uuid.uuid4()
+    with engine.begin() as conn:
+        store.insert_session(
+            conn,
+            session_id=sid,
+            language=Language.EN,
+            agent_mode=AgentMode.REPLAY,
+            scenario_context_id="leftover",
+            prompt_version="fd-prompt/1",
+            tool_schema_version="fd-tools/1",
+            model_id=None,
+        )
+    intake_sessions.append(str(sid))
+    with pytest.raises(SystemExit, match="clean state"):
+        author_transcript.fill_hashes(load_transcript(TRANSCRIPT), engine)

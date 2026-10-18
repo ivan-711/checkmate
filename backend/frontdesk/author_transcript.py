@@ -274,6 +274,7 @@ def fill_hashes(transcript: Transcript, engine) -> Transcript:
         scenario_context_id=transcript.scenario_context_id,
     )
     _require_test_database(engine)
+    _require_clean_state(engine)
     # Record against a hash-free copy: a stale hash would make the inner adapter diverge mid-script
     # and the steps after it would never be requested, let alone observed.
     blank = _without_hashes(transcript)
@@ -340,6 +341,25 @@ def _require_test_database(engine) -> None:
     name = (engine.url.database or "").rsplit("/", 1)[-1]
     if "test" not in name:
         raise SystemExit(f"--fill-hashes purges the intake rows it writes; refusing to run on database {name!r}")
+
+
+def _require_clean_state(engine) -> None:
+    """Hashes are only meaningful from the state a demo reset leaves: a leftover intake record from an
+    earlier session is itself a candidate and would change every ToolResult recorded here."""
+    from sqlalchemy import text
+
+    with engine.connect() as conn:
+        leftovers = conn.execute(
+            text(
+                "SELECT (SELECT count(*) FROM source_record WHERE kind = 'FRONTDESK_INTAKE') "
+                "+ (SELECT count(*) FROM intake_session)"
+            )
+        ).scalar_one()
+    if leftovers:
+        raise SystemExit(
+            f"--fill-hashes needs a clean state; {leftovers} intake record(s)/session(s) are left over. "
+            "Purge them (or reset the demo) and run again."
+        )
 
 
 def _purge_intake_session(engine, session_id) -> None:

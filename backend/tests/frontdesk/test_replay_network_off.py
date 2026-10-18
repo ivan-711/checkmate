@@ -19,10 +19,9 @@ from sqlalchemy import text
 
 from backend.frontdesk import loop
 from backend.frontdesk.replay import build_replay_model, load_transcript, transcript_path, transcript_sha256
-from backend.policy.args import demographics_grounded
 from backend.tests.frontdesk.conftest import API, engine
 from contracts.models.intake import AgentMode, IntakeTurn, RegistrationState, TurnRequest
-from contracts.models.policy import PolicyOutcome, PolicyReason, ProposeArgs
+from contracts.models.policy import PolicyOutcome, PolicyReason
 
 TRANSCRIPT = load_transcript(transcript_path())
 SCRIPTS = {(t.steps[0].model.args["preferredLanguage"], t.steps[0].expect.gate_outcome): t for t in TRANSCRIPT.turns}
@@ -30,19 +29,6 @@ SCRIPTS = {(t.steps[0].model.args["preferredLanguage"], t.steps[0].expect.gate_o
 
 def _blocked(*_a, **_k):
     raise AssertionError("network call attempted in REPLAY mode")
-
-
-def _unknown_sex_still_ungrounded(script) -> bool:
-    """Flag for Q1.1 (PR #20): the prompt says ``sex: UNKNOWN`` when unstated and never to quote a
-    field the patient did not state, but the gate requires a quote for every ``sex`` value. Until that
-    one rule changes, an on-prompt propose is denied UNGROUNDED_FIELD. Probed, not assumed."""
-    args = ProposeArgs.model_validate(script.steps[0].model.args)
-    return args.sex == "UNKNOWN" and args.evidence.sex is None and not demographics_grounded(args, [script.user_text])
-
-
-def _xfail_if_gate_rejects_unknown_sex(call, script) -> None:
-    if call.gate.reason_code == PolicyReason.UNGROUNDED_FIELD and _unknown_sex_still_ungrounded(script):
-        pytest.xfail("Flag for Q1.1 (PR #20): sex UNKNOWN without a quote is denied as UNGROUNDED_FIELD")
 
 
 @pytest.fixture
@@ -102,7 +88,6 @@ def test_returning_patient_is_denied_and_handed_to_a_registrar(
     call = turn.tool_calls[0]
     assert call.tool_name == "propose_new_chart"
     assert call.gate.outcome == PolicyOutcome.DENY
-    _xfail_if_gate_rejects_unknown_sex(call, script)
     assert call.gate.reason_code == PolicyReason.CANDIDATE_IN_REVIEW_OR_HIGHER
     assert call.gate.handoff_required is True
     assert hero_clinic_record in {c.record_id for c in call.candidates}
@@ -141,7 +126,6 @@ def test_new_patient_is_allowed_and_the_record_is_started(client, network_off, i
     assert turn.degraded is None
     assert turn.assistant_text == script.steps[1].model.text
     call = turn.tool_calls[0]
-    _xfail_if_gate_rejects_unknown_sex(call, script)
     assert call.gate.outcome == PolicyOutcome.ALLOW
     assert call.gate.reason_code is None
     assert call.effect.status == "APPLIED"
@@ -203,3 +187,64 @@ def test_route_stamps_transcript_sha_on_the_tool_call_event(client, network_off,
             {"s": uuid.UUID(session["id"])},
         ).scalar_one()
     assert versions["transcriptSha256"] == transcript_sha256(transcript_path())
+
+
+# --- UI parity (ADR-016 section 7): a REPLAY turn and a LIVE turn are the same IntakeTurn shape and differ only
+# in agentMode, latencyMs, ids and timestamps. The LIVE adapter is a fake that plays the transcript's first step.
+
+_VOLATILE_KEYS = frozenset(
+    {
+        "id",
+        "latencyMs",
+        "turnIndex",
+        "pairId",
+        "intakeRecordId",
+        "handoffPairIds",
+        "evidenceIds",
+        "recordId",
+        "entityId",
+        "createdAt",
+        "decidedAt",
+        "ts",
+    }
+)
+
+
+def _shape(obj):
+    """Drop volatile values and keep only the first candidate (session 1's intake record is itself a candidate
+    for session 2 under the same demographics), so the two turns compare on structure and gate result."""
+    if isinstance(obj, dict):
+        return {k: _shape(v) for k, v in obj.items() if k not in _VOLATILE_KEYS and k != "agentMode"}
+    if isinstance(obj, list):
+        kept = [v for v in obj if not (isinstance(v, dict) and v.get("sourceSystem") == "FRONTDESK_INTAKE")]
+        return [_shape(v) for v in kept[:1]]
+    return obj
+
+
+def test_replay_and_live_turns_differ_only_in_mode_latency_ids_and_timestamps(
+    client, network_off, hero_clinic_record, intake_sessions, model_factory_override, monkeypatch
+):
+    from backend.app.main import app
+    from backend.tests.frontdesk.conftest import FakeAgentModel, tool_call
+
+    script = SCRIPTS[("EN", PolicyOutcome.DENY)]  # a DENY leaves no chart effect, so two sessions do not collide
+    replay_session = _start_session(client, intake_sessions, "EN")
+    replay_turn = _turn(client, replay_session["id"], script.user_text).model_dump(mode="json", by_alias=True)
+
+    step = script.steps[0].model
+    fake = FakeAgentModel(steps=[tool_call(step.tool_name, step.args)], final_text=script.steps[1].model.text)
+    model_factory_override(lambda _mode, _settings: fake)
+    import dataclasses
+
+    live_settings = dataclasses.replace(app.state.settings, frontdesk_agent_mode="LIVE", gemini_model_id="fake-model")
+    monkeypatch.setattr(app.state, "settings", live_settings)
+    r = client.post(
+        f"{API}/intake-sessions", json={"language": "EN", "scenarioContextId": TRANSCRIPT.scenario_context_id}
+    )
+    assert r.status_code == 201, r.text
+    intake_sessions.append(r.json()["id"])
+    assert r.json()["agentMode"] == AgentMode.LIVE.value
+    live_turn = _turn(client, r.json()["id"], script.user_text).model_dump(mode="json", by_alias=True)
+
+    assert replay_turn["agentMode"] == "REPLAY" and live_turn["agentMode"] == "LIVE"
+    assert _shape(replay_turn) == _shape(live_turn)

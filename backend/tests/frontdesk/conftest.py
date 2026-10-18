@@ -167,7 +167,8 @@ def cleanup(db_conn):
     sessions: list[str] = []
     records: list = []
     yield sessions, records
-    for sid in sessions:
+    # Newest first: a later session's handoff pair can reference an earlier session's intake record.
+    for sid in reversed(sessions):
         purge_session(db_conn, sid)
     purge_records(db_conn, records)
 
