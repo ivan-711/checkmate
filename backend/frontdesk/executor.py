@@ -290,7 +290,7 @@ def _apply_effect(
     none = Effect(status=EffectStatus.NONE)
     tool, outcome, reason = action.tool, decision.outcome, decision.reason_code
     if tool == ToolName.PROPOSE_NEW_CHART and outcome == PolicyOutcome.ALLOW:
-        token = policy_decide.allow_token(decision)
+        token = policy_decide.allow_token(decision, tool)
         intake_record_id = current.intake_record_id or chart_writes.create_intake_record(
             conn,
             token,
@@ -302,7 +302,7 @@ def _apply_effect(
         applied = chart_writes.mark_new_chart(conn, token, session_id=session_id, intake_record_id=intake_record_id)
         return Notice.NEW_CHART_CREATED, applied, chart_effect_key(session_id), [], intake_record_id
     if tool == ToolName.PROPOSE_NEW_CHART and reason == PolicyReason.CANDIDATE_IN_REVIEW_OR_HIGHER:
-        token = policy_decide.handoff_token(decision)
+        token = policy_decide.handoff_token(decision, tool)
         intake_record_id = current.intake_record_id or chart_writes.create_intake_record(
             conn,
             token,
@@ -323,7 +323,7 @@ def _apply_effect(
         )
         return Notice.HANDED_TO_REGISTRAR, none, None, list(pair_ids), intake_record_id
     if tool == ToolName.ATTACH_HISTORY and outcome == PolicyOutcome.ALLOW and isinstance(action.args, AttachArgs):
-        token = policy_decide.allow_token(decision)
+        token = policy_decide.allow_token(decision, tool)
         intake_record_id = current.intake_record_id
         effects = chart_writes.append_intake_history(
             conn, token, intake_record_id=intake_record_id, items=list(action.args.items)
