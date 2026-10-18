@@ -9,7 +9,7 @@ import { attachablePair } from "@/components/case/reviewPlan";
 import { HANDOFF_KEY, useIntakeSession } from "@/components/frontdesk/intake";
 import { useDataSource } from "@/data/DataSourceProvider";
 import { actorName } from "@/lib/display";
-import { newChartFacts, type NewChartFacts } from "@/lib/newChart";
+import { newChartFacts, type NewChartFacts } from "@/lib/kioskNewChart";
 import { useDesk } from "./DeskContext";
 import type { useDeskCase } from "./useDeskCase";
 

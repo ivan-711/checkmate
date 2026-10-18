@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { IntakeSession, IntakeTurn } from "@/api/types";
-import { newChartFacts } from "./newChart";
+import { newChartFacts } from "./kioskNewChart";
 
 const allowed = {
   toolName: "propose_new_chart",
