@@ -69,6 +69,7 @@ class Claim:
     session: store.SessionRow
     turn_index: int
     prior_turns: tuple[Row, ...]
+    first_step_index: int = 0
 
 
 @dataclass(frozen=True)
@@ -110,7 +111,8 @@ def claim(engine: Engine, session_id: UUID, key: str, body: TurnRequest) -> Clai
             except IntegrityError:
                 raise ApiError(ErrorCode.TURN_IN_PROGRESS, "this turn is still running") from None
         prior = tuple(t for t in store.read_turns(conn, session_id) if t.turn_index != turn_index)
-    return Claim(session=session, turn_index=turn_index, prior_turns=prior)
+        first_step = store.next_step_index(conn, session_id, turn_index)
+    return Claim(session=session, turn_index=turn_index, prior_turns=prior, first_step_index=first_step)
 
 
 def _history_messages(prior_turns: tuple[Row, ...]) -> list[Message]:
@@ -148,6 +150,28 @@ def run_turn(
     claimed = claim(engine, session_id, key, body)
     if isinstance(claimed, Stored):
         return 201, claimed.response
+    try:
+        return 201, _run_claimed(
+            engine, model, claimed, key=key, body=body, sleep=sleep, transcript_sha256=transcript_sha256
+        )
+    except Exception:
+        # The kiosk must not sit on 409 until the lease expires: mark the turn FAILED now; the same key
+        # re-claims it and effect keys keep the re-run from writing twice.
+        with engine.begin() as conn:
+            store.complete_turn(conn, session_id, claimed.turn_index, TurnStatus.FAILED, None, None)
+        raise
+
+
+def _run_claimed(
+    engine: Engine,
+    model: AgentModel,
+    claimed: Claim,
+    *,
+    key: str,
+    body: TurnRequest,
+    sleep: Sleep,
+    transcript_sha256: str | None,
+) -> dict:
     session, turn_index = claimed.session, claimed.turn_index
     started = time.perf_counter()
     language = session.language
@@ -166,7 +190,7 @@ def run_turn(
         messages = _history_messages(claimed.prior_turns) + [Message(role="user", text=body.text)]
         last_sha: str | None = None
         retried = False
-        step_index = 0
+        step_index = claimed.first_step_index
         calls_this_turn = 0
         while True:
             if time.perf_counter() - started > TURN_BUDGET_S:
@@ -260,4 +284,4 @@ def run_turn(
         )
         if turn_index + 1 >= MAX_TURNS_PER_SESSION:
             store.close_session(conn, session.id)
-    return 201, response
+    return response

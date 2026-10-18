@@ -46,15 +46,16 @@ def _xfail_if_gate_rejects_unknown_sex(call, script) -> None:
 
 
 @pytest.fixture
-def network_off(monkeypatch):
+def network_off(monkeypatch, real_model_factory):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     # The real-network transports, not Client.send: the TestClient is an httpx client over an
     # in-process ASGI transport and must keep working.
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", _blocked)
     monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", _blocked)
     assert "GEMINI_API_KEY" not in __import__("os").environ
+    sdk_loaded_before = "google.genai" in sys.modules  # other tests drive the LIVE adapter with a fake client
     yield
-    assert "google.genai" not in sys.modules, "the SDK must never load in REPLAY mode"
+    assert ("google.genai" in sys.modules) == sdk_loaded_before, "REPLAY must never import the SDK"
 
 
 def _start_session(client, intake_sessions, language: str) -> dict:

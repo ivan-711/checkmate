@@ -12,9 +12,8 @@ from pathlib import Path
 import pytest
 from sqlalchemy import text
 
-from backend.api import intake
 from backend.frontdesk.replay import ReplayAgentModel, ToolCallModelStep, load_transcript
-from backend.tests.frontdesk.conftest import API, app, engine
+from backend.tests.frontdesk.conftest import API, engine
 from contracts.models.intake import AgentMode, IntakeTurn, RegistrationState
 from contracts.models.policy import PolicyReason
 
@@ -24,12 +23,11 @@ CHART_EFFECTS = frozenset({RegistrationState.NEW_CHART, RegistrationState.LINKED
 
 
 @pytest.fixture
-def attack_model(request, monkeypatch):
+def attack_model(request, model_factory_override):
     transcript = load_transcript(request.param)
     model = ReplayAgentModel(transcript, pacing=False)
-    app.dependency_overrides[intake.get_model_factory] = lambda: lambda _mode, _settings: model
-    yield transcript
-    app.dependency_overrides.pop(intake.get_model_factory, None)
+    model_factory_override(lambda _mode, _settings: model)
+    return transcript
 
 
 def _play(client, intake_sessions, transcript) -> tuple[str, list[IntakeTurn]]:

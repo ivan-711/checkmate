@@ -33,7 +33,6 @@ from contracts.models.events import Versions
 from contracts.models.intake import Effect, EffectStatus, GateResult, ToolCallCandidate, ToolCallRecord
 from contracts.models.policy import (
     AttachArgs,
-    EvidenceKind,
     InvalidArgs,
     PolicyOutcome,
     PolicyReason,
@@ -102,8 +101,7 @@ def chart_effect_key(session_id: UUID) -> str:
 
 
 def attach_effect_key(session_id: UUID, kind: str, item_text: str) -> str:
-    digest = hashlib.sha256(f"{kind}|{fold(item_text)}".encode()).hexdigest()
-    return f"attach:v1:{session_id}:{digest}"
+    return f"attach:v1:{session_id}:{_digest(f'{kind}|{fold(item_text)}')}"
 
 
 def tool_result_sha256(tool_result: dict) -> str:
@@ -221,7 +219,8 @@ def _execute(
         with conn.begin_nested():
             store.insert_tool_call(conn, row)
     except IntegrityError:
-        # A concurrent re-run claimed the same effect key first: the effect already happened.
+        # The effect key was claimed by an earlier run (the row's (session, turn, step) is fresh: a
+        # re-claimed turn continues its step numbering): the effect already happened.
         effect = Effect(status=EffectStatus.REPLAYED, ref=effect.ref)
         row.update({"effect_key": None, "effect_status": effect.status.value})
         store.insert_tool_call(conn, row)
@@ -292,8 +291,6 @@ def _apply_effect(
     tool, outcome, reason = action.tool, decision.outcome, decision.reason_code
     if tool == ToolName.PROPOSE_NEW_CHART and outcome == PolicyOutcome.ALLOW:
         token = policy_decide.allow_token(decision)
-        key = chart_effect_key(session_id)
-        existing = store.effect_by_key(conn, key)
         intake_record_id = current.intake_record_id or chart_writes.create_intake_record(
             conn,
             token,
@@ -302,22 +299,8 @@ def _apply_effect(
             args_sha256=action.args_sha256,
             scenario_context_id=current.scenario_context_id,
         )
-        if existing is not None:
-            return (
-                Notice.NEW_CHART_CREATED,
-                Effect(status=EffectStatus.REPLAYED, ref=existing.effect_ref),
-                key,
-                [],
-                intake_record_id,
-            )
         applied = chart_writes.mark_new_chart(conn, token, session_id=session_id, intake_record_id=intake_record_id)
-        return (
-            Notice.NEW_CHART_CREATED,
-            Effect(status=EffectStatus.APPLIED, ref=_ref(applied, intake_record_id)),
-            key,
-            [],
-            intake_record_id,
-        )
+        return Notice.NEW_CHART_CREATED, applied, chart_effect_key(session_id), [], intake_record_id
     if tool == ToolName.PROPOSE_NEW_CHART and reason == PolicyReason.CANDIDATE_IN_REVIEW_OR_HIGHER:
         token = policy_decide.handoff_token(decision)
         intake_record_id = current.intake_record_id or chart_writes.create_intake_record(
@@ -328,17 +311,12 @@ def _apply_effect(
             args_sha256=action.args_sha256,
             scenario_context_id=current.scenario_context_id,
         )
-        blocking = [
-            c
-            for c in evaluation.candidates
-            if c.record_id in {r.id for r in decision.evidence_ids if r.kind == EvidenceKind.CANDIDATE_RECORD}
-        ]
         pair_ids = chart_writes.create_handoff_pairs(
             conn,
             token,
             session_id=session_id,
             intake_record_id=intake_record_id,
-            candidates=blocking or list(evaluation.candidates),
+            candidates=list(evaluation.candidates),
             evidence_snapshot=evaluation.evidence_snapshot,
             thresholds_id=evaluation.thresholds_id,
             scorer_version=evaluation.scorer_version,
@@ -347,26 +325,19 @@ def _apply_effect(
     if tool == ToolName.ATTACH_HISTORY and outcome == PolicyOutcome.ALLOW and isinstance(action.args, AttachArgs):
         token = policy_decide.allow_token(decision)
         intake_record_id = current.intake_record_id
-        existing = {
-            (r.kind, fold(r.text)) for r in conn.execute(_EXISTING_HISTORY, {"intake_record_id": intake_record_id})
-        }
-        new_items = [i for i in action.args.items if (i.kind.value, fold(i.text)) not in existing]
-        keys = [attach_effect_key(session_id, i.kind.value, i.text) for i in action.args.items]
-        key = (
-            keys[0]
-            if len(keys) == 1
-            else f"attach:v1:{session_id}:{hashlib.sha256('|'.join(sorted(keys)).encode()).hexdigest()}"
+        effects = chart_writes.append_intake_history(
+            conn, token, intake_record_id=intake_record_id, items=list(action.args.items)
         )
-        if not new_items or store.has_effect_key(conn, key):
-            return (
-                Notice.NONE,
-                Effect(status=EffectStatus.REPLAYED, ref=str(intake_record_id)),
-                key,
-                [],
-                intake_record_id,
-            )
-        chart_writes.append_intake_history(conn, token, intake_record_id=intake_record_id, items=new_items)
-        return Notice.NONE, Effect(status=EffectStatus.APPLIED, ref=str(intake_record_id)), key, [], intake_record_id
+        keys = [attach_effect_key(session_id, i.kind.value, i.text) for i in action.args.items]
+        # One effect_key column per row: the item key for one item, a digest of the sorted keys for a set.
+        key = keys[0] if len(keys) == 1 else f"attach:v1:{session_id}:{_digest('|'.join(sorted(keys)))}"
+        status = (
+            EffectStatus.APPLIED if any(e.status == EffectStatus.APPLIED for e in effects) else EffectStatus.REPLAYED
+        )
+        if store.has_effect_key(conn, key):
+            status = EffectStatus.REPLAYED
+        ref = ",".join(e.ref for e in effects if e.ref) or str(intake_record_id)
+        return Notice.NONE, Effect(status=status, ref=ref), key, [], intake_record_id
     if reason == PolicyReason.ALREADY_LINKED:
         return Notice.ALREADY_LINKED, none, None, [], current.intake_record_id
     if decision.handoff_required:
@@ -374,11 +345,8 @@ def _apply_effect(
     return Notice.NONE, none, None, [], current.intake_record_id
 
 
-def _ref(applied, fallback: UUID | None) -> str | None:
-    ref = getattr(applied, "ref", None)
-    if ref is None and isinstance(applied, dict):
-        ref = applied.get("ref")
-    return str(ref) if ref is not None else (str(fallback) if fallback else None)
+def _digest(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
 
 
 def _candidate_aliases(conn: Connection, session_id: UUID, candidates: Sequence[ScoredCandidate]) -> dict[UUID, str]:
