@@ -1,5 +1,7 @@
 import type {
   CandidatePairDetail,
+  CandidatePairPage,
+  CandidatePairQuery,
   EventLogRow,
   EventType,
   IntakeSession,
@@ -59,28 +61,36 @@ export class FixtureSource implements DataSource {
     return this.current.session;
   }
 
-  async getCase(): Promise<CaseData> {
+  async getCase(pairId?: string): Promise<CaseData> {
     const { outcome, resolved } = this.current;
-    const detail = this.currentDetail();
+    const detail = pairId ? await this.getCandidatePair(pairId) : this.currentDetail();
     return { sources: this.current.session.sources, detail, outcome, resolved, alertsKnown: true };
   }
 
-  /** The fixture has one pair: it is both the Case pair and the pair FrontDesk hands off. */
+  /** The fixture is already scored; Resolve only re-queues the pair and logs the run. It has no
+   * match-run receipt to return, so the work queue shows no funnel in REPLAY. */
+  async resolve(): Promise<null> {
+    this.current = { ...this.current, resolved: true };
+    this.log("MATCH_RUN_COMPLETED", { pairId: this.fixture.pair.pair.id });
+    return null;
+  }
+
+  /** The fixture's one pair, with this session's decision, once Resolve has queued it (as Case
+   * shows it); filtered the way the API filters, on one page. */
+  async getCandidatePairs(query: CandidatePairQuery): Promise<CandidatePairPage> {
+    if (!this.current.resolved) return { items: [], nextCursor: null };
+    const { pair } = this.currentDetail();
+    const matches =
+      (!query.band || pair.decision.band === query.band) &&
+      (!query.status || pair.decision.status === query.status) &&
+      (!query.origin || pair.origin === query.origin) &&
+      (!query.recordId || [pair.recordAId, pair.recordBId].includes(query.recordId));
+    return { items: matches ? [pair] : [], nextCursor: null };
+  }
+
   async getCandidatePair(pairId: string): Promise<CandidatePairDetail> {
     if (pairId !== this.fixture.pair.pair.id) throw new DataError("NOT_FOUND", "Pair not found.");
     return this.currentDetail();
-  }
-
-  private currentDetail(): CandidatePairDetail {
-    const { history } = this.current;
-    const base = this.fixture.pair;
-    return { ...base, pair: { ...base.pair, decision: history[history.length - 1] }, history };
-  }
-
-  /** The fixture is already scored; Resolve only re-queues the pair and logs the run. */
-  async resolve(): Promise<void> {
-    this.current = { ...this.current, resolved: true };
-    this.log("MATCH_RUN_COMPLETED", { pairId: this.fixture.pair.pair.id });
   }
 
   async review(pairId: string, body: ReviewRequest, idempotencyKey: string): Promise<ReviewResponse> {
@@ -173,6 +183,12 @@ export class FixtureSource implements DataSource {
     }
     this.current = this.previous;
     this.previous = null;
+  }
+
+  private currentDetail(): CandidatePairDetail {
+    const { history } = this.current;
+    const base = this.fixture.pair;
+    return { ...base, pair: { ...base.pair, decision: history[history.length - 1] }, history };
   }
 
   private decide(body: ReviewRequest): ReviewResponse {
