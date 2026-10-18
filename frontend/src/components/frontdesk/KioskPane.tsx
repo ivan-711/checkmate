@@ -255,7 +255,7 @@ export function KioskPane() {
                 {t.tryAgain}
               </button>
             </div>
-          ) : turns.length === 0 && !pending ? (
+          ) : turns.length === 0 && !pending && !failedText ? (
             // pt-4 matches the 16 px gap to the composer below, so the line sits centred between them.
             <p className="m-auto pt-4 text-center text-ink-3">{t.empty}</p>
           ) : (

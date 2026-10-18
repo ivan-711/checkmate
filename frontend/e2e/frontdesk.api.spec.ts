@@ -58,15 +58,19 @@ for (const lang of [
     use: "Use this",
     reading: "Reading your message",
     wait: "Wait for FrontDesk to finish",
+    failed: "FrontDesk could not reach the agent service. Your message was not sent.",
   },
   {
     toggle: "Español",
     use: "Usar este",
     reading: "Leyendo su mensaje",
     wait: "Espere a que FrontDesk termine",
+    failed: "FrontDesk no pudo conectar con el servicio del agente. Su mensaje no se envió.",
   },
 ]) {
-  test(`the waiting state reads at body size at 1280x720 (${lang.toggle})`, async ({ page }) => {
+  test(`waiting, then a failed first turn: kiosk text at 16 px or more at 1280x720 (${lang.toggle})`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto("/frontdesk");
     await page.getByRole("button", { name: lang.toggle }).click();
@@ -84,8 +88,11 @@ for (const lang of [
     expect(await kioskTextBelow(page)).toEqual([]);
     expect(await fontSizePx(page.getByText(lang.reading))).toBeGreaterThanOrEqual(BODY_TEXT_PX);
 
-    // The turn never reaches the API, so this check writes no check-in record.
+    // The turn never reaches the API, so this check writes no check-in record. The kiosk then shows
+    // its failed-turn automatic message, the other state a waiting patient can see.
     await held!.abort();
     await page.unroute("**/api/v1/intake-sessions/*/turns");
+    await expect(page.getByText(lang.failed)).toBeVisible();
+    expect(await kioskTextBelow(page)).toEqual([]);
   });
 }
