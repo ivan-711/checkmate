@@ -4,7 +4,6 @@ Database tests use CHECKMATE_TEST_DATABASE_URL (default: checkmate_test_w1 on th
 stack). They skip, with the reason printed, when that database is unreachable; they never
 touch the `checkmate` database.
 """
-
 from __future__ import annotations
 
 import os

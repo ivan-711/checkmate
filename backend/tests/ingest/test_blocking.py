@@ -39,16 +39,8 @@ def test_full_key_set_in_cores_vocabulary():
 
 def test_rows_equal_core_block_keys_over_the_stored_row():
     """The gate's property: what ingest writes is what CORE.block_keys computes from the row it reads."""
-    n = normalize_identity(
-        Identity(
-            given="María",
-            family="García López",
-            birth_date="1990-03-07",
-            sex="female",
-            phone="617-555-2368",
-            postal_code="02139",
-        )
-    )
+    n = normalize_identity(Identity(given="María", family="García López", birth_date="1990-03-07", sex="female",
+                                    phone="617-555-2368", postal_code="02139"))
     row = n.to_row_dict()
     from_core = {(k.key_type, k.key_value) for k in CORE.block_keys(row)}
     assert set(block_keys(n)) == set(block_keys(row)) == from_core
@@ -56,10 +48,7 @@ def test_rows_equal_core_block_keys_over_the_stored_row():
 
 
 def test_day_month_swap_shares_a_block_only_when_the_day_could_be_a_month():
-    assert (
-        keys_for(birth_date="1990-03-07")[KEY_DOB_DAY_MONTH_SWAP]
-        == keys_for(birth_date="1990-07-03")[KEY_DOB_DAY_MONTH_SWAP]
-    )
+    assert keys_for(birth_date="1990-03-07")[KEY_DOB_DAY_MONTH_SWAP] == keys_for(birth_date="1990-07-03")[KEY_DOB_DAY_MONTH_SWAP]
     assert KEY_DOB_DAY_MONTH_SWAP not in keys_for(birth_date="1990-03-17")
     assert KEY_DOB_DAY_MONTH_SWAP not in keys_for(birth_date="1990-03-03")
 

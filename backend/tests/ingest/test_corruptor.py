@@ -5,32 +5,11 @@ from backend.ingest import corruptor as c
 from backend.ingest.normalize import Identity, parse_date
 from backend.tests.ingest.conftest import PATIENT_A, PATIENT_B
 
-SPANISH = Identity(
-    given="María",
-    middle="José",
-    family="García López",
-    birth_date="1990-03-07",
-    sex="female",
-    phone="555-123-4567",
-    address_line="857 Kling Arcade",
-    city="Worcester",
-    state="MA",
-    postal_code="01604",
-    language="es",
-    mother_maiden="Isabela López",
-)
-ENGLISH = Identity(
-    given="Robert",
-    family="Smith",
-    birth_date="1985-11-02",
-    sex="male",
-    phone="555-987-6543",
-    address_line="1 Main St",
-    city="Boston",
-    state="MA",
-    postal_code="02118",
-    language="en-US",
-)
+SPANISH = Identity(given="María", middle="José", family="García López", birth_date="1990-03-07", sex="female",
+                   phone="555-123-4567", address_line="857 Kling Arcade", city="Worcester", state="MA", postal_code="01604",
+                   language="es", mother_maiden="Isabela López")
+ENGLISH = Identity(given="Robert", family="Smith", birth_date="1985-11-02", sex="male", phone="555-987-6543",
+                   address_line="1 Main St", city="Boston", state="MA", postal_code="02118", language="en-US")
 
 
 def rng() -> random.Random:
@@ -131,12 +110,7 @@ def test_build_corpus_is_deterministic_for_a_seed(bundles, csv_patients, tmp_pat
     assert {r.synthea_id for r in first.records} == {PATIENT_A, PATIENT_B}
     assert all(p["label"] in (c.LABEL_SAME, c.LABEL_NOT_SAME) for p in first.pairs)
     assert first.run["heldout_families"] == c.draw_heldout_families(42)
-    assert (
-        (tmp_path / "a" / "truth.csv")
-        .read_text()
-        .splitlines()[0]
-        .startswith("entity_id,record_id,source_system,synthea_patient_id")
-    )
+    assert (tmp_path / "a" / "truth.csv").read_text().splitlines()[0].startswith("entity_id,record_id,source_system,synthea_patient_id")
 
 
 def test_spanish_entity_gets_the_compound_surname_in_its_base_records(bundles, csv_patients):
@@ -183,11 +157,7 @@ def test_grafted_hard_negatives_share_demographics_and_one_split(bundles, csv_pa
     for spec in corpus.grafts:
         assert partition_of[spec.donor_id] == partition_of[spec.recipient_id]  # the graft group inherits one split
         donor, recipient = entities[spec.donor_id].identity, entities[spec.recipient_id].identity
-        assert (recipient.family, recipient.address_line, recipient.postal_code) == (
-            donor.family,
-            donor.address_line,
-            donor.postal_code,
-        )
+        assert (recipient.family, recipient.address_line, recipient.postal_code) == (donor.family, donor.address_line, donor.postal_code)
         if spec.family == "N3":
             assert recipient.given == donor.given
         else:
@@ -216,9 +186,7 @@ def test_clinic_record_without_phone_has_no_phone_anywhere(bundles, csv_patients
     er = fhir_draft(a.identity, a, "ER-CLEAN")
     text = str(er.raw_payload["patient"])
     assert "Person seed" not in text and "birthsex" not in text and "us-core-race" not in text
-    assert er.raw_payload["patient"]["extension"] == [
-        {"url": "http://hl7.org/fhir/StructureDefinition/patient-mothersMaidenName", "valueString": "Isabela de Anda"}
-    ]
+    assert er.raw_payload["patient"]["extension"] == [{"url": "http://hl7.org/fhir/StructureDefinition/patient-mothersMaidenName", "valueString": "Isabela de Anda"}]
     assert er.identity.language == "es" and er.identity.mother_maiden == "Isabela de Anda"
 
 
@@ -229,9 +197,7 @@ def test_clinical_payload_is_partitioned_across_fragments_not_copied(bundles, cs
         owned = [r["id"] for s in shares.values() for r in getattr(s, key)]
         assert sorted(owned) == sorted(r["id"] for r in getattr(a, key)), key  # every resource exactly once
     order_owner = next(o for o, s in shares.items() if s.medication_requests)
-    assert (
-        shares[order_owner].encounters and shares[order_owner].medications
-    )  # the order follows its encounter and medication
+    assert shares[order_owner].encounters and shares[order_owner].medications  # the order follows its encounter and medication
     csv_shares = c.partition_csv(csv_patients[PATIENT_A], [1, 2], random.Random(4))
     rows = [r for s in csv_shares.values() for r in s.encounters]
     assert len(rows) == len(csv_patients[PATIENT_A].encounters)

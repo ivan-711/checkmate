@@ -62,11 +62,7 @@ def test_generation_suffix_reaches_core_and_professional_suffix_does_not():
 
 @pytest.mark.parametrize(
     "identity",
-    [
-        JOSE,
-        Identity(given="Robert", family="Smith", suffix="Jr.", birth_date="1985-11-02"),
-        Identity(family="de la Cruz López"),
-    ],
+    [JOSE, Identity(given="Robert", family="Smith", suffix="Jr.", birth_date="1985-11-02"), Identity(family="de la Cruz López")],
 )
 def test_stored_row_renormalizes_to_the_same_record(identity):
     """store.py writes ``to_row_dict()`` and keys it from that row; the gate re-reads the row."""
