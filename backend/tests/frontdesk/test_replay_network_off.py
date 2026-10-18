@@ -10,6 +10,7 @@ Author: Christian Flores (Q1.4 builder).
 
 from __future__ import annotations
 
+import socket
 import sys
 import uuid
 
@@ -38,6 +39,12 @@ def network_off(monkeypatch, real_model_factory):
     # in-process ASGI transport and must keep working.
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", _blocked)
     monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", _blocked)
+    # Below every client library: no Python socket can connect and no name resolves. The database
+    # driver (libpq) and the in-process ASGI client do not go through the socket module.
+    monkeypatch.setattr(socket.socket, "connect", _blocked)
+    monkeypatch.setattr(socket.socket, "connect_ex", _blocked)
+    monkeypatch.setattr(socket, "create_connection", _blocked)
+    monkeypatch.setattr(socket, "getaddrinfo", _blocked)
     assert "GEMINI_API_KEY" not in __import__("os").environ
     sdk_loaded_before = "google.genai" in sys.modules  # other tests drive the LIVE adapter with a fake client
     yield
@@ -64,6 +71,19 @@ def _turn(client, session_id: str, user_text: str) -> IntakeTurn:
     assert r.status_code == 201, r.text
     assert r.headers["X-Request-Id"]
     return IntakeTurn.model_validate(r.json())  # schema parity: a REPLAY turn is an IntakeTurn
+
+
+def test_network_off_guard_stops_every_socket(network_off):
+    with pytest.raises(AssertionError, match="network call attempted"):
+        socket.create_connection(("generativelanguage.googleapis.com", 443), timeout=1)
+    with pytest.raises(AssertionError, match="network call attempted"):
+        socket.getaddrinfo("generativelanguage.googleapis.com", 443)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        with pytest.raises(AssertionError, match="network call attempted"):
+            sock.connect(("192.0.2.1", 443))  # TEST-NET-1: never routable
+    finally:
+        sock.close()
 
 
 def test_health_agent_is_replay_without_network_or_key(client, network_off):
