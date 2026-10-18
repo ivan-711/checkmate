@@ -34,15 +34,28 @@ describe("FixtureSource FrontDesk intake", () => {
       policyVersion: "frontdesk-gate/1",
     });
     // Well-formed calls carry their validated arguments; only an invalid call has null args.
-    expect(propose.args).toMatchObject({ birthDate: scenario.pair.recordA.normalized.birthDate });
+    expect(propose.args).toMatchObject({
+      birthDate: scenario.pair.recordA.normalized.birthDate,
+      sex: "UNKNOWN",
+      preferredLanguage: "ES",
+      evidence: { birthDate: "3 de julio de 1985" },
+    });
+    // Every quoted value is exactly what the patient typed.
+    for (const quote of Object.values((propose.args as { evidence: Record<string, string> }).evidence)) {
+      expect(utteranceEs).toContain(quote);
+    }
+    expect(search.gate.evidenceIds).toEqual([
+      { kind: "CANDIDATE_RECORD", id: scenario.pair.recordB.record.id },
+    ]);
     expect(propose.candidates![0]).toMatchObject({
       band: scenario.pair.pair.decision.band,
       pairId: scenario.pair.pair.id,
     });
-    expect(turn.registration).toEqual({
+    expect(turn.registration).toMatchObject({
       state: "PENDING_REGISTRAR",
       handoffPairIds: [scenario.pair.pair.id],
     });
+    expect(turn.registration.intakeRecordId).toBeTruthy();
     expect(turn.assistantText).toMatch(/^Gracias/);
   });
 
