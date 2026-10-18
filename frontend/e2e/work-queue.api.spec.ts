@@ -41,7 +41,9 @@ test("the work queue sends no POST on open, on window focus or on reload", async
   await expect(page.getByTestId("candidate-pair")).toBeVisible({ timeout: 30_000 });
 
   const sent = writes(page);
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Work queue" }).click();
+  // No tabs: the queue opens from the ⌘K command bar.
+  await page.getByRole("button", { name: "Commands" }).click();
+  await page.getByRole("option", { name: "Open work queue" }).click();
   // The funnel comes from the Resolve response this tab already holds.
   await expect(page.getByRole("list", { name: "Match run funnel" })).toContainText("all possible pairs");
   await expect(page.getByTestId("work-queue-row").first()).toBeVisible({ timeout: 30_000 });
@@ -51,7 +53,7 @@ test("the work queue sends no POST on open, on window focus or on reload", async
 
   await page.reload();
   await expect(page.getByTestId("work-queue-no-funnel")).toHaveText(
-    "Press Resolve identity on Case to see the match-run funnel.",
+    "Press Resolve identity on the Desk to see the match-run funnel.",
   );
   await expect(page.getByTestId("work-queue-row").first()).toBeVisible({ timeout: 30_000 });
   await refocus(page);

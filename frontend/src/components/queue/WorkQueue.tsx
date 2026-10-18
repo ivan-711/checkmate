@@ -21,7 +21,7 @@ const FUNNEL_STYLE = { clipPath: "polygon(4% 0, 96% 0, 89% 100%, 11% 100%)" };
 // The queue only reads. Refocusing the window must not send anything, not even a re-read.
 const READ_ONLY = { refetchOnWindowFocus: false } as const;
 const NO_FUNNEL: Record<Mode, string> = {
-  LOCAL: "Press Resolve identity on Case to see the match-run funnel.",
+  LOCAL: "Press Resolve identity on the Desk to see the match-run funnel.",
   REPLAY: "The recorded scenario comes already scored, so REPLAY has no match-run funnel.",
 };
 
@@ -102,7 +102,7 @@ export function WorkQueue() {
   const [status, setStatus] = useState<DecisionStatus | "">("");
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
   const cursor = cursors.at(-1) ?? null;
-  // Written only by Resolve on Case; this screen never posts a match run.
+  // Written only by Resolve on the Desk; this screen never posts a match run.
   const run = useQuery<MatchRunResponse>({ queryKey: LATEST_MATCH_RUN_KEY, queryFn: skipToken });
   const page = useQuery({
     ...READ_ONLY,
@@ -208,7 +208,7 @@ export function WorkQueue() {
           <p className="rounded-lg border border-border-subtle bg-surface p-6 text-ink-3">
             {band || status
               ? "No candidate pairs match these filters."
-              : "Nothing is waiting for review. Pairs arrive when Resolve identity runs on Case, or when the identity gate hands a FrontDesk check-in to a registrar."}
+              : "Nothing is waiting for review. Pairs arrive when Resolve identity runs on the Desk, or when the identity gate hands a FrontDesk check-in to a registrar."}
           </p>
         )}
         {page.data && page.data.items.length > 0 && (

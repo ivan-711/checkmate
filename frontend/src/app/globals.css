@@ -247,9 +247,12 @@ kbd {
   padding-top: 4px;
 }
 
-/* The mark's halves slide shut when a link is approved (CONCEPT.md §5, touch 1). */
-.mark path {
-  transition: transform var(--t-fuse) var(--ease-fuse);
+/* The 404 draws the mark with its halves pulled apart (CONCEPT.md §3). */
+.mark-apart path:first-of-type {
+  transform: translateX(-5px);
+}
+.mark-apart path:last-of-type {
+  transform: translateX(5px);
 }
 
 /* The compact layer hides the Commands label; the keycap stands alone. */
@@ -259,6 +262,13 @@ kbd {
   }
   .compact-nomargin {
     margin-left: 0;
+  }
+  /* The stepper tightens so all five steps stay on one line at 1280 wide. */
+  .stepper {
+    font-size: 13px;
+  }
+  .stepper-rule {
+    width: 6px;
   }
 }
 
