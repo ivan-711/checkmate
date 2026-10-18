@@ -5,6 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VITALS_COPY } from "./copy";
 import { createPulseEngine, type PulseEngine, type PulseReading } from "./engine";
 import VitalsPanel, { MEASURE_SECONDS, VITALS_TIMEOUT_MS } from "./VitalsPanel";
+import { VitalsSlot } from "./VitalsSlot";
+
+// next/dynamic loads the panel lazily in the app; here the slot gets the panel itself, so a test
+// can drive it through the same keyed slot KioskPane renders.
+vi.mock("next/dynamic", async () => {
+  const panel = await import("./VitalsPanel");
+  return { default: () => panel.default };
+});
 
 vi.mock("./engine", async (original) => ({
   ...(await original<typeof import("./engine")>()),
@@ -177,7 +185,10 @@ describe("VitalsPanel", () => {
   it("bounds the whole run at 45 s, countdown included, when starting took long", async () => {
     const slowStart = VITALS_TIMEOUT_MS - (MEASURE_SECONDS * 1000) / 2; // the countdown cannot finish in time
     vi.mocked(createPulseEngine).mockImplementation(
-      () => new Promise<PulseEngine>((resolve) => setTimeout(() => resolve(engine as unknown as PulseEngine), slowStart)),
+      () =>
+        new Promise<PulseEngine>((resolve) =>
+          setTimeout(() => resolve(engine as unknown as PulseEngine), slowStart),
+        ),
     );
     engineReports({ bpm: 70, confidence: 0.9 });
     await render();
@@ -237,7 +248,7 @@ describe("VitalsPanel", () => {
     expect(byTestId("vitals-label")?.textContent).toBe(VITALS_COPY.es.label);
   });
 
-  it("labels itself constructed and non-diagnostic beside the footer, in every phase", async () => {
+  it("labels itself a constructed wellness demo beside the footer, in every phase", async () => {
     await render();
     expect(byTestId("vitals-label")?.textContent).toBe(en.label);
     expect(byTestId("vitals-footer")?.textContent).toBe(en.footer);
@@ -268,5 +279,32 @@ describe("VitalsPanel", () => {
     } finally {
       window.history.replaceState(null, "", "/");
     }
+  });
+});
+
+describe("VitalsSlot in the kiosk", () => {
+  async function renderSlot(sessionId: string) {
+    await act(async () => root.render(<VitalsSlot key={sessionId} language="en" />));
+  }
+
+  it("renders nothing with the flag off", async () => {
+    vi.stubEnv("NEXT_PUBLIC_VITALS", "");
+    await renderSlot("session-1");
+    expect(byTestId("vitals-panel")).toBeNull();
+  });
+
+  it("releases the camera and asks again when the check-in changes (Reset, Start over)", async () => {
+    vi.stubEnv("NEXT_PUBLIC_VITALS", "on");
+    libraryNeverLoads();
+    await renderSlot("session-1");
+    await click("vitals-accept");
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(track.stop).not.toHaveBeenCalled();
+
+    // KioskPane keys the slot by the intake session id, so a new check-in remounts the panel.
+    await renderSlot("session-2");
+    expect(track.stop).toHaveBeenCalled();
+    expect(byTestId("vitals-accept")).not.toBeNull();
+    expect(byTestId("vitals-stop")).toBeNull();
   });
 });
