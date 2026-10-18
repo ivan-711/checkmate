@@ -4,7 +4,7 @@ Author: Christian Flores (docs) · 2026-10-18
 
 This file lists the third-party packages in the repository's lock files, the container images and build tools installed outside them, and the data sources. The tables are maintained by hand: update them in the same pull request that changes a lock file, an image or a build step. Each license is the one the package declares in its own metadata. Nobody has checked these against the license files or reviewed them legally. Where a package declares only "BSD", the BSD variant is not stated.
 
-The project's own code license is not set yet.
+The project's own code is released under the MIT License (`LICENSE` at the repository root). It covers the code only; the data sources below keep their own terms.
 
 ## Python: `uv.lock`
 
