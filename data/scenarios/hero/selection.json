@@ -6337,23 +6337,5 @@
       "tie_break": "d5be1139a19a6129247f4287eced21683b7c6516ba3283f0d6f7350d90f7699b"
     }
   ],
-  "wording": "a selected showcase satisfying published criteria; aggregate metrics cover the full frozen test set; headline metrics were frozen before selection",
-  "pin": {
-    "entityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
-    "decidedBy": "lead session, 2026-10-17 (R5 round 2 on PR #5)",
-    "reason": "keep the current provisional hero until the 20:00 selection run picks the final hero under the fixed criteria; the export is re-rendered with captions computed from what each button does",
-    "removeAt": "the 20:00 selection run: python -m data.hero_select --ignore-pin",
-    "author": "Christian Flores (lane W5)"
-  },
-  "wouldSelect": {
-    "entityId": "d2f739cb-ae51-5065-bee9-1784d4b1e817",
-    "qualified": false,
-    "relaxationLevel": null,
-    "unmetCriteria": [
-      "change_birth_year_keep_separate",
-      "swap_dob_day_month_robust"
-    ],
-    "baselineRaw": 2.15,
-    "language": "ES"
-  }
+  "wording": "a selected showcase satisfying published criteria; aggregate metrics cover the full frozen test set; headline metrics were frozen before selection"
 }
