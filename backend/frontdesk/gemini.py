@@ -29,8 +29,9 @@ FUNCTION_RESPONSE_ROLE = "user"
 _RETRYABLE_HTTP_MIN = 500
 _RATE_LIMITED = 429
 QUOTA_STATUS = "RESOURCE_EXHAUSTED"
-PROBE_TEXT = "ok"
-PROBE_MAX_OUTPUT_TOKENS = 1
+SERVER_TIMEOUT_HEADER = "X-Server-Timeout"
+# The API rejects a server deadline under 10 s; the per-call model timeout is that floor (contracts).
+PROBE_SERVER_DEADLINE_S = MODEL_TIMEOUT_MS // 1000
 _BLOCKED_FINISH = {types.FinishReason.SAFETY: "SAFETY_BLOCKED", types.FinishReason.MALFORMED_FUNCTION_CALL: "MALFORMED"}
 
 
@@ -124,30 +125,33 @@ def api_error_retryable(exc: errors.APIError) -> bool:
     return False
 
 
+def probe_http_options() -> types.HttpOptions:
+    """The probe's own options: a short client-side wait (AUTO_MODE_PROBE_S) so session start never
+    stalls, and an explicit server deadline. Without the header the SDK derives X-Server-Timeout from
+    the client timeout (1.5 s → "2"), and the API rejects any deadline under 10 s, so every probe
+    would fail and AUTO could never pin LIVE."""
+    return types.HttpOptions(
+        timeout=int(AUTO_MODE_PROBE_S * 1000),
+        headers={SERVER_TIMEOUT_HEADER: str(PROBE_SERVER_DEADLINE_S)},
+        retry_options=types.HttpRetryOptions(attempts=SDK_ATTEMPTS),
+    )
+
+
 def probe_live(*, api_key: str, model_id: str) -> bool:
-    """AUTO mode's session-start probe: one minimal real generate call inside AUTO_MODE_PROBE_S, so a
-    model whose daily quota is gone cannot pass (a metadata read would). It spends one request of the
-    free tier's daily quota. Any 429, any other API error, a timeout or a transport failure pins the
-    session to REPLAY (fail closed)."""
+    """AUTO mode's session-start probe: one cheap metadata read (``models.get`` on the configured
+    model id), no generate call, so it spends no generation quota (billing is linked since 19:41).
+    Any 429, 403, 404, 5xx, timeout, transport failure or other library error pins the session to
+    REPLAY (fail closed)."""
     try:
-        client = Client(
-            api_key=api_key,
-            http_options=types.HttpOptions(
-                timeout=int(AUTO_MODE_PROBE_S * 1000), retry_options=types.HttpRetryOptions(attempts=SDK_ATTEMPTS)
-            ),
-        )
-        client.models.generate_content(
-            model=model_id,
-            contents=PROBE_TEXT,
-            config=types.GenerateContentConfig(temperature=0, max_output_tokens=PROBE_MAX_OUTPUT_TOKENS),
-        )
+        client = Client(api_key=api_key, http_options=probe_http_options())
+        client.models.get(model=model_id)
         return True
     except errors.APIError as exc:
         log.warning(
             "gemini probe failed exception_class=%s code=%s status=%s", type(exc).__name__, exc.code, _status(exc)
         )
         return False
-    except httpx.HTTPError as exc:
+    except Exception as exc:  # noqa: BLE001 — fail closed: anything else from the library also pins REPLAY
         log.warning("gemini probe failed exception_class=%s", type(exc).__name__)
         return False
 
