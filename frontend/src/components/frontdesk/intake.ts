@@ -24,6 +24,18 @@ export function subscribeToIntake(queryClient: QueryClient, onChange: () => void
   });
 }
 
+/** Re-reads the held pairs whenever a mutation succeeds. The registrar decides on the Desk with
+ * the case's own review (not a kiosk mutation), so nothing else tells the kiosk that its pair is
+ * now LINKED or REJECTED. Any success is enough: re-reading two pairs is cheap, and keying on one
+ * screen's mutation would miss the next screen's. */
+export function refreshHandoffOnMutation(queryClient: QueryClient): () => void {
+  return queryClient.getMutationCache().subscribe((event) => {
+    if (event.type === "updated" && event.action.type === "success") {
+      void queryClient.invalidateQueries({ queryKey: HANDOFF_KEY });
+    }
+  });
+}
+
 /** The linked chart's active flags as an approval's review response returned them (every current
  * alert on the entity, kept ones included), keyed by that decision: a Reset makes a new one, so an
  * old flag never shows again. Kept in the cache, not under HANDOFF_KEY, which is refetched, so the
@@ -38,11 +50,10 @@ export function useIntakeSession(): IntakeSession | undefined {
     (onChange: () => void) => subscribeToIntake(queryClient, onChange),
     [queryClient],
   );
-  return useSyncExternalStore(
-    subscribe,
-    () => queryClient.getQueryData<IntakeSession>(INTAKE_KEY),
-    () => undefined,
-  );
+  const read = useCallback(() => queryClient.getQueryData<IntakeSession>(INTAKE_KEY), [queryClient]);
+  // The server snapshot reads the cache too: it is empty during real SSR and hydration (the
+  // check-in starts after mount), and a static render of a seeded cache then sees the check-in.
+  return useSyncExternalStore(subscribe, read, read);
 }
 
 /** Every pair the turn handed off (the hero has two: the ER and the Clinic record). */

@@ -10,7 +10,7 @@ import { GateCard } from "./GateCard";
 
 /** The text of each list row, tags stripped: "Given name+0.90". */
 function rows(html: string): string[] {
-  return [...html.matchAll(/<li[^>]*>(.*?)<\/li>/g)].map((m) => m[1].replace(/<[^>]+>/g, ""));
+  return [...html.matchAll(/<li(?:\s[^>]*)?>(.*?)<\/li>/g)].map((m) => m[1].replace(/<[^>]+>/g, ""));
 }
 
 function gateRows(call: ToolCallRecord, candidate: ToolCallCandidate, language: "en" | "es" = "en") {

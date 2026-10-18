@@ -16,7 +16,7 @@ test("approving both held pairs: the approval that raises the flag shows it, and
   page,
 }) => {
   await page.goto("/frontdesk");
-  await expect(page.getByTestId("agent-mode-badge")).toBeVisible();
+  await expect(page.getByTestId("kiosk-composer")).toBeVisible();
   const reset = page.waitForResponse((r) => isReset(r.url(), r.request().method()), { timeout: RESET_MS });
   await page.getByTestId("reset-button").click();
   await reset;

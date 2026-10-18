@@ -72,9 +72,9 @@ function StageHead() {
 
 /** The Desk (CONCEPT.md §3): the kiosk device on the left, the registrar's stage on the right,
  * three fixed rows so nothing jumps between states. The body holds the Organism (L3) beside the
- * decision column (L4); the kiosk slot holds L2's kiosk. */
+ * decision column (L4). The kiosk (L2) reports its state through setKiosk. */
 export function DeskScreen() {
-  const { desk, kiosk, sheet, cite, setCite, actions, commandsOpen } = useDesk();
+  const { desk, kiosk, setKiosk, sheet, cite, setCite, actions, commandsOpen } = useDesk();
   const c = useDeskCase();
   const { setJustApproved } = c;
   // The Organism reads the cite the evidence rail writes; DeskContext owns it, so both meet there.
@@ -132,7 +132,9 @@ export function DeskScreen() {
         className="desk-region overflow-y-auto rounded-device bg-paper shadow-[0_0_0_1px_var(--hair),0_24px_60px_-30px_rgba(60,20,55,0.18)]"
         data-kiosk={kiosk}
       >
-        <KioskPane />
+        {/* "Looking at it now" only once the registrar opens the confirm sheet: the hand-off itself
+            already proposes the pair, so "review" starts the moment the check-in is held. */}
+        <KioskPane onStateChange={setKiosk} registrarReviewing={desk === "confirm"} />
       </section>
 
       <section aria-label="Registrar" className="desk-region stage">
