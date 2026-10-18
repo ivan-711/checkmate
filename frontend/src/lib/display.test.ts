@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { scenario } from "@/data/scenario";
 import {
+  FEATURE_FIELD,
+  citeFieldFor,
+  evidenceDots,
+  evidenceNote,
   FEATURE_LABELS,
   actorName,
   footerWithoutRule,
@@ -163,5 +167,50 @@ describe("FEATURE_LABELS", () => {
   it("labels the folded given-name feature the evidence rail showed raw", () => {
     const [row] = rankContributions([{ feature: "given_jw_folded", logit: 1.5, value: 1 }]);
     expect(row.label).toBe("Given name, accents ignored");
+  });
+});
+
+describe("FEATURE_FIELD", () => {
+  it("maps every scorer feature to the record field it cites", () => {
+    expect(FEATURE_FIELD.dob_exact).toBe("dob");
+    expect(FEATURE_FIELD.dob_day_month_swap).toBe("dob");
+    expect(FEATURE_FIELD.given_jw_folded).toBe("given");
+    expect(FEATURE_FIELD.given_name_jw).toBe("given");
+    expect(FEATURE_FIELD.family_dmeta).toBe("family");
+    expect(FEATURE_FIELD.family_metaphone).toBe("family");
+    expect(FEATURE_FIELD.address_jaccard).toBe("addr");
+    expect(FEATURE_FIELD.zip_match).toBe("addr");
+    expect(FEATURE_FIELD.phone_match).toBe("phone");
+    expect(FEATURE_FIELD.sex_match).toBe("sex");
+    expect(FEATURE_FIELD.missing_phone).toBe("phone");
+  });
+
+  it("leaves an unknown feature without a field, so the row cites nothing rather than the wrong thing", () => {
+    expect(FEATURE_FIELD.new_thing).toBeUndefined();
+    expect(citeFieldFor("new_thing")).toBeNull();
+    expect(citeFieldFor("dob_exact")).toBe("dob");
+  });
+});
+
+describe("evidenceDots", () => {
+  it("draws six dots, one per 0.5 log-odds, with partial fill", () => {
+    expect(evidenceDots(3.0)).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(evidenceDots(1.47)).toEqual([1, 1, 0.94, 0, 0, 0]);
+    expect(evidenceDots(0)).toEqual([0, 0, 0, 0, 0, 0]);
+  });
+
+  it("shows the weight of evidence against by magnitude and never more than six dots", () => {
+    expect(evidenceDots(-1.2)).toEqual([1, 1, 0.4, 0, 0, 0]);
+    expect(evidenceDots(9)).toEqual([1, 1, 1, 1, 1, 1]);
+  });
+});
+
+describe("evidenceNote", () => {
+  it("says what a row compared in plain words from the feature and the two values", () => {
+    expect(evidenceNote("dob_exact", 1)).toBe("Exact");
+    expect(evidenceNote("given_jw_folded", 1)).toBe("Same, accents ignored");
+    expect(evidenceNote("family_jw_folded", 0.93)).toBe("Close, accents ignored");
+    expect(evidenceNote("address_jaccard", 1)).toBe("Same street and ZIP");
+    expect(evidenceNote("phone_match", null)).toBe("Not given on one side");
   });
 });

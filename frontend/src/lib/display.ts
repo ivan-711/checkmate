@@ -1,4 +1,5 @@
 import type { Contribution, NormalizedRecord, SourceCard } from "@/api/types";
+import type { CiteField } from "./desk";
 
 // Feature codes come from the scorer; the screen shows plain words. One closed list: the scorer's
 // ids (backend/core) plus the contract fixture's older ids. Unknown codes fall through unchanged
@@ -54,6 +55,89 @@ export const FEATURE_LABELS: Record<string, string> = {
   family_name_jw: "Family name",
   family_metaphone: "Family name sound",
 };
+
+/** The record field each scorer feature rests on (ux-system finding 3): a closed map, client-only,
+ * so hovering a rail row can light the same field in both records. An unknown feature has no
+ * field and cites nothing rather than the wrong thing. */
+const NAME_FIELDS = Object.fromEntries([
+  ...GIVEN_FEATURES.map((f) => [`given_${f}`, "given"]),
+  ...FAMILY_FEATURES.map((f) => [`family_${f}`, "family"]),
+]) as Record<string, CiteField>;
+
+export const FEATURE_FIELD: Record<string, CiteField> = {
+  ...NAME_FIELDS,
+  dob_exact: "dob",
+  dob_day_month_swap: "dob",
+  dob_one_digit_edit: "dob",
+  dob_one_component_off: "dob",
+  dob_year_match: "dob",
+  sex_match: "sex",
+  phone_match: "phone",
+  address_jaccard: "addr",
+  zip_match: "addr",
+  missing_given_name: "given",
+  missing_family_name: "family",
+  missing_dob: "dob",
+  missing_sex: "sex",
+  missing_phone: "phone",
+  missing_address: "addr",
+  missing_zip: "addr",
+  given_name_jw: "given",
+  family_name_jw: "family",
+  family_metaphone: "family",
+};
+
+export function citeFieldFor(feature: string): CiteField | null {
+  return FEATURE_FIELD[feature] ?? null;
+}
+
+/** Weight as dots (CONCEPT §5 touch 8): six dots, one per 0.5 log-odds, partial fill allowed, by
+ * magnitude. 1.47 is 2.94 dots. It reads at a glance and claims no more precision than it has. */
+export const EVIDENCE_DOTS = 6;
+const LOGIT_PER_DOT = 0.5;
+
+export function evidenceDots(logit: number): number[] {
+  const dots = Math.abs(logit) / LOGIT_PER_DOT;
+  return Array.from({ length: EVIDENCE_DOTS }, (_, i) => Math.round(Math.max(0, Math.min(1, dots - i)) * 100) / 100);
+}
+
+const SAME = 1;
+const CLOSE = 0.85;
+// Every comparison the scorer makes, said as what it found (backend/core/features.py).
+const NAME_NOTES: Record<NameFeature, [same: string, close: string, different: string]> = {
+  jw: ["Same letters", "Close spelling", "Different spelling"],
+  jw_folded: ["Same, accents ignored", "Close, accents ignored", "Different, accents ignored"],
+  dl: ["Same, typos allowed", "Close, typos allowed", "Different, typos allowed"],
+  dmeta: ["Same sound", "Similar sound", "Different sound"],
+  nickname: ["Nickname match", "Nickname match", "No nickname match"],
+  initial: ["Same initial", "Same initial", "Different initial"],
+  token_overlap: ["Same parts", "Some parts shared", "Different parts"],
+};
+const FIELD_NOTES: Record<string, [same: string, close: string, different: string]> = {
+  dob_exact: ["Exact", "Exact", "Differs"],
+  dob_day_month_swap: ["Day and month swapped", "Day and month swapped", "Not swapped"],
+  dob_one_digit_edit: ["One digit off", "One digit off", "More than one digit off"],
+  dob_one_component_off: ["One part off", "One part off", "More than one part off"],
+  dob_year_match: ["Same year", "Same year", "Different year"],
+  sex_match: ["Same", "Same", "Differs"],
+  phone_match: ["Same phone", "Same phone", "Different phone"],
+  address_jaccard: ["Same street and ZIP", "Mostly the same", "Different address"],
+  zip_match: ["Same ZIP", "Same ZIP", "Different ZIP"],
+  given_name_jw: NAME_NOTES.jw,
+  family_name_jw: NAME_NOTES.jw,
+  family_metaphone: NAME_NOTES.dmeta,
+};
+const NAME_FEATURE = /^(given|family)_(.+)$/;
+
+/** What a row compared, in plain words: the feature's own comparison and how close the two values
+ * came. A missing value says so; it is never called a difference. */
+export function evidenceNote(feature: string, value: number | null | undefined): string {
+  if (value == null) return "Not given on one side";
+  const name = NAME_FEATURE.exec(feature);
+  const notes = FIELD_NOTES[feature] ?? (name ? NAME_NOTES[name[2] as NameFeature] : undefined);
+  if (!notes) return value >= SAME ? "Same" : value > 0 ? "Partly the same" : "Differs";
+  return value >= SAME ? notes[0] : value >= CLOSE || (value > 0 && notes[1] === notes[0]) ? notes[1] : notes[2];
+}
 
 export interface RankedContribution extends Contribution {
   label: string;
