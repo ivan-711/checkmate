@@ -1,18 +1,48 @@
 import type { Contribution, NormalizedRecord, SourceCard } from "@/api/types";
 
-// Feature codes come from the scorer; the screen shows plain words. Unknown codes fall
-// through unchanged so a new feature is visible rather than silently dropped.
-const FEATURE_LABELS: Record<string, string> = {
-  given_name_jw: "Given name",
-  family_name_jw: "Family name",
-  family_metaphone: "Family name sound",
+// Feature codes come from the scorer; the screen shows plain words. One closed list: the scorer's
+// ids (backend/core) plus the contract fixture's older ids. Unknown codes fall through unchanged
+// so a new feature is visible rather than silently dropped.
+// Each name feature reads as "<Given|Family> name" plus this suffix.
+const NAME_FEATURES = {
+  jw: " spelling",
+  jw_folded: ", no accents",
+  dl: " typos",
+  dmeta: " sound",
+  nickname: " nickname",
+  initial: " initial",
+  token_overlap: " parts",
+} as const;
+
+function nameLabels(prefix: "given" | "family", name: string): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(NAME_FEATURES).map(([suffix, words]) => [`${prefix}_${suffix}`, `${name}${words}`]),
+  );
+}
+
+export const FEATURE_LABELS: Record<string, string> = {
+  ...nameLabels("given", "Given name"),
+  ...nameLabels("family", "Family name"),
   dob_exact: "Date of birth",
   dob_day_month_swap: "Day and month swapped",
   dob_one_digit_edit: "Date of birth, one digit off",
+  dob_one_component_off: "Date of birth, one part off",
+  dob_year_match: "Birth year",
   sex_match: "Sex",
   phone_match: "Phone",
   address_jaccard: "Address",
   zip_match: "ZIP code",
+  missing_given_name: "Given name missing",
+  missing_family_name: "Family name missing",
+  missing_dob: "Date of birth missing",
+  missing_sex: "Sex missing",
+  missing_phone: "Phone missing",
+  missing_address: "Address missing",
+  missing_zip: "ZIP code missing",
+  // The contract fixture's ids (REPLAY mode).
+  given_name_jw: "Given name",
+  family_name_jw: "Family name",
+  family_metaphone: "Family name sound",
 };
 
 export interface RankedContribution extends Contribution {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { scenario } from "@/data/scenario";
 import {
+  FEATURE_LABELS,
   actorName,
   differingFields,
   formatCt,
@@ -104,5 +105,41 @@ describe("compactLane", () => {
 
   it("shows everything when the lane fits", () => {
     expect(compactLane([ev(2), ev(1)], 5)).toEqual({ shown: [ev(1), ev(2)], hidden: 0 });
+  });
+});
+
+describe("FEATURE_LABELS", () => {
+  // Every id the scorer emits (backend/core/features.py, score.py).
+  const SCORER_IDS = [
+    ...["given", "family"].flatMap((p) =>
+      ["jw", "jw_folded", "dl", "dmeta", "nickname", "initial", "token_overlap"].map((s) => `${p}_${s}`),
+    ),
+    "dob_exact",
+    "dob_day_month_swap",
+    "dob_one_digit_edit",
+    "dob_one_component_off",
+    "dob_year_match",
+    "sex_match",
+    "phone_match",
+    "address_jaccard",
+    "zip_match",
+    ...["given_name", "family_name", "dob", "sex", "phone", "address", "zip"].map((f) => `missing_${f}`),
+  ];
+
+  it("gives every scorer id a plain label, never the raw id", () => {
+    for (const id of SCORER_IDS) {
+      expect(FEATURE_LABELS[id], id).toBeTruthy();
+      expect(FEATURE_LABELS[id]).not.toMatch(/_/);
+    }
+  });
+
+  it("keeps labels distinct so five rows never read the same", () => {
+    const labels = SCORER_IDS.map((id) => FEATURE_LABELS[id]);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it("labels the folded given-name feature the evidence rail showed raw", () => {
+    const [row] = rankContributions([{ feature: "given_jw_folded", logit: 1.5, value: 1 }]);
+    expect(row.label).toBe("Given name, no accents");
   });
 });

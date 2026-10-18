@@ -55,7 +55,7 @@ export function EvidenceRail({ detail }: { detail: CandidatePairDetail }) {
             <li
               key={c.feature}
               data-testid="evidence-feature-row"
-              className={`grid grid-cols-[10rem_1fr_4rem] items-center gap-2 text-[16px] ${
+              className={`grid grid-cols-[13rem_1fr_4rem] items-center gap-2 text-[16px] ${
                 i >= SHORT_SCREEN_ROWS && !showAll ? "short-screen-hidden" : ""
               }`}
             >
