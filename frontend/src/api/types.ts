@@ -40,3 +40,4 @@ export type IntakeTurn = Schemas["IntakeTurn"];
 export type ToolCallRecord = Schemas["ToolCallRecord"];
 export type ToolCallCandidate = Schemas["ToolCallCandidate"];
 export type PolicyReason = Schemas["PolicyReason"];
+export type RegistrationState = Schemas["Registration"]["state"];

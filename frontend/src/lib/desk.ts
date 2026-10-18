@@ -1,4 +1,4 @@
-import type { DecisionStatus, ReasonCode } from "@/api/types";
+import type { DecisionStatus, ReasonCode, RegistrationState } from "@/api/types";
 
 /* The Desk contract (CONCEPT.md §8, "contract first"). L1 owns this file; L2, L3 and L4 build
  * against it and meet only here. Nothing in it renders. */
@@ -137,4 +137,55 @@ export function stageHead(desk: DeskState, ctx: StageHeadContext): StageHead {
             : "Rejected for now. Nothing was linked, and nothing was suppressed: they can be compared again.",
       };
   }
+}
+
+/** The kiosk's default state from the check-in on record (the Registration state the contract
+ * returns). The kiosk (L2) sets "working" itself while a turn runs; this is the fallback. */
+export function kioskStateFrom(state: RegistrationState | undefined, turnRunning: boolean): KioskState {
+  switch (state) {
+    case "PENDING_REGISTRAR":
+      return "held";
+    case "NEW_CHART":
+    case "LINKED":
+    case "RELEASED":
+      return "done";
+    default:
+      return turnRunning ? "working" : "idle";
+  }
+}
+
+export interface EventGroup {
+  eventType: string;
+  count: number;
+  /** The newest event's time and id in the group. */
+  ts: string;
+  eventId: string;
+}
+
+/** Consecutive events of one type collapse into one row with a count ("Pairs scored ×12"). */
+export function groupEvents(rows: readonly { eventId: string; eventType: string; ts: string }[]): EventGroup[] {
+  const groups: EventGroup[] = [];
+  for (const row of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last.eventType === row.eventType) last.count += 1;
+    else groups.push({ eventType: row.eventType, count: 1, ts: row.ts, eventId: row.eventId });
+  }
+  return groups;
+}
+
+const SECONDS_PER_MINUTE = 60;
+const JUST_NOW_SECONDS = 3;
+
+/** "held 0:41": minutes and zero-padded seconds. */
+export function formatHeld(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(s / SECONDS_PER_MINUTE)}:${String(s % SECONDS_PER_MINUTE).padStart(2, "0")}`;
+}
+
+/** A live relative time that never rounds up what has not happened yet. */
+export function agoText(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  if (s < JUST_NOW_SECONDS) return "just now";
+  if (s < SECONDS_PER_MINUTE) return `${s} s ago`;
+  return `${Math.floor(s / SECONDS_PER_MINUTE)} min ago`;
 }
