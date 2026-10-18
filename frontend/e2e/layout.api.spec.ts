@@ -95,6 +95,7 @@ async function checkIn(page: Page, language: "EN" | "ES" = "EN") {
   }
   await page
     .getByRole("button", { name: language === "ES" ? "Usar este" : "Use this" })
+    .first()
     .click({ timeout: 30_000 });
   await page.getByTestId("kiosk-send").click();
   await expect(page.getByTestId("gate-card")).toBeVisible({ timeout: 30_000 });

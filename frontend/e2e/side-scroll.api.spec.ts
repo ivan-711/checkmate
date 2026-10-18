@@ -43,11 +43,11 @@ for (const viewport of VIEWPORTS) {
     );
     await page.getByTestId("reset-button").click();
     await reset;
-    await expect(page.getByRole("button", { name: "Use this" })).toBeEnabled({ timeout: RESET_MS });
+    await expect(page.getByRole("button", { name: "Use this" }).first()).toBeEnabled({ timeout: RESET_MS });
     expect(await sideScroll(page), "before a turn").toBeLessThanOrEqual(0);
     await expectEveryOpenTooltipInside(page, viewport.width);
 
-    await page.getByRole("button", { name: "Use this" }).click();
+    await page.getByRole("button", { name: "Use this" }).first().click();
     await page.getByTestId("kiosk-send").click();
     await expect(page.getByTestId("gate-card")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('[data-pane="held"]')).toBeVisible({ timeout: 30_000 });

@@ -67,6 +67,7 @@ export const COPY = {
     title: "Welcome. Let’s get you checked in.",
     sub: "Type your full name and date of birth, in English or Spanish.",
     demoLabel: "Demo line",
+    newPatientLabel: "New patient",
     suggestUse: "Use this",
     constructed: "constructed scenario",
     constructedKiosk:
@@ -165,6 +166,7 @@ export const COPY = {
     title: "Le damos la bienvenida. Registremos su llegada.",
     sub: "Escriba su nombre completo y su fecha de nacimiento, en español o en inglés.",
     demoLabel: "Mensaje de demostración",
+    newPatientLabel: "Paciente nuevo",
     suggestUse: "Usar este",
     constructed: "caso de demostración",
     constructedKiosk:

@@ -6,10 +6,17 @@ import type { Language } from "@/api/types";
 type ScriptTurn = { userText: string; steps: { model: { args?: { preferredLanguage?: string } } }[] };
 const TURNS = (transcript as unknown as { turns: ScriptTurn[] }).turns;
 
-/** The first turn in each language is the hero's; later turns cover other patients. */
-function firstLine(language: Language): string {
-  const turn = TURNS.find((t) => t.steps.some((step) => step.model.args?.preferredLanguage === language));
-  return turn?.userText ?? "";
+/** The transcript's lines in one language, in order: the hero's first, then later patients. */
+function lines(language: Language): string[] {
+  return TURNS.filter((t) => t.steps.some((step) => step.model.args?.preferredLanguage === language)).map(
+    (t) => t.userText,
+  );
 }
 
-export const DEMO_SCRIPT = { en: firstLine("EN"), es: firstLine("ES") } as const;
+/** The hero's line in each language, and the new patient's (the second turn), which the gate lets
+ * open a chart. The replay accepts only these exact texts. */
+export const DEMO_SCRIPT = {
+  en: lines("EN")[0] ?? "",
+  es: lines("ES")[0] ?? "",
+  newPatient: { en: lines("EN")[1] ?? "", es: lines("ES")[1] ?? "" },
+} as const;

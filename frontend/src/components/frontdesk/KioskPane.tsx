@@ -168,6 +168,37 @@ function Turn({
   );
 }
 
+/** A scripted check-in the presenter can drop into the composer: the replay knows its exact text. */
+function DemoLine({
+  label,
+  line,
+  language,
+  use,
+  disabled,
+  onUse,
+  alt = false,
+}: {
+  alt?: boolean;
+  label: string;
+  line: string;
+  language: KioskLanguage;
+  use: string;
+  disabled: boolean;
+  onUse: (line: string) => void;
+}) {
+  return (
+    <div className={alt ? "k-demo k-demo-alt" : "k-demo"}>
+      <p className="k-demo-lbl">{label}</p>
+      <q lang={language} className="k-demo-q">
+        {line}
+      </q>
+      <button type="button" disabled={disabled} onClick={() => onUse(line)} className="k-use">
+        {use}
+      </button>
+    </div>
+  );
+}
+
 /** The patient's kiosk (CONCEPT.md §3): welcome and the demo line, then the working glow and the
  * checklist, the gate card, and "You're checked in" once a registrar has linked the chart.
  * `onStateChange` tells the Desk which still the kiosk is on; `registrarReviewing` is true while
@@ -190,6 +221,7 @@ export function KioskPane({
   const announce = useAnnounce();
   const t = COPY[language];
   const suggestion = source.suggestedCheckIn[language];
+  const newPatient = source.suggestedCheckIn.newPatient?.[language];
 
   // The server picks the agent mode; the check-in's language picks the recording replay plays.
   const checkInLanguage = language === "es" ? "ES" : "EN";
@@ -349,6 +381,10 @@ export function KioskPane({
   const finished = state === "done" || state === "rejected";
   // The demo line sends the one recorded turn: not while a turn runs, not after the first turn.
   const demoLineDisabled = resetting || sending || turns.length > 0;
+  const useLine = (line: string) => {
+    setText(line);
+    composer.current?.focus();
+  };
   const sendDisabled = !text.trim() || sending || resetting || !session.data;
 
   return (
@@ -388,23 +424,25 @@ export function KioskPane({
           <div className="k-welcome">
             <h2 className="k-title">{t.title}</h2>
             <p className="k-sub">{t.sub}</p>
-            <div className="k-demo">
-              <p className="k-demo-lbl">{t.demoLabel}</p>
-              <q lang={language} className="k-demo-q">
-                {suggestion}
-              </q>
-              <button
-                type="button"
+            <DemoLine
+              label={t.demoLabel}
+              line={suggestion}
+              language={language}
+              use={t.suggestUse}
+              disabled={demoLineDisabled}
+              onUse={useLine}
+            />
+            {newPatient && (
+              <DemoLine
+                alt
+                label={t.newPatientLabel}
+                line={newPatient}
+                language={language}
+                use={t.suggestUse}
                 disabled={demoLineDisabled}
-                onClick={() => {
-                  setText(suggestion);
-                  composer.current?.focus();
-                }}
-                className="k-use"
-              >
-                {t.suggestUse}
-              </button>
-            </div>
+                onUse={useLine}
+              />
+            )}
           </div>
         ) : finished ? (
           <div className="k-done">

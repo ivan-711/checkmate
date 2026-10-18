@@ -31,7 +31,7 @@ test("Send is held during Reset; Español before the first turn plays the record
   await page.getByTestId("reset-button").click();
   await page.getByTestId("kiosk-composer").fill("hello");
   await expect(page.getByTestId("kiosk-send")).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Use this" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Use this" }).first()).toBeDisabled();
   await reset;
   expect(resetDone).toBe(true);
   // The new check-in starts only after the reset completed.
@@ -40,7 +40,7 @@ test("Send is held during Reset; Español before the first turn plays the record
 
   await page.getByRole("button", { name: "Español" }).click();
   await expect.poll(() => starts.at(-1)).toBe("ES");
-  await page.getByRole("button", { name: "Usar este" }).click();
+  await page.getByRole("button", { name: "Usar este" }).first().click();
   const [res] = await Promise.all([
     page.waitForResponse((r) => isTurn(r.url()), { timeout: 30_000 }),
     page.keyboard.press("Enter"),
@@ -59,12 +59,12 @@ test("Send is held during Reset; Español before the first turn plays the record
 test("Start over after a held check-in resets the demo, then starts a new check-in", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("kiosk-composer")).toBeVisible();
-  await page.getByRole("button", { name: "Use this" }).click();
+  await page.getByRole("button", { name: "Use this" }).first().click();
   await expect(page.getByTestId("kiosk-send")).toBeEnabled({ timeout: 30_000 });
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("gate-card")).toBeVisible({ timeout: 30_000 });
   // The demo line runs once per check-in.
-  await expect(page.getByRole("button", { name: "Use this" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Use this" }).first()).toHaveCount(0);
 
   const starts: string[] = [];
   page.on("request", (r) => {
@@ -80,7 +80,7 @@ test("Start over after a held check-in resets the demo, then starts a new check-
   expect(reset.status()).toBe(201);
   await expect(page.getByTestId("kiosk")).toHaveAttribute("data-k", "idle", { timeout: 30_000 });
   await expect.poll(() => starts.length, { timeout: 30_000 }).toBeGreaterThan(0);
-  await expect(page.getByRole("button", { name: "Use this" })).toBeEnabled({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Use this" }).first()).toBeEnabled({ timeout: 30_000 });
 });
 
 for (const lang of [
@@ -105,7 +105,7 @@ for (const lang of [
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto("/");
     await page.getByRole("button", { name: lang.toggle }).click();
-    await page.getByRole("button", { name: lang.use }).click();
+    await page.getByRole("button", { name: lang.use }).first().click();
     await expect(page.getByTestId("kiosk-send")).toBeEnabled({ timeout: 30_000 });
 
     let held: Route | null = null;
