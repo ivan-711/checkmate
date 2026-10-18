@@ -129,7 +129,7 @@ def test_sticky_review_candidate_keeps_blocking_after_the_model_changes_the_demo
 
 
 def test_sticky_keep_separate_candidate_does_not_block(conn):
-    er, clinic = near_duplicates(conn)
+    er, _clinic = near_duplicates(conn)
     sid = insert_session(conn)
     insert_tool_call(conn, sid, [er], bands={er: "KEEP_SEPARATE"})
     ev = propose(conn, sid, UNRELATED_ARGS, (UNRELATED_TEXT,))
