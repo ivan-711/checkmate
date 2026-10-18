@@ -149,6 +149,8 @@ The harness measures the code the app runs: the synthetic corpus built from the 
 
 Source: harness run 1c3f8f96, with a committed copy of the run's metrics in `docs/eval/run-1c3f8f96-metrics.json`. In that copy every cell the harness flags "do not read" has its value withheld (null). The run directory itself is in the gitignored `eval/runs/`; reproduce the run with the eval command below.
 
+A separate gate ablation (300 scripted kiosk check-ins, gate on and off) is written up in `docs/eval/gate-ablation-300.md`, with its selection caveats.
+
 - The run scored the development partition out of fold, then scored the test partition once. The test partition holds 144 of the 500 dependency components. They are kept out of the development scoring and the cutoff selection (manifest `regime`: "development + single test pass"; split rules in `eval/expectations/splits.json`).
 - Settings: seed 20261017, scorer `handset-1`, threshold row `provisional-1` (`c_low` 0.0, `c_high` 4.0). Every band number is computed at that row; auto-link is off in the app, so the `AUTO_LINK` rows describe the band only.
 - The top-level `thresholds` block in the metrics copy (`c_low` -0.35, `c_high` 0.44375, id `oof-4dc28f256de9`) is the harness's out-of-fold proposal, recorded as descriptive; this run did not use it and banded every pair at `provisional-1` (`c_low` 0.0, `c_high` 4.0), as the run manifest records.
