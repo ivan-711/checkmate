@@ -36,8 +36,6 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
   const announce = useAnnounce();
   const queryClient = useQueryClient();
   const [justApproved, setJustApproved] = useState(false);
-  // Set by an approve: the flag card under the new record scrolls into view once, inside its pane.
-  const [revealFlag, setRevealFlag] = useState(false);
   const flagRef = useRef<HTMLDivElement>(null);
   // Held while Reset or Undo runs, until the new session has loaded (see SESSION_CHANGE_KEY).
   const sessionChanging = useIsMutating({ mutationKey: SESSION_CHANGE_KEY }) > 0;
@@ -51,6 +49,7 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
   });
   const entity = caseQuery.data?.outcome?.entity ?? null;
   const linked = caseQuery.data?.detail?.pair.decision.status === "LINKED" && entity !== null;
+  const flagRaised = caseQuery.data ? flagState(caseQuery.data).kind === "raised" : false;
   const timeline = useQuery({
     queryKey: ["timeline", entity?.id],
     queryFn: () => source.getTimeline(entity!.id),
@@ -69,14 +68,17 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
     },
   });
 
-  // Runs after GoldenRecord has focused its heading (child effects run first), so the heading
-  // keeps focus while the pane brings the flag card into view.
+  // After an approve, focus goes where the eye should (DESIGN.md, Focus): to the flag's heading when
+  // the rule flagged the linked record, with the card scrolled into view in its pane; otherwise
+  // GoldenRecord keeps it on its own heading, at the top of the pane. The wrapper is the scroll
+  // target: the card's entrance transform would skew it.
   useEffect(() => {
-    if (!revealFlag || !linked) return;
+    if (!justApproved || !linked || !flagRaised) return;
+    flagRef.current?.querySelector<HTMLElement>("#flag-heading")?.focus({ preventScroll: true });
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     flagRef.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
-    setRevealFlag(false);
-  }, [revealFlag, linked]);
+    setJustApproved(false);
+  }, [justApproved, linked, flagRaised]);
 
   const resolveButton = (
     <button
@@ -113,7 +115,6 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
 
   function onDecided(response: ReviewResponse) {
     setJustApproved(response.decision.status === "LINKED");
-    setRevealFlag(response.decision.status === "LINKED");
     announce(announcement(response));
   }
 
@@ -127,11 +128,10 @@ export function CaseScreen({ pairId }: { pairId?: string }) {
               <GoldenRecord
                 entity={entity}
                 cards={cards}
-                focusOnMount={justApproved}
+                focusOnMount={justApproved && !flagRaised}
                 onFocused={() => setJustApproved(false)}
               />
-              {/* The flag sits right under the combined record so it is on screen after Approve.
-                  The wrapper is the scroll target: the card's entrance transform would skew it. */}
+              {/* The flag sits right under the combined record so it is on screen after Approve. */}
               <div ref={flagRef}>
                 <FlagCard state={flagState(caseQuery.data)} />
               </div>

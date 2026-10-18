@@ -54,8 +54,8 @@ test("case path: reject keeps the rule silent, then approve links and flags", as
   await expect(page.locator('[data-testid="event-row"][data-event-type="LINK_REJECTED"]')).toHaveCount(1);
 
   await review(page, "approve", undefined, "second review approves");
-  const golden = page.getByRole("heading", { name: "Golden record" });
-  await expect(golden).toBeFocused();
+  // The approval raised the flag: focus lands on the flag card's heading.
+  await expect(page.getByRole("heading", { name: "Flagged for clinician review" })).toBeFocused();
   const goldenRegion = page.getByRole("region", { name: "Golden record" });
   await expect(goldenRegion.getByText("Clinic CSV").first()).toBeVisible();
   await expect(goldenRegion.getByText("ER FHIR").first()).toBeVisible();
@@ -172,7 +172,7 @@ test("reset returns to the separate records and Undo reset brings the link back"
   await expect(golden).not.toBeFocused();
 });
 
-test("keyboard path reaches Approve link and moves focus to the golden record", async ({ page }) => {
+test("keyboard path reaches Approve link and moves focus to the raised flag", async ({ page }) => {
   await resolved(page);
   const approve = page.getByTestId("approve-button");
   for (let i = 0; i < 60 && !(await approve.evaluate((el) => el === document.activeElement)); i++) {
@@ -183,7 +183,7 @@ test("keyboard path reaches Approve link and moves focus to the golden record", 
   // The dialog opens with focus on the note; Enter in the form submits it.
   await expect(page.getByTestId("review-note-input")).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Golden record" })).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Flagged for clinician review" })).toBeFocused();
 });
 
 test("FrontDesk shell: empty chat pane, ES/EN switch and the agent gate tile", async ({ page }) => {

@@ -23,6 +23,14 @@ const LANGUAGES: { value: KioskLanguage; label: string }[] = [
   { value: "es", label: "Español" },
 ];
 
+/** Side by side the kiosk is its own scroll pane (globals.css, .pane); stacked, the page scrolls. */
+function inScrollPane(el: Element): boolean {
+  for (let box = el.parentElement; box; box = box.parentElement) {
+    if (/auto|scroll/.test(getComputedStyle(box).overflowY)) return true;
+  }
+  return false;
+}
+
 /** The denied new chart that a registrar now holds: the card the demo is about. */
 function gateDenial(call: ToolCallRecord) {
   const candidate = call.candidates?.[0];
@@ -161,17 +169,6 @@ export function KioskPane() {
     wasResetting.current = resetting;
   }, [resetting]);
   const gateCount = turns.filter((turn) => (turn.toolCalls ?? []).some((c) => gateDenial(c))).length;
-  useEffect(() => {
-    // A new gate card always scrolls fully into view: it is the moment the demo is about.
-    if (gateCount === 0) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // Its list row is the target: the card's entrance transform would leave the card's foot cut off.
-    // Side by side, only the kiosk pane scrolls (globals.css, .pane), never the page.
-    gateCard.current?.parentElement?.scrollIntoView({
-      block: "nearest",
-      behavior: reduce ? "auto" : "smooth",
-    });
-  }, [gateCount]);
 
   function submit() {
     const message = text.trim();
@@ -186,6 +183,27 @@ export function KioskPane() {
   const agentMode = session.data?.agentMode;
   const pending = send.isPending ? send.variables?.text : null;
   const failedText = failed && failed.sessionId === session.data?.id ? failed.text : null;
+
+  // New lines come into view. A new gate card always ends fully in view (it is the moment the demo
+  // is about) and the line under it comes along when both fit; its list row is the target, as the
+  // card's entrance transform would cut the card's foot off. Side by side only the kiosk pane
+  // scrolls (globals.css, .pane). Stacked, only a new gate card moves the page, so a registrar's
+  // decision never pulls the page away from the staff pane.
+  const transcript = useRef<HTMLOListElement>(null);
+  const gatesShown = useRef(0);
+  useEffect(() => {
+    const newGate = gateCount > gatesShown.current;
+    gatesShown.current = gateCount;
+    const last = transcript.current?.lastElementChild;
+    if (!last || (!newGate && !inScrollPane(last))) return;
+    const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    if (newGate) {
+      last.scrollIntoView({ block: "nearest" }); // at once, so the gate row is placed from there
+      gateCard.current?.parentElement?.scrollIntoView({ block: "nearest", behavior });
+    } else {
+      last.scrollIntoView({ block: "nearest", behavior });
+    }
+  }, [gateCount, turns.length, pending, failedText, decided]);
 
   return (
     <section lang={language} aria-labelledby="kiosk-label" className="flex min-w-0 flex-col gap-4">
@@ -269,7 +287,7 @@ export function KioskPane() {
             // pt-4 matches the 16 px gap to the composer below, so the line sits centred between them.
             <p className="m-auto pt-4 text-center text-ink-3">{t.empty}</p>
           ) : (
-            <ol aria-live="off" className="mt-3 flex flex-col gap-3">
+            <ol ref={transcript} aria-live="off" className="mt-3 flex flex-col gap-3">
               {turns.map((turn) => (
                 <Turn key={turn.turnIndex} turn={turn} t={t} gateRef={(el) => (gateCard.current = el)} />
               ))}

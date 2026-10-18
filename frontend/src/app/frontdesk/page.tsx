@@ -1,6 +1,5 @@
-import { AuditTile } from "@/components/frontdesk/AuditTile";
 import { KioskPane } from "@/components/frontdesk/KioskPane";
-import { RegistrarPane } from "@/components/frontdesk/RegistrarPane";
+import { StaffPane } from "@/components/frontdesk/StaffPane";
 
 // Side by side, each pane scrolls on its own (globals.css, .pane-layout). Stacked and portrait,
 // the screen is the patient-facing kiosk: the staff pane, which shows the other chart's name,
@@ -13,18 +12,7 @@ export default function FrontDeskPage() {
       <div className="pane min-w-0">
         <KioskPane />
       </div>
-      <section
-        aria-labelledby="registrar-label"
-        className="pane flex min-w-0 flex-col gap-4 max-[1100px]:portrait:hidden"
-      >
-        <h2 id="registrar-label" className="text-[16px] font-semibold uppercase tracking-wider text-ink-3">
-          Registrar workspace · staff view
-        </h2>
-        <RegistrarPane />
-        <div className="mt-auto">
-          <AuditTile />
-        </div>
-      </section>
+      <StaffPane />
     </div>
   );
 }

@@ -77,7 +77,7 @@ Ghost/link `font-semibold text-accent underline underline-offset-2`. Busy label 
 
 ## Focus
 
-Global `:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px }`. Never `outline-none` without a visible replacement, except on a programmatic focus target (`tabIndex={-1}` heading or main), which is never reached by Tab. After Approve, focus moves to the new record's heading (`tabIndex={-1}`).
+Global `:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px }`. Never `outline-none` without a visible replacement, except on a programmatic focus target (`tabIndex={-1}` heading or main), which is never reached by Tab. After Approve, focus moves to the flag card's heading when the approval raised a flag (the card scrolls into view in its pane; it stays neutral, never `role="alert"`), otherwise to the new record's heading (both `tabIndex={-1}`).
 
 ## Motion (tokens in globals.css)
 
@@ -93,7 +93,7 @@ Global `:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px }`
 
 Max content 1440 px, `p-4` gutter. Case: `grid-cols-[1fr_28rem]`, one column at `max-[1100px]`. FrontDesk: `grid-cols-[600px_1fr]`, one column at `max-[1100px]`. Phone (`max-[640px]`): the target is no horizontal scroll at 390 px. Today the header does not wrap and Case keeps two source cards side by side (audit #11, pending), so a new screen must not add width: let its own rows wrap and give grid children `min-w-0`. Short laptop (`max-height:700px`): `.short-screen-hidden` / `.short-screen-only` keep decision buttons above the fold.
 
-Side by side (1100 px and wider), Case and FrontDesk do not scroll the page: each column scrolls on its own (`.pane-layout` on the grid, `.pane` on each column, in `globals.css`), so Approve, the flag card after Approve and the kiosk's newest message stay in view. Scroll a moment into view with `scrollIntoView({ block: "nearest" })` on an element without an entrance transform. FrontDesk stacked and portrait is the patient-facing kiosk: the staff pane is not displayed (`max-[1100px]:portrait:hidden`); stacked and landscape keeps both panes.
+Side by side (1100 px and wider), Case and FrontDesk do not scroll the page: each column scrolls on its own (`.pane-layout` on the grid, `.pane` on each column, in `globals.css`), so Approve, the flag card after Approve and the kiosk's newest message stay in view. Scroll a moment into view with `scrollIntoView({ block: "nearest" })` on an element without an entrance transform. New kiosk lines scroll into view in the kiosk pane; a new held check-in brings its first pair's heading to the top of the staff pane, without taking focus from the kiosk. FrontDesk stacked and portrait is the patient-facing kiosk: the staff pane is not displayed (`max-[1100px]:portrait:hidden`); stacked and landscape keeps both panes.
 
 ## Do / don't
 
