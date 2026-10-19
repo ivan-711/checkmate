@@ -6,21 +6,6 @@ Author: Christian Flores (docs) · 2026-10-18
 
 Built at HackGB 2026 (UW-Green Bay, October 17 to 18) by a team of two. **Not for clinical use. Synthetic data only.**
 
-## How we used AI
-
-We used coding and research agents, and we reviewed, integrated and evaluated what they produced. We disclose this in this section and on our commits: every commit we wrote carries the `[AI-assisted]` tag. The only commits on `main` without it are GitHub's initial commit and three merge commits that kept git's default message.
-
-At build time:
-- Coding agents built each lane in its own git worktree from a one-page build brief (`CLAUDE.md`, mirrored as `AGENTS.md`) and the lane's spec section.
-- A paired adversarial reviewer agent reviewed lane pull requests: it ran the app and the acceptance script, wrote tests meant to fail, and posted PASS or BLOCK on the pull request.
-- Codex, in a read-only sandbox, reviewed several pull requests. The build brief also called for GitHub Copilot code review, but it did not run on any merged pull request.
-- The evaluation harness ran on most merges to `main` once CI landed and posted per-band precision and recall with n as a commit comment. A few runs were cancelled by a newer push or stopped on a failed job and posted nothing.
-- A human clicked every merge until 17:15 CT on Saturday. After that, the lead orchestration session merged pull requests under the owner's standing authorization, normally once CI was green, the paired reviewer had posted PASS and a second review had passed. On the subset of pull requests Codex reviewed, that second review was Codex's cross-review; on others it was the lead session's own review. Two small pull requests on Sunday morning (the evaluation sweep and the never-say list) merged on green CI and the lead session's own reading of the diff, with the owner's approval. Either of us could still click merge.
-
-Separately, the running app can use a model. In `LIVE` mode Gemini runs the intake conversation, the language handling and the tool arguments (`backend/frontdesk/gemini.py`). The API starts in `REPLAY` mode (`backend/app/config.py`, `docker-compose.yml`), where a committed transcript stands in for the model and plays through the real gate, matcher and database (`backend/frontdesk/replay.py`). That transcript is marked `AUTHORED`: the team wrote it from the call shapes a Gemini spike verified; it is not a recorded model run (`data/scenarios/hero/frontdesk_transcript.json`). In every mode, matching, the rules gate, the allergy rule and the approval are deterministic code or a human decision, so no language model is on the decision path.
-
-All design documents (PRD, architecture, evaluation plan, UX spec) were written before the event and shown to the organizers' rule. Every line of code, every migration and every prompt file in this repository was written after 12:00 CT on 2026-10-17. We confirmed this arrangement with the organizers at the 11:00 opening.
-
 ## What it does
 
 The app is one screen, the Desk at `/`: the patient kiosk on the left, the registrar's stage on the right (the records and the decision column), and an Activity strip with a Human reviews meter (`frontend/src/app/page.tsx`, `frontend/src/components/desk/DeskScreen.tsx`). The header shows a story stepper (Check-in, Rules gate, Compare, Link, Clinician flag), the mode badge, **Commands ⌘K** and **Reset demo** (`frontend/src/components/ui/Header.tsx`, `frontend/src/lib/desk.ts`). The kiosk also runs on its own at `/kiosk`. The Work queue is at `/queue`, opened from the command bar, and each row opens a Case page at `/queue/<pair id>`. The old `/frontdesk` address redirects to `/`.
@@ -85,6 +70,19 @@ Run the demo setup under [How to run](#how-to-run) first, then open http://127.0
 For another run, press **Reset demo**, or **Start over** in the kiosk, which runs the same reset.
 
 In `REPLAY` mode the agent's replies come only from the transcript: a typed message must match a scripted line (case, accents and spacing ignored), and anything else gets the template line (`backend/frontdesk/replay.py`). With FRONTDESK_OFFSCRIPT_READER=on, text that matches no scripted line is read by a deterministic rules-based reader (no model) and goes through the same gate, so you can try a made-up patient.
+
+## What we did
+
+CheckMate was built in 24 hours by a team of two, Christian Flores and Alejandro Barojas-Diaz.
+
+**Christian Flores** led the project.
+- Chose the problem: one patient split across two charts, which he saw firsthand working hospital patient registration. Entered it in the Healthcare & Wellness track.
+- Led the design before the event: the requirements, the architecture and its decision records, the evaluation plan and the UX spec. He made the calls that define the product: an AI intake agent that cannot override a deterministic rules gate, and no records linked without a person's approval.
+- Split the build into parallel lanes around a frozen API contract, orchestrated the coding and review agents across both laptops, and reviewed their pull requests.
+- Owned the backend: the matching engine (blocking, scoring, bands, linking and the golden record), the FrontDesk intake agent and its rules gate, the allergy rule, the evaluation harness and the seed sweep.
+- Wrote and gave the pitch, demoing both sides of the app, the patient kiosk and the registrar's desk. CheckMate won the Healthcare & Wellness track and was one of the top 5 of 23 teams in the Shark Tank round.
+
+**Alejandro Barojas-Diaz** built the frontend from his own laptop: the kiosk chat pane and gate card, the registrar hand-off, the work queue, the design system and the final Desk redesign. He also wrote the first README and Devpost outline.
 
 ## How to run
 
@@ -291,6 +289,10 @@ Contract routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the co
 Third-party licenses are listed in `docs/LICENSES.md`: every package in `uv.lock`, the direct dependencies of `frontend/` and `eval/acceptance/`, the container images, and the data sources.
 
 CheckMate's own code is released under the MIT License; see `LICENSE`. The data sources above keep their own terms.
+
+## How we used AI
+
+We used coding and review agents throughout the build, with Christian orchestrating every lane and reviewing their pull requests; every commit we wrote carries the `[AI-assisted]` tag. In `LIVE` mode the app itself uses Gemini for the kiosk conversation, but matching, the rules gate, the allergy rule and every link approval are deterministic code or a human decision. All design documents were written before the event, and every line of code was written after 12:00 CT on October 17, 2026, as confirmed with the organizers.
 
 ## Not for clinical use
 
