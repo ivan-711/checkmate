@@ -4,9 +4,11 @@ Author: Christian Flores (docs) · 2026-10-23
 
 GitHub Actions logs for this repository can be read only by a signed-in GitHub user, and GitHub deletes them after the retention period (90 days by default for a public repository, so the last `main` run's log expires around 2027-01-17). This file copies the summary lines that the README's numbers rest on, names where each one came from, and gives the command that reproduces it. Every quoted line is copied from the log or the file named next to it. The data is synthetic throughout.
 
+Commit messages on `main` were edited on 2026-10-23 (wording only; no file changed). Commit IDs from the merge of pull request #2 (2026-10-17 15:50 CDT) onward changed, so CI runs, pull requests and comments from before 2026-10-23 show the old IDs. Each old commit has the same file tree as its new one. Where this file names a changed commit, it gives both IDs.
+
 ## The last CI run on `main`
 
-Run #197, [run 39340754421](https://github.com/ivan-711/checkmate/actions/runs/39340754421), push to `main` at commit `b24d455` (pull request #71), 2026-10-19 23:18:33 to 23:21:41 UTC. Conclusion: success.
+Run #197, [run 39340754421](https://github.com/ivan-711/checkmate/actions/runs/39340754421), push to `main` at the commit of pull request #71 (`ef27ae5`; the run page shows the old ID `b24d455`), 2026-10-19 23:18:33 to 23:21:41 UTC. Conclusion: success.
 
 | Job | Result |
 |---|---|
@@ -65,7 +67,7 @@ These are the per-merge `--fast` numbers (development components only), not the 
 
 ## Frontend unit tests
 
-CI builds the frontend but does not run Vitest. Run locally on 2026-10-23 from the `b24d455` tree (`npx vitest run` in `frontend/`):
+CI builds the frontend but does not run Vitest. Run locally on 2026-10-23 from the tree of pull request #71 (`ef27ae5`), with `npx vitest run` in `frontend/`:
 
 ```
 Test Files  42 passed (42)
@@ -91,7 +93,7 @@ Re-run from a fresh clone on 2026-10-23, every non-withheld `test.*` value match
 
 ## Build timeline
 
-- 199 commits on `main` at `b24d455`. 198 of them have author and committer times inside the event window, 2026-10-17 12:00 to 2026-10-18 12:00 CDT. The one after it is `b24d455` itself, the README rewrite of 2026-10-19.
+- 199 commits on `main` up to and including pull request #71 (`ef27ae5`, old ID `b24d455`). 198 of them have author and committer times inside the event window, 2026-10-17 12:00 to 2026-10-18 12:00 CDT. The one after it is `ef27ae5` itself, the README rewrite of 2026-10-19.
 - Pull requests #1 to #71: 61 opened, 59 merged, 2 closed without merging (#44, #59). 58 of the 59 merged inside the window; #71 merged 2026-10-19 23:18 UTC. All 59 merges are under the `ivan-711` account. Later pull requests are post-event documentation and are not counted here.
 - The contract freeze is the annotated tag `contracts-v1` on commit `3585a52`. The commit and the tag are both timestamped 2026-10-17 13:21:18 CDT, 81 minutes after the 12:00 start (the build brief's planned freeze time was 13:15).
 
@@ -124,8 +126,8 @@ make test-backend
 The repository history and pull requests, with `git` and the GitHub CLI:
 
 ```sh
-git rev-list --count b24d455
-git log --format='%at %ct' b24d455 | awk '$1>=1792256400 && $1<1792342800 && $2>=1792256400 && $2<1792342800' | wc -l
+git rev-list --count ef27ae5
+git log --format='%at %ct' ef27ae5 | awk '$1>=1792256400 && $1<1792342800 && $2>=1792256400 && $2<1792342800' | wc -l
 gh pr list --repo ivan-711/checkmate --state merged --limit 200 --json number,mergedAt,mergedBy \
   --jq '[.[] | select(.number <= 71)] | {merged: length, inside_window: ([.[] | select(.mergedAt >= "2026-10-17T17:00:00Z" and .mergedAt < "2026-10-18T17:00:00Z")] | length), merged_by: ([.[].mergedBy.login] | unique)}'
 git cat-file -p contracts-v1
