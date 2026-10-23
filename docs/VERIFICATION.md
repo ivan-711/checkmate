@@ -49,7 +49,7 @@ The next step reads the API's own request log and fails on any 5xx other than 50
 request log: 3554 requests, no non-501 5xx
 ```
 
-3,554 counts request-log lines, which is slightly more than the 3,549 generated test cases. Schemathesis generates its cases at random, so the count changes from run to run: the three runs of 2026-10-23 (39986982441, 39987393678, 39988112606) logged 3,447, 3,446 and 3,411 requests, each with no non-501 5xx and the same pytest line. The same log also warns "Missing test data: 4 operations repeatedly returned 404" (3 in run 2): operations that need an existing id were exercised mostly on their not-found path.
+3,554 counts request-log lines, which is slightly more than the 3,549 generated test cases. Schemathesis generates its cases at random, so the count changes from run to run: the three runs of 2026-10-23 (39986982441, 39987393678, 39988112606) logged 3,447, 3,446 and 3,411 requests, each with no non-501 5xx and the same pytest counts (1515 passed, 5 skipped, 1 xfailed). The same log also warns "Missing test data: 4 operations repeatedly returned 404" (3 in run 2): operations that need an existing id were exercised mostly on their not-found path.
 
 ### Evaluation harness on merge
 
