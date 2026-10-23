@@ -78,7 +78,7 @@ CheckMate was built in 24 hours by a team of two, Christian Flores and Alejandro
 **Christian Flores** led the project.
 - Chose the problem: one patient split across two charts, which he saw firsthand working hospital patient registration. Entered it in the Healthcare & Wellness track.
 - Led the design before the event: the requirements, the architecture and its decision records, the evaluation plan and the UX spec. He made the calls that define the product: an AI intake agent that cannot override a deterministic rules gate, and no records linked without a person's approval.
-- Split the build into parallel lanes around a frozen API contract, orchestrated the coding and review agents across both laptops, and reviewed their pull requests.
+- Planned the build: split it into parallel lanes around a frozen API contract and directed the coding and review agents across both laptops. Reviewer agents posted the formal reviews; he read their findings, made the escalated decisions, and reviewed and merged all 59 pull requests of the build.
 - Owned the backend: the matching engine (blocking, scoring, bands, linking and the golden record), the FrontDesk intake agent and its rules gate, the allergy rule, the evaluation harness and the seed sweep.
 - Wrote and gave the pitch, demoing both sides of the app, the patient kiosk and the registrar's desk. CheckMate won the Healthcare & Wellness track and was one of the top 5 of 23 teams in the Shark Tank round.
 
@@ -135,7 +135,7 @@ NEXT_PUBLIC_CHECKMATE_SOURCE=api npm run dev
 | `npm run e2e:api` (in `frontend/`) | Playwright against a running API named by `CHECKMATE_API_ORIGIN`; it presses Reset demo on that API (`frontend/playwright.api.config.ts`) |
 | `npm test` (in `eval/acceptance/`) | The G16 acceptance path against the running UI and API: reset, resolve, reject, resolve, approve, flag card, event counts, review tile; it presses Reset demo (`eval/acceptance/README.md`) |
 
-CI runs ruff, the OpenAPI snapshot check, pytest, a schemathesis contract test against an API it starts, the protected-paths check, the hero-export regeneration and fixture check, the acceptance script's type check, the frontend build and a secret scan. On every merge to `main` it also runs the evaluation harness (`.github/workflows/ci.yml`). CI and agents use only the `REPLAY` adapter; no key exists in CI.
+CI runs ruff, the OpenAPI snapshot check, pytest, a schemathesis contract test against an API it starts, the protected-paths check, the hero-export regeneration and fixture check, the acceptance script's type check, the frontend build and a secret scan. On every merge to `main` it also runs the evaluation harness (`.github/workflows/ci.yml`). CI and agents use only the `REPLAY` adapter; no key exists in CI. Actions logs need a GitHub sign-in and expire, so the summary lines of the last `main` run, with the commands to reproduce them, are kept in `docs/VERIFICATION.md`.
 
 ## Evaluation
 
@@ -272,7 +272,7 @@ Contract routes whose lane has not merged answer `501 NOT_IMPLEMENTED` in the co
 | `frontend/` | W4 and wave 2 UI lanes | Next.js app: the Desk, the standalone kiosk, the Work queue and Case pages (`frontend/src/`), design rules (`frontend/DESIGN.md`), unit tests beside the code, Playwright specs (`frontend/e2e/`) |
 | `eval/` | W5, Q2, Q5 | Evaluation harness (`eval/harness/`), protected expectations (`eval/expectations/`), the G16 acceptance script (`eval/acceptance/`), the parallel seed sweep (`eval/sweep/`), tests (`eval/tests/`, `eval/tests_r5/`) |
 | `data/` | W1, W5 | `data/download.py` and `data/HASHES.json`; hero selector and export (`data/hero_select.py`, `data/hero_export.py`, `data/hero_overlay.py`), `data/fixture_check.py`, and the exported hero with the replay transcript in `data/scenarios/hero/`; raw data stays gitignored |
-| `docs/` | D1, D2, D3 | `docs/LICENSES.md`, `docs/devpost-outline.md`, the committed metrics of the held-out run (`docs/eval/run-1c3f8f96-metrics.json`) |
+| `docs/` | D1, D2, D3 | `docs/LICENSES.md`, `docs/devpost-outline.md`, the committed metrics of the held-out run (`docs/eval/run-1c3f8f96-metrics.json`), the recorded CI and evaluation results (`docs/VERIFICATION.md`) |
 | `tools/` | Q15, notify-patient | The optional patient check-in notifier (`tools/notify/`, off unless started) |
 | `.github/` | W5 | CI workflow `.github/workflows/ci.yml` |
 
@@ -292,7 +292,7 @@ CheckMate's own code is released under the MIT License; see `LICENSE`. The data 
 
 ## How we used AI
 
-We used coding and review agents throughout the build, with Christian orchestrating every lane and reviewing their pull requests; every commit we wrote carries the `[AI-assisted]` tag. In `LIVE` mode the app itself uses Gemini for the kiosk conversation, but matching, the rules gate, the allergy rule and every link approval are deterministic code or a human decision. All design documents were written before the event, and every line of code was written after 12:00 CT on October 17, 2026, as confirmed with the organizers.
+We used coding and review agents throughout the build. Christian directed every lane; reviewer agents posted the formal reviews, and he read their findings, made the escalated decisions, and reviewed and merged every pull request. Every commit we wrote carries the `[AI-assisted]` tag. In `LIVE` mode the app itself uses Gemini for the kiosk conversation, but matching, the rules gate, the allergy rule and every link approval are deterministic code or a human decision. All design documents were written before the event, and every line of code was written after 12:00 CT on October 17, 2026, as confirmed with the organizers.
 
 ## Not for clinical use
 

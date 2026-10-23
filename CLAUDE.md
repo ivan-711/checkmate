@@ -6,8 +6,8 @@ CheckMate = **FrontDesk** (a Gemini intake agent behind a deterministic policy g
 
 ## Standing rules for every lane agent
 1. Every task comes with how to check it. Run that check before you say you are done: the acceptance script or a Playwright run against the running app for UI and API lanes; the named unit or harness tests for core lanes.
-2. Review each of your own commits (code-review skill, or Codex read-only) and fix until clean **before** opening a PR. Then the PR goes to the paired reviewer, Codex and Copilot.
-3. Build only in your own worktree (`.worktrees/<lane>` on branch `lane/<lane>`). Push only your own `lane/*` branch. Never push to `main`. Never merge. The lead session merges a PR once every gate below is green (Ivan's standing authorization, 2026-10-17 17:15); Ivan or Alejandro Barojas may also click merge.
+2. Review each of your own commits (code-review skill, or Codex read-only) and fix until clean **before** opening a PR. Then the PR goes to the paired reviewer, Codex and Copilot, and then to Ivan.
+3. Build only in your own worktree (`.worktrees/<lane>` on branch `lane/<lane>`). Push only your own `lane/*` branch. Never push to `main`. Never merge. Ivan reviews and merges each PR once every gate below is green. Under his standing authorization (2026-10-17 17:15) the lead session may press merge for him; Alejandro Barojas may also click merge.
 4. Reuse the running dev server and database. Do not start new ones. The database is synthetic and rebuilt from the seed with one command (`docker compose down -v && docker compose up`).
 5. Never edit `eval/acceptance/` or `eval/expectations/` once W5 has written them. From 20:00, never edit `data/scenarios/hero/`. A change there is a fork for Ivan.
 6. The Gemini key lives only in the gitignored `.env`. Never print it, log it or copy it into a tracked file. CI and agents use only the Replay adapter; no key exists in CI.
@@ -59,11 +59,12 @@ The frontend never imports from the backend. The backend never renders HTML. The
 
 Merge order for wave 1: W1, W2, W3a, W3b, W5, W4. 14:30 walking-skeleton check (two cards, Approve, flag card over the real API). 15:30 scorer checkpoint. 16:00 integration gate G16 on Alejandro Barojas's fresh clone; wave 2 starts only when G16 passes. The G16 steps and the wave 2 ranked queue (Q1 FrontDesk gate/agent/UI/replay, Q2 evaluation tab + ONC, Q3 what-ifs + why, Q3a card capture, Q4 third source + split + why-not, Q4a reason, Q5 Platt + injection suite, Q5a consent, Q6 note extraction, Q6a lookup, Q6b board, Q8 gate latency tile, Q13 Modal, Q15 vitals, Q16 mirror) arrive in each lane's prompt. Check-in desk lanes merge with their flag (`FRONTDESK_STEPS`, `VITALS_ENABLED`) off; the lead session turns a flag on only when the lane is green. Feature merge cutoff 19:45; freeze 20:00 (tag `freeze-20`); `main` freezes Sunday 11:30.
 
-## Review lane (every PR; Ivan is not a reviewer)
+## Review lane (every PR; reviewer agents post the formal reviews, Ivan reviews and merges)
 1. Paired reviewer agent, started with the builder, given the spec section, the contracts and the tests, never the builder's reasoning. It runs the app in `.worktrees/review-<lane>` and the acceptance script, writes tests that should fail, checks every on-screen string against the say/never-say list, checks contract conformance, and posts PASS or BLOCK with numbered findings. It may add failing tests on `review/<lane>`; it never pushes to the builder's branch.
 2. Codex, read-only sandbox, on the diff; blocking findings fixed or answered.
 3. Copilot code review; each comment fixed or replied to.
 4. Harness on every merge to `main`; a drop beyond `eval/expectations/tolerance.json` opens a revert PR automatically.
+5. Ivan reads the reviewer agents' findings, decides anything they escalate, reviews the PR and merges it. Every merge runs under his GitHub account.
 
 A PR merges only when: CI green (until W5's CI is on `main`, the lead's integration run stands in); reviewer PASS; Codex blocking findings closed; Copilot comments answered; the description names the lane, links test evidence, carries `[AI-assisted]`, names the owner (Ivan for his Mac's lanes, Alejandro Barojas for his) and opens with one line of product impact. Over about 400 changed lines (generated and lock files excluded): split before review. Demo-path lanes also get a two-minute manual click-through on localhost before the merge.
 
@@ -76,7 +77,7 @@ Security: 12 approval, split and chart creation only through their endpoints; th
 
 ## Skills each lane loads (and no more)
 - Builders: `superpowers:test-driven-development`, `superpowers:verification-before-completion`.
-- Reviewers: `code-review` (and Codex in its read-only sandbox).
+- Reviewer agents: `code-review` (and Codex in its read-only sandbox).
 - UI lanes load `impeccable`, the accessibility pass and Context7 docs from 19:20 (Ivan, design squad on Alejandro Barojas's machine); every change is still a reviewed PR, and the G16 path and its `data-testid`s stay as they are.
 - Nobody loads brainstorming or planning skills inside a lane; the plan is done.
 
